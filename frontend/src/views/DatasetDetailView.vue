@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 
 const route = useRoute()
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 const dataset = ref({
   id: '',
@@ -37,7 +39,7 @@ onMounted(() => {
   <div class="dataset-detail">
     <div class="page-header">
       <h1>{{ dataset.name }}</h1>
-      <el-button @click="router.push('/datasets')">返回列表</el-button>
+      <el-button @click="navigateTo('/datasets')">返回列表</el-button>
     </div>
 
     <el-card>

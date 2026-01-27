@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 
 const route = useRoute()
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 const activeTab = ref('overview')
 
 const environment = ref({
@@ -69,7 +71,7 @@ onMounted(() => {
         <el-button v-if="environment.status === 'running'" type="warning" @click="stopEnvironment">
           停止
         </el-button>
-        <el-button @click="router.push('/environments')">返回列表</el-button>
+        <el-button @click="navigateTo('/environments')">返回列表</el-button>
       </div>
     </div>
 

@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import PageHeader from '@/components/common/PageHeader.vue'
 import FilterBar from '@/components/common/FilterBar.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -10,6 +11,7 @@ import ConfigurableTable from '@/components/common/ConfigurableTable.vue'
 import { datasetColumns } from '@/config/tableColumns'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 interface Dataset {
   id: string
@@ -94,7 +96,7 @@ onMounted(() => {
   <div class="dataset-list">
     <PageHeader title="数据集管理">
       <template #actions>
-        <el-button type="primary" :icon="Upload" @click="router.push('/datasets/upload')">
+        <el-button type="primary" :icon="Upload" @click="navigateTo('/datasets/upload')">
           上传数据集
         </el-button>
       </template>

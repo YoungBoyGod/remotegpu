@@ -2,6 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import {
   ArrowLeft,
   User,
@@ -90,6 +91,7 @@ interface OperationLog {
 
 const route = useRoute()
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 const loading = ref(false)
 const customer = ref<Customer | null>(null)
 const trainingTasks = ref<TrainingTask[]>([])
@@ -378,7 +380,7 @@ const loadOperationLogs = async () => {
 
 // 返回客户列表
 const handleBack = () => {
-  router.push('/customer-center')
+  navigateTo('/customer-center')
 }
 
 // 格式化文件大小

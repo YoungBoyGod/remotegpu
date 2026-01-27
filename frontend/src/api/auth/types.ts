@@ -10,6 +10,7 @@ export interface User extends Timestamps, UUIDField {
   email: string
   phone?: string
   avatar?: string
+  role: 'admin' | 'customer'
   account_type: 'individual' | 'enterprise'
   status: 'active' | 'inactive' | 'suspended'
   last_login_at?: string

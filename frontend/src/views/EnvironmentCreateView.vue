@@ -2,9 +2,11 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 const currentStep = ref(0)
 const formRef = ref<FormInstance>()
 
@@ -51,7 +53,7 @@ const submitForm = async () => {
   try {
     ElMessage.success('环境创建中，请稍候...')
     setTimeout(() => {
-      router.push('/environments')
+      navigateTo('/environments')
     }, 1500)
   } catch (error) {
     ElMessage.error('创建失败')
@@ -159,7 +161,7 @@ const submitForm = async () => {
         <el-button v-if="currentStep > 0" @click="prevStep">上一步</el-button>
         <el-button v-if="currentStep < 3" type="primary" @click="nextStep">下一步</el-button>
         <el-button v-if="currentStep === 3" type="primary" @click="submitForm">创建环境</el-button>
-        <el-button @click="router.push('/environments')">取消</el-button>
+        <el-button @click="navigateTo('/environments')">取消</el-button>
       </div>
     </div>
   </div>

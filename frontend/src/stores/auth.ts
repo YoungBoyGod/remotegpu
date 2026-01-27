@@ -1,11 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { login, logout, getCurrentUser } from '@/api/auth'
-import type { LoginRequest } from '@/api/auth/types'
+import type { LoginRequest, User } from '@/api/auth/types'
 
 export const useAuthStore = defineStore('auth', () => {
   const token = ref<string | null>(localStorage.getItem('token'))
-  const user = ref<any>(null)
+  const user = ref<User | null>(null)
   const isAuthenticated = ref<boolean>(!!token.value)
 
   // 登录

@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 
 const route = useRoute()
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 const job = ref({
   id: '',
@@ -39,7 +41,7 @@ onMounted(() => {
         <el-tag v-if="job.status === 'running'" type="primary">运行中</el-tag>
         <el-tag v-else-if="job.status === 'completed'" type="success">已完成</el-tag>
       </div>
-      <el-button @click="router.push('/training')">返回列表</el-button>
+      <el-button @click="navigateTo('/training')">返回列表</el-button>
     </div>
 
     <el-card class="info-card">

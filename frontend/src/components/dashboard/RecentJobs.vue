@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import StatusTag from '@/components/common/StatusTag.vue'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 interface TrainingJob {
   id: string
@@ -70,7 +72,7 @@ onMounted(() => {
   <div class="recent-jobs">
     <div class="section-header">
       <h3>最近的训练任务</h3>
-      <el-link type="primary" :underline="false" @click="router.push('/training')">
+      <el-link type="primary" :underline="false" @click="navigateTo('/training')">
         查看全部
       </el-link>
     </div>

@@ -2,8 +2,10 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 const formData = reactive({
   name: '',
@@ -19,7 +21,7 @@ const formData = reactive({
 
 const submitForm = async () => {
   ElMessage.success('训练任务创建成功')
-  setTimeout(() => router.push('/training'), 1500)
+  setTimeout(() => navigateTo('/training'), 1500)
 }
 </script>
 
@@ -61,7 +63,7 @@ const submitForm = async () => {
 
         <el-form-item>
           <el-button type="primary" @click="submitForm">创建任务</el-button>
-          <el-button @click="router.push('/training')">取消</el-button>
+          <el-button @click="navigateTo('/training')">取消</el-button>
         </el-form-item>
       </el-form>
     </div>

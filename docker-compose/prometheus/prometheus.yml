@@ -1,0 +1,46 @@
+global:
+  scrape_interval: 30s
+  evaluation_interval: 30s
+  external_labels:
+    cluster: 'remotegpu'
+    environment: 'production'
+
+# 告警规则文件
+# rule_files:
+#   - 'alerts/*.yml'
+
+scrape_configs:
+  # Prometheus 自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter 监控
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets:
+        # - 'node1:9100'
+        # - 'node2:9100'
+        labels:
+          group: 'production'
+
+  # NVIDIA GPU 监控
+  - job_name: 'nvidia-gpu'
+    static_configs:
+      - targets:
+        # - 'gpu-node1:9445'
+        # - 'gpu-node2:9445'
+        labels:
+          group: 'gpu-nodes'
+
+  # PostgreSQL 监控
+  - job_name: 'postgresql'
+    static_configs:
+      - targets:
+        # - 'postgres-exporter:9187'
+
+  # Redis 监控
+  - job_name: 'redis'
+    static_configs:
+      - targets:
+        # - 'redis-exporter:9121'

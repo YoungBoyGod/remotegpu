@@ -3,9 +3,11 @@ import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Upload } from '@element-plus/icons-vue'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import type { FormInstance, UploadProps } from 'element-plus'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 const formRef = ref<FormInstance>()
 const uploadProgress = ref(0)
 const uploading = ref(false)
@@ -27,7 +29,7 @@ const handleUpload: UploadProps['onChange'] = (file) => {
       clearInterval(interval)
       uploading.value = false
       ElMessage.success('上传成功')
-      setTimeout(() => router.push('/datasets'), 1500)
+      setTimeout(() => navigateTo('/datasets'), 1500)
     }
   }, 500)
 }
@@ -35,7 +37,7 @@ const handleUpload: UploadProps['onChange'] = (file) => {
 const submitForm = async () => {
   await formRef.value?.validate()
   ElMessage.success('数据集创建成功')
-  router.push('/datasets')
+  navigateTo('/datasets')
 }
 </script>
 
@@ -96,7 +98,7 @@ const submitForm = async () => {
 
         <el-form-item>
           <el-button type="primary" @click="submitForm">创建数据集</el-button>
-          <el-button @click="router.push('/datasets')">取消</el-button>
+          <el-button @click="navigateTo('/datasets')">取消</el-button>
         </el-form-item>
       </el-form>
     </div>

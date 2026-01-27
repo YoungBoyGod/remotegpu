@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  jumpserver:
+    image: jumpserver/jms_all:v3.10.0
+    container_name: remotegpu-jumpserver
+    restart: always
+    ports:
+      - "8080:80"
+      - "2222:2222"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-changeme_secret_key_at_least_50_chars_long_random_string}
+      BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-changeme_bootstrap_token}
+      LOG_LEVEL: ERROR
+      DB_ENGINE: postgresql
+      DB_HOST: ${DB_HOST:-postgresql}
+      DB_PORT: ${DB_PORT:-5432}
+      DB_USER: ${DB_USER:-jumpserver}
+      DB_PASSWORD: ${DB_PASSWORD:-changeme_db_password}
+      DB_NAME: ${DB_NAME:-jumpserver}
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-changeme_redis_password}
+    volumes:
+      - jumpserver_data:/opt/jumpserver/data
+      - jumpserver_logs:/opt/jumpserver/logs
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/api/health/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - remotegpu-network
+
+volumes:
+  jumpserver_data:
+    driver: local
+  jumpserver_logs:
+    driver: local
+
+networks:
+  remotegpu-network:
+    driver: bridge

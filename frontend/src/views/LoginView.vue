@@ -4,10 +4,12 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
 const authStore = useAuthStore()
+const { navigateTo } = useRoleNavigation()
 
 // 表单数据
 const loginForm = reactive({
@@ -47,7 +49,7 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
           password: loginForm.password,
         })
         ElMessage.success('登录成功')
-        router.push('/dashboard')
+        navigateTo('/dashboard')
       } catch (error: any) {
         ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
       } finally {

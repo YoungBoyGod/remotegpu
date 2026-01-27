@@ -2,9 +2,11 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import StatusTag from '@/components/common/StatusTag.vue'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 interface Environment {
   id: string
@@ -70,7 +72,7 @@ onMounted(() => {
   <div class="recent-environments">
     <div class="section-header">
       <h3>最近使用的环境</h3>
-      <el-link type="primary" :underline="false" @click="router.push('/environments')">
+      <el-link type="primary" :underline="false" @click="navigateTo('/environments')">
         查看全部
       </el-link>
     </div>

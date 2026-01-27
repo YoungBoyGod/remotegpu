@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  rustfs:
+    image: rustfs/rustfs:latest
+    container_name: remotegpu-rustfs
+    restart: always
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      RUSTFS_ROOT_USER: ${RUSTFS_ROOT_USER:-admin}
+      RUSTFS_ROOT_PASSWORD: ${RUSTFS_ROOT_PASSWORD:-changeme_rustfs_password}
+    volumes:
+      - rustfs_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - remotegpu-network
+
+volumes:
+  rustfs_data:
+    driver: local
+
+networks:
+  remotegpu-network:
+    driver: bridge

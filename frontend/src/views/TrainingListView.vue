@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import PageHeader from '@/components/common/PageHeader.vue'
 import FilterBar from '@/components/common/FilterBar.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -10,6 +11,7 @@ import ConfigurableTable from '@/components/common/ConfigurableTable.vue'
 import { trainingColumns } from '@/config/tableColumns'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 interface TrainingJob {
   id: string
@@ -79,7 +81,7 @@ onMounted(() => {
   <div class="training-list">
     <PageHeader title="训练任务">
       <template #actions>
-        <el-button type="primary" :icon="Plus" @click="router.push('/training/create')">
+        <el-button type="primary" :icon="Plus" @click="navigateTo('/training/create')">
           创建任务
         </el-button>
       </template>

@@ -3,10 +3,12 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Plus } from '@element-plus/icons-vue'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import PageHeader from '@/components/common/PageHeader.vue'
 import FilterBar from '@/components/common/FilterBar.vue'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 interface Image {
   id: string
@@ -74,7 +76,7 @@ onMounted(() => {
   <div class="image-list">
     <PageHeader title="镜像管理">
       <template #actions>
-        <el-button type="primary" :icon="Plus" @click="router.push('/images/build')">
+        <el-button type="primary" :icon="Plus" @click="navigateTo('/images/build')">
           构建镜像
         </el-button>
       </template>

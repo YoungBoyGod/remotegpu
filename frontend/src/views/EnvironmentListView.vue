@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import PageHeader from '@/components/common/PageHeader.vue'
 import FilterBar from '@/components/common/FilterBar.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
@@ -10,6 +11,7 @@ import ConfigurableTable from '@/components/common/ConfigurableTable.vue'
 import { environmentColumns } from '@/config/tableColumns'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 interface Environment {
   id: string
@@ -129,7 +131,7 @@ onMounted(() => {
   <div class="environment-list">
     <PageHeader title="开发环境">
       <template #actions>
-        <el-button type="primary" :icon="Plus" @click="router.push('/environments/create')">
+        <el-button type="primary" :icon="Plus" @click="navigateTo('/environments/create')">
           创建环境
         </el-button>
       </template>

@@ -2,8 +2,10 @@
 import { ref, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { useRoleNavigation } from '@/composables/useRoleNavigation'
 
 const router = useRouter()
+const { navigateTo } = useRoleNavigation()
 
 const formData = reactive({
   name: '',
@@ -37,7 +39,7 @@ const startBuild = async () => {
 
   building.value = false
   ElMessage.success('镜像构建成功')
-  setTimeout(() => router.push('/images'), 1500)
+  setTimeout(() => navigateTo('/images'), 1500)
 }
 </script>
 
@@ -81,7 +83,7 @@ const startBuild = async () => {
           <el-button type="primary" :loading="building" @click="startBuild">
             开始构建
           </el-button>
-          <el-button @click="router.push('/images')">取消</el-button>
+          <el-button @click="navigateTo('/images')">取消</el-button>
         </el-form-item>
       </el-form>
     </div>

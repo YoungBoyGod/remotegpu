@@ -1,0 +1,100 @@
+version: '3.8'
+
+services:
+  # Harbor 核心服务
+  harbor-core:
+    image: goharbor/harbor-core:v2.9.0
+    container_name: remotegpu-harbor-core
+    restart: always
+    environment:
+      CORE_SECRET: ${CORE_SECRET:-changeme_core_secret}
+      JOBSERVICE_SECRET: ${JOBSERVICE_SECRET:-changeme_jobservice_secret}
+      DATABASE_TYPE: postgresql
+      POSTGRESQL_HOST: postgresql
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_USERNAME: harbor
+      POSTGRESQL_PASSWORD: ${HARBOR_DATABASE_PASSWORD:-changeme_db_password}
+      POSTGRESQL_DATABASE: harbor
+      POSTGRESQL_SSLMODE: disable
+      REGISTRY_URL: http://harbor-registry:5000
+      REGISTRY_CONTROLLER_URL: http://harbor-registryctl:8080
+    depends_on:
+      - harbor-registry
+      - harbor-registryctl
+    networks:
+      - remotegpu-network
+    volumes:
+      - harbor_data:/data
+
+  # Harbor 镜像仓库
+  harbor-registry:
+    image: goharbor/registry-photon:v2.9.0
+    container_name: remotegpu-harbor-registry
+    restart: always
+    volumes:
+      - harbor_registry:/storage
+    networks:
+      - remotegpu-network
+
+  # Harbor 仓库控制器
+  harbor-registryctl:
+    image: goharbor/harbor-registryctl:v2.9.0
+    container_name: remotegpu-harbor-registryctl
+    restart: always
+    environment:
+      CORE_SECRET: ${CORE_SECRET:-changeme_core_secret}
+    volumes:
+      - harbor_registry:/storage
+    networks:
+      - remotegpu-network
+
+  # Harbor 任务服务
+  harbor-jobservice:
+    image: goharbor/harbor-jobservice:v2.9.0
+    container_name: remotegpu-harbor-jobservice
+    restart: always
+    environment:
+      CORE_SECRET: ${CORE_SECRET:-changeme_core_secret}
+      JOBSERVICE_SECRET: ${JOBSERVICE_SECRET:-changeme_jobservice_secret}
+      CORE_URL: http://harbor-core:8080
+      REGISTRY_URL: http://harbor-registry:5000
+      REGISTRY_CONTROLLER_URL: http://harbor-registryctl:8080
+    depends_on:
+      - harbor-core
+    networks:
+      - remotegpu-network
+    volumes:
+      - harbor_data:/data
+
+  # Harbor Portal (Web UI)
+  harbor-portal:
+    image: goharbor/harbor-portal:v2.9.0
+    container_name: remotegpu-harbor-portal
+    restart: always
+    networks:
+      - remotegpu-network
+
+  # Nginx 代理
+  harbor-nginx:
+    image: goharbor/nginx-photon:v2.9.0
+    container_name: remotegpu-harbor-nginx
+    restart: always
+    ports:
+      - "8082:8080"
+    depends_on:
+      - harbor-core
+      - harbor-portal
+    networks:
+      - remotegpu-network
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+
+volumes:
+  harbor_data:
+    driver: local
+  harbor_registry:
+    driver: local
+
+networks:
+  remotegpu-network:
+    driver: bridge
