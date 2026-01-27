@@ -1,12 +1,12 @@
 server:
   port: 8080
-  mode: debug  # debug, release, test
+  mode: debug # debug, release, test
 
 database:
   host: localhost
-  port: 3306
-  user: root
-  password: your_password
+  port: 5432 # PostgreSQL端口
+  user: remotegpu_user
+  password: changeme_secure_password
   dbname: remotegpu
 
 redis:
@@ -14,3 +14,72 @@ redis:
   port: 6379
   password: ""
   db: 0
+
+jwt:
+  secret: "remotegpu"
+  expire_time: 24 # JWT过期时间(小时)
+
+log:
+  level: debug # debug, info, warn, error
+  output_path: "./logs/app.log"
+  max_size: 100 # 单个日志文件最大大小(MB)
+  max_backups: 10 # 保留的旧日志文件数量
+  max_age: 30 # 保留旧日志文件的最大天数
+
+storage:
+  type: local # local, rustfs, s3
+  local_path: "./uploads"
+  rustfs:
+    endpoint: "http://localhost:9000"
+    access_key: "admin"
+    secret_key: "changeme_rustfs_password"
+    bucket: "remotegpu"
+  max_upload_size: 10737418240 # 10GB
+
+harbor:
+  enabled: true
+  endpoint: "http://localhost:8082"
+  username: "admin"
+  password: "Harbor12345"
+  project: "remotegpu"
+
+etcd:
+  enabled: true
+  endpoints:
+    - "http://localhost:2379"
+  username: ""
+  password: ""
+  timeout: 5 # 连接超时时间(秒)
+
+prometheus:
+  enabled: true
+  endpoint: "http://localhost:19090"
+  port: 19090
+
+jumpserver:
+  enabled: true
+  endpoint: "http://localhost:8080"
+  api_key: "your_jumpserver_api_key"
+  org_id: "00000000-0000-0000-0000-000000000002"
+
+nginx:
+  enabled: true
+  endpoint: "http://localhost"
+  port: 80
+
+uptime_kuma:
+  enabled: true
+  endpoint: "http://localhost:13001"
+  port: 13001
+
+guacamole:
+  enabled: true
+  endpoint: "http://localhost:8081/guacamole"
+  username: "guacadmin"
+  password: "guacadmin"
+
+k8s:
+  enabled: true
+  kubeconfig: "~/.kube/config" # kubeconfig文件路径
+  namespace: "default" # 默认命名空间
+  in_cluster: false # 是否在集群内运行

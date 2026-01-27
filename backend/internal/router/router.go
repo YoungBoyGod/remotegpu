@@ -10,6 +10,7 @@ import (
 func InitRouter(r *gin.Engine) {
 	// 初始化控制器
 	userController := v1.NewUserController()
+	healthController := v1.NewHealthController()
 
 	// API v1 路由组
 	apiV1 := r.Group("/api/v1")
@@ -42,6 +43,10 @@ func InitRouter(r *gin.Engine) {
 		admin := apiV1.Group("/admin")
 		admin.Use(middleware.Auth(), middleware.RequireAdmin())
 		{
+			// 健康检查
+			admin.GET("/health/all", healthController.CheckAll)
+			admin.GET("/health/:service", healthController.CheckService)
+
 			// 用户管理
 			// admin.GET("/users", userController.ListUsers)           // 获取用户列表
 			// admin.PUT("/users/:id/status", userController.UpdateUserStatus) // 更新用户状态
