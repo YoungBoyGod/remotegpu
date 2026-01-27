@@ -17,4 +17,9 @@ export default defineConfig({
       '@': fileURLToPath(new URL('./src', import.meta.url))
     },
   },
+  server: {
+    port: 7777,
+    host: '0.0.0.0', // 允许外部访问
+    strictPort: true, // 端口被占用时直接退出
+  },
 })

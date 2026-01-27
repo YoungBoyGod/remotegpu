@@ -1,7 +1,7 @@
 /**
  * 用户与权限模块 - 类型定义
  */
-import { Timestamps, UUIDField } from '../common/types'
+import type { Timestamps, UUIDField } from '../common/types'
 
 // 用户信息
 export interface User extends Timestamps, UUIDField {
