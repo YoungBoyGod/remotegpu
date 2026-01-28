@@ -10,12 +10,24 @@
 CREATE TABLE IF NOT EXISTS billing_records (
     id BIGSERIAL PRIMARY KEY,
     customer_id BIGINT NOT NULL,
-    env_id VARCHAR(64),
+    workspace_id BIGINT,
+
+    -- 资源关联
+    resource_id VARCHAR(64),
     resource_type VARCHAR(32) NOT NULL,
+    resource_name VARCHAR(256),
+
+    -- 计费详情
     quantity FLOAT NOT NULL,
     unit_price DECIMAL(10,4) NOT NULL,
     amount DECIMAL(10,4) NOT NULL,
     currency VARCHAR(10) DEFAULT 'CNY',
+
+    -- 计费粒度
+    billing_unit VARCHAR(20) DEFAULT 'minute',
+    billing_minutes INT,
+
+    -- 时间范围
     start_time TIMESTAMP NOT NULL,
     end_time TIMESTAMP NOT NULL,
     created_at TIMESTAMP DEFAULT NOW()
@@ -23,16 +35,22 @@ CREATE TABLE IF NOT EXISTS billing_records (
 
 -- 创建索引
 CREATE INDEX idx_billing_records_customer ON billing_records(customer_id);
-CREATE INDEX idx_billing_records_env ON billing_records(env_id);
+CREATE INDEX idx_billing_records_workspace ON billing_records(workspace_id);
+CREATE INDEX idx_billing_records_resource ON billing_records(resource_id);
 CREATE INDEX idx_billing_records_start_time ON billing_records(start_time DESC);
 CREATE INDEX idx_billing_records_created_at ON billing_records(created_at DESC);
 
 -- 添加注释
 COMMENT ON TABLE billing_records IS '计费记录表';
-COMMENT ON COLUMN billing_records.resource_type IS '资源类型: cpu, memory, gpu, storage, network';
+COMMENT ON COLUMN billing_records.workspace_id IS '工作空间ID（工作空间维度计费）';
+COMMENT ON COLUMN billing_records.resource_id IS '资源ID（env_id, training_job_id, inference_service_id等）';
+COMMENT ON COLUMN billing_records.resource_type IS '资源类型: environment, training, inference, storage';
+COMMENT ON COLUMN billing_records.resource_name IS '资源名称';
 COMMENT ON COLUMN billing_records.quantity IS '数量（如CPU核心数、内存GB数）';
-COMMENT ON COLUMN billing_records.unit_price IS '单价';
-COMMENT ON COLUMN billing_records.amount IS '金额';
+COMMENT ON COLUMN billing_records.unit_price IS '单价（算力点）';
+COMMENT ON COLUMN billing_records.amount IS '金额（算力点）';
+COMMENT ON COLUMN billing_records.billing_unit IS '计费单位: minute-分钟, hour-小时, day-天';
+COMMENT ON COLUMN billing_records.billing_minutes IS '计费分钟数（向上取整）';
 
 -- 账单表
 CREATE TABLE IF NOT EXISTS invoices (

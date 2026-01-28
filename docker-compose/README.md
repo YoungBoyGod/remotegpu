@@ -18,9 +18,9 @@
 
 | 服务 | 目录 | 端口 | 说明 |
 |------|------|------|------|
-| Prometheus | `prometheus/` | 9090 | 监控指标采集 |
-| Grafana | `grafana/` | 3000 | 监控可视化 |
-| Uptime Kuma | `uptime-kuma/` | 3001 | 服务监控 |
+| Prometheus | `prometheus/` | 19090 | 监控指标采集 |
+| Grafana | `grafana/` | 13000 | 监控可视化 |
+| Uptime Kuma | `uptime-kuma/` | 13001 | 服务监控 |
 
 ### 可选服务（参考配置）
 

@@ -8,7 +8,7 @@ docker-compose up -d
 
 ## 访问控制台
 
-- 访问地址: http://localhost:3001
+- 访问地址: http://localhost:13001
 - 首次访问需要创建管理员账户
 
 ## 监控配置建议

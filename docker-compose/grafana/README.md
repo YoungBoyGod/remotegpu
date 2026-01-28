@@ -8,7 +8,7 @@ docker-compose up -d
 
 ## 访问控制台
 
-- 访问地址: http://localhost:3000
+- 访问地址: http://localhost:13000
 - 默认用户名: admin
 - 默认密码: changeme_grafana_password
 

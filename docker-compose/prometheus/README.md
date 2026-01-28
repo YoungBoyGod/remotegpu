@@ -8,7 +8,7 @@ docker-compose up -d
 
 ## 访问控制台
 
-- 访问地址: http://localhost:9090
+- 访问地址: http://localhost:19090
 - 无需登录
 
 ## 配置说明

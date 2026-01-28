@@ -13,6 +13,8 @@ services:
       - ./conf.d:/etc/nginx/conf.d:ro
       - ./ssl:/etc/nginx/ssl:ro
       - nginx_logs:/var/log/nginx
+      - nginx_cache:/var/cache/nginx
+      - nginx_run:/var/run
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s
@@ -23,6 +25,10 @@ services:
 
 volumes:
   nginx_logs:
+    driver: local
+  nginx_cache:
+    driver: local
+  nginx_run:
     driver: local
 
 networks:

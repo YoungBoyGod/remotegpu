@@ -203,10 +203,6 @@ const router = createRouter({
           name: 'portal-download-center',
           component: () => import('@/views/DownloadCenterView.vue'),
         },
-      ],
-    },
-  ],
-})
         {
           path: 'resource-center',
           name: 'resource-center',

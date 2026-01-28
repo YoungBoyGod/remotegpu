@@ -23,6 +23,17 @@ CREATE TABLE IF NOT EXISTS customers (
     status VARCHAR(32) DEFAULT 'active',
     email_verified BOOLEAN DEFAULT FALSE,
     phone_verified BOOLEAN DEFAULT FALSE,
+
+    -- 账户余额
+    balance DECIMAL(10,4) DEFAULT 0.00,
+    currency VARCHAR(10) DEFAULT 'CNY',
+
+    -- 欠费管理
+    overdue_status VARCHAR(20) DEFAULT 'normal',
+    overdue_since TIMESTAMP,
+    last_payment_at TIMESTAMP,
+
+    -- 时间戳
     last_login_at TIMESTAMP,
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW(),
@@ -35,6 +46,7 @@ CREATE INDEX idx_customers_email ON customers(email);
 CREATE INDEX idx_customers_status ON customers(status);
 CREATE INDEX idx_customers_user_type ON customers(user_type);
 CREATE INDEX idx_customers_account_type ON customers(account_type);
+CREATE INDEX idx_customers_overdue_status ON customers(overdue_status);
 
 -- 创建更新时间触发器
 CREATE TRIGGER update_customers_updated_at
@@ -47,6 +59,11 @@ COMMENT ON TABLE customers IS '客户表（用户表）';
 COMMENT ON COLUMN customers.user_type IS '用户类型: admin-管理人员, internal-内部用户, external-外部用户';
 COMMENT ON COLUMN customers.account_type IS '账户类型: individual-个人, enterprise-企业';
 COMMENT ON COLUMN customers.status IS '状态: active-活跃, suspended-暂停, deleted-已删除';
+COMMENT ON COLUMN customers.balance IS '账户余额（算力点）';
+COMMENT ON COLUMN customers.currency IS '货币类型';
+COMMENT ON COLUMN customers.overdue_status IS '欠费状态: normal-正常, overdue-欠费, suspended-已暂停';
+COMMENT ON COLUMN customers.overdue_since IS '欠费开始时间';
+COMMENT ON COLUMN customers.last_payment_at IS '最后充值时间';
 
 -- 工作空间表
 CREATE TABLE IF NOT EXISTS workspaces (
