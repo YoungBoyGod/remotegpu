@@ -64,13 +64,12 @@ func main() {
 // runServer 运行服务器
 func runServer(restartChan chan struct{}) error {
 	// 初始化基础设施
-	storageMgr, err := initInfrastructure()
-	if err != nil {
+	if err := initInfrastructure(); err != nil {
 		return err
 	}
 
 	// 创建 Gin 引擎
-	r := createGinEngine(storageMgr)
+	r := createGinEngine()
 
 	// 创建 HTTP 服务器
 	addr := fmt.Sprintf(":%d", config.GlobalConfig.Server.Port)
@@ -89,7 +88,7 @@ func runServer(restartChan chan struct{}) error {
 }
 
 // initInfrastructure 初始化基础设施（数据库、Redis等）
-func initInfrastructure() (*storage.Manager, error) {
+func initInfrastructure() error {
 	// 初始化数据库
 	dbConfig := database.Config{
 		Host:     config.GlobalConfig.Database.Host,
@@ -99,12 +98,12 @@ func initInfrastructure() (*storage.Manager, error) {
 		DBName:   config.GlobalConfig.Database.DBName,
 	}
 	if err := database.InitDB(dbConfig); err != nil {
-		return nil, fmt.Errorf("初始化数据库失败: %w", err)
+		return fmt.Errorf("初始化数据库失败: %w", err)
 	}
 
 	// 自动迁移数据库表
 	if err := database.GetDB().AutoMigrate(&entity.Customer{}); err != nil {
-		return nil, fmt.Errorf("数据库迁移失败: %w", err)
+		return fmt.Errorf("数据库迁移失败: %w", err)
 	}
 	logger.GetLogger().Info("数据库表迁移完成")
 
@@ -116,21 +115,20 @@ func initInfrastructure() (*storage.Manager, error) {
 		DB:       config.GlobalConfig.Redis.DB,
 	}
 	if err := pkgRedis.InitRedis(redisConfig); err != nil {
-		return nil, fmt.Errorf("初始化 Redis 失败: %w", err)
+		return fmt.Errorf("初始化 Redis 失败: %w", err)
 	}
 
 	// 初始化存储管理器
-	storageMgr, err := storage.NewManager(config.GlobalConfig.Storage)
-	if err != nil {
-		return nil, fmt.Errorf("初始化存储管理器失败: %w", err)
+	if _, err := storage.NewManager(config.GlobalConfig.Storage); err != nil {
+		return fmt.Errorf("初始化存储管理器失败: %w", err)
 	}
 	logger.GetLogger().Info("存储管理器初始化完成")
 
-	return storageMgr, nil
+	return nil
 }
 
 // createGinEngine 创建 Gin 引擎
-func createGinEngine(storageMgr *storage.Manager) *gin.Engine {
+func createGinEngine() *gin.Engine {
 	// 设置 Gin 模式
 	gin.SetMode(getGinMode(*mode))
 
@@ -143,7 +141,7 @@ func createGinEngine(storageMgr *storage.Manager) *gin.Engine {
 	r.Use(middleware.Recovery(logger.GetLogger()))
 
 	// 初始化路由
-	router.InitRouter(r, storageMgr)
+	router.InitRouter(r)
 
 	return r
 }
