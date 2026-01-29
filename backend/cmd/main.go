@@ -4,14 +4,18 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/internal/router"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
+	"github.com/YoungBoyGod/remotegpu/pkg/graceful"
+	"github.com/YoungBoyGod/remotegpu/pkg/hotreload"
 	"github.com/YoungBoyGod/remotegpu/pkg/logger"
 	pkgRedis "github.com/YoungBoyGod/remotegpu/pkg/redis"
+	"github.com/YoungBoyGod/remotegpu/pkg/storage"
 	"github.com/gin-gonic/gin"
 )
 
@@ -35,6 +39,57 @@ func main() {
 	}
 	defer logger.GetLogger().Sync()
 
+	// 创建重启信号通道
+	restartChan := make(chan struct{}, 1)
+
+	// 初始化热更新管理器
+	hotReloadMgr, err := initHotReload(restartChan)
+	if err != nil {
+		logger.GetLogger().Fatal(fmt.Sprintf("初始化热更新失败: %v", err))
+	}
+	if hotReloadMgr != nil {
+		if err := hotReloadMgr.Start(); err != nil {
+			logger.GetLogger().Fatal(fmt.Sprintf("启动热更新失败: %v", err))
+		}
+		defer hotReloadMgr.Stop()
+		logger.GetLogger().Info("热更新已启动")
+	}
+
+	// 初始化并运行服务器
+	if err := runServer(restartChan); err != nil {
+		logger.GetLogger().Fatal(fmt.Sprintf("服务器运行失败: %v", err))
+	}
+}
+
+// runServer 运行服务器
+func runServer(restartChan chan struct{}) error {
+	// 初始化基础设施
+	storageMgr, err := initInfrastructure()
+	if err != nil {
+		return err
+	}
+
+	// 创建 Gin 引擎
+	r := createGinEngine(storageMgr)
+
+	// 创建 HTTP 服务器
+	addr := fmt.Sprintf(":%d", config.GlobalConfig.Server.Port)
+	httpServer := graceful.NewHTTPServer(r, addr)
+
+	// 创建优雅启动管理器
+	gracefulCfg := graceful.Config{
+		ShutdownTimeout: time.Duration(config.GlobalConfig.Graceful.ShutdownTimeout) * time.Second,
+		RetryInterval:   time.Duration(config.GlobalConfig.Graceful.RetryInterval) * time.Second,
+		MaxRetries:      config.GlobalConfig.Graceful.MaxRetries,
+	}
+	gracefulMgr := graceful.NewManager(gracefulCfg, httpServer)
+
+	// 运行服务器
+	return gracefulMgr.Run(restartChan)
+}
+
+// initInfrastructure 初始化基础设施（数据库、Redis等）
+func initInfrastructure() (*storage.Manager, error) {
 	// 初始化数据库
 	dbConfig := database.Config{
 		Host:     config.GlobalConfig.Database.Host,
@@ -44,12 +99,12 @@ func main() {
 		DBName:   config.GlobalConfig.Database.DBName,
 	}
 	if err := database.InitDB(dbConfig); err != nil {
-		logger.GetLogger().Fatal(fmt.Sprintf("初始化数据库失败: %v", err))
+		return nil, fmt.Errorf("初始化数据库失败: %w", err)
 	}
 
 	// 自动迁移数据库表
 	if err := database.GetDB().AutoMigrate(&entity.Customer{}); err != nil {
-		logger.GetLogger().Fatal(fmt.Sprintf("数据库迁移失败: %v", err))
+		return nil, fmt.Errorf("数据库迁移失败: %w", err)
 	}
 	logger.GetLogger().Info("数据库表迁移完成")
 
@@ -61,9 +116,21 @@ func main() {
 		DB:       config.GlobalConfig.Redis.DB,
 	}
 	if err := pkgRedis.InitRedis(redisConfig); err != nil {
-		logger.GetLogger().Fatal(fmt.Sprintf("初始化 Redis 失败: %v", err))
+		return nil, fmt.Errorf("初始化 Redis 失败: %w", err)
 	}
 
+	// 初始化存储管理器
+	storageMgr, err := storage.NewManager(config.GlobalConfig.Storage)
+	if err != nil {
+		return nil, fmt.Errorf("初始化存储管理器失败: %w", err)
+	}
+	logger.GetLogger().Info("存储管理器初始化完成")
+
+	return storageMgr, nil
+}
+
+// createGinEngine 创建 Gin 引擎
+func createGinEngine(storageMgr *storage.Manager) *gin.Engine {
 	// 设置 Gin 模式
 	gin.SetMode(getGinMode(*mode))
 
@@ -76,14 +143,28 @@ func main() {
 	r.Use(middleware.Recovery(logger.GetLogger()))
 
 	// 初始化路由
-	router.InitRouter(r)
+	router.InitRouter(r, storageMgr)
 
-	// 启动服务
-	addr := fmt.Sprintf(":%d", config.GlobalConfig.Server.Port)
-	logger.GetLogger().Info(fmt.Sprintf("服务启动在 %s", addr))
-	if err := r.Run(addr); err != nil {
-		logger.GetLogger().Fatal(fmt.Sprintf("启动服务失败: %v", err))
+	return r
+}
+
+// initHotReload 初始化热更新管理器
+func initHotReload(restartChan chan struct{}) (*hotreload.Manager, error) {
+	if !config.GlobalConfig.HotReload.Enabled {
+		return nil, nil
 	}
+
+	cfg := hotreload.Config{
+		Enabled:       config.GlobalConfig.HotReload.Enabled,
+		WatchDirs:     config.GlobalConfig.HotReload.WatchDirs,
+		WatchExts:     config.GlobalConfig.HotReload.WatchExts,
+		ExcludeDirs:   config.GlobalConfig.HotReload.ExcludeDirs,
+		BuildCmd:      config.GlobalConfig.HotReload.BuildCmd,
+		Debounce:      time.Duration(config.GlobalConfig.HotReload.Debounce) * time.Second,
+		RestartSignal: restartChan,
+	}
+
+	return hotreload.NewManager(cfg)
 }
 
 func getGinMode(mode string) string {

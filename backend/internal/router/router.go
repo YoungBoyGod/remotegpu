@@ -3,14 +3,16 @@ package router
 import (
 	v1 "github.com/YoungBoyGod/remotegpu/internal/controller/v1"
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
+	"github.com/YoungBoyGod/remotegpu/pkg/storage"
 	"github.com/gin-gonic/gin"
 )
 
 // InitRouter 初始化路由
-func InitRouter(r *gin.Engine) {
+func InitRouter(r *gin.Engine, storageManager *storage.Manager) {
 	// 初始化控制器
 	userController := v1.NewUserController()
 	healthController := v1.NewHealthController()
+	storageController := v1.NewStorageController(storageManager)
 
 	// API v1 路由组
 	apiV1 := r.Group("/api/v1")
@@ -59,6 +61,17 @@ func InitRouter(r *gin.Engine) {
 
 			// 系统统计
 			// admin.GET("/stats", statsController.GetSystemStats)     // 获取系统统计
+
+			// 存储管理
+			storage := admin.Group("/storage")
+			{
+				storage.GET("/backends", storageController.ListBackends)
+				storage.POST("/upload", storageController.Upload)
+				storage.GET("/download", storageController.Download)
+				storage.DELETE("/file", storageController.Delete)
+				storage.GET("/list", storageController.List)
+				storage.GET("/url", storageController.GetURL)
+			}
 		}
 	}
 }

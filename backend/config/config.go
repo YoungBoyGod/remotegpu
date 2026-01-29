@@ -23,6 +23,8 @@ type Config struct {
 	UptimeKuma UptimeKumaConfig `yaml:"uptime_kuma"`
 	Guacamole  GuacamoleConfig  `yaml:"guacamole"`
 	K8s        K8sConfig        `yaml:"k8s"`
+	HotReload  HotReloadConfig  `yaml:"hot_reload"`
+	Graceful   GracefulConfig   `yaml:"graceful"`
 }
 
 // ServerConfig 服务器配置
@@ -63,17 +65,24 @@ type LogConfig struct {
 	MaxAge     int    `yaml:"max_age"`     // 保留旧日志文件的最大天数
 }
 
-// StorageConfig 存储配置（RustFS）
+// StorageConfig 存储配置
 type StorageConfig struct {
-	Type      string `yaml:"type"`       // local, rustfs, s3
-	LocalPath string `yaml:"local_path"` // 本地存储路径
-	RustFS    struct {
-		Endpoint  string `yaml:"endpoint"`
-		AccessKey string `yaml:"access_key"`
-		SecretKey string `yaml:"secret_key"`
-		Bucket    string `yaml:"bucket"`
-	} `yaml:"rustfs"`
-	MaxUploadSize int64 `yaml:"max_upload_size"` // 最大上传大小(字节)
+	MaxUploadSize int64            `yaml:"max_upload_size"` // 最大上传大小(字节)
+	Default       string           `yaml:"default"`         // 默认存储后端名称
+	Backends      []StorageBackend `yaml:"backends"`        // 存储后端列表
+}
+
+// StorageBackend 存储后端配置
+type StorageBackend struct {
+	Name      string `yaml:"name"`       // 存储后端名称（唯一标识）
+	Type      string `yaml:"type"`       // 类型: local, rustfs, s3
+	Enabled   bool   `yaml:"enabled"`    // 是否启用
+	Path      string `yaml:"path"`       // 本地存储路径（type=local时使用）
+	Endpoint  string `yaml:"endpoint"`   // S3/RustFS 端点
+	Region    string `yaml:"region"`     // S3 区域
+	AccessKey string `yaml:"access_key"` // 访问密钥
+	SecretKey string `yaml:"secret_key"` // 秘密密钥
+	Bucket    string `yaml:"bucket"`     // 存储桶名称
 }
 
 // HarborConfig Harbor 镜像仓库配置
@@ -137,6 +146,23 @@ type K8sConfig struct {
 	KubeConfig string `yaml:"kubeconfig"` // kubeconfig文件路径
 	Namespace  string `yaml:"namespace"`  // 默认命名空间
 	InCluster  bool   `yaml:"in_cluster"` // 是否在集群内运行
+}
+
+// HotReloadConfig 热更新配置
+type HotReloadConfig struct {
+	Enabled     bool     `yaml:"enabled"`      // 是否启用热更新
+	WatchDirs   []string `yaml:"watch_dirs"`   // 监控的目录
+	WatchExts   []string `yaml:"watch_exts"`   // 监控的文件扩展名
+	ExcludeDirs []string `yaml:"exclude_dirs"` // 排除的目录
+	BuildCmd    string   `yaml:"build_cmd"`    // 构建命令
+	Debounce    int      `yaml:"debounce"`     // 防抖时间(秒)
+}
+
+// GracefulConfig 优雅启动配置
+type GracefulConfig struct {
+	ShutdownTimeout int `yaml:"shutdown_timeout"` // 关闭超时时间(秒)
+	RetryInterval   int `yaml:"retry_interval"`   // 重试间隔(秒)
+	MaxRetries      int `yaml:"max_retries"`      // 最大重试次数，0表示无限重试
 }
 
 var GlobalConfig *Config
