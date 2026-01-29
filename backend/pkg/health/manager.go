@@ -23,7 +23,7 @@ func InitManager(cfg *config.Config) *Manager {
 	manager.Register(NewNginxChecker(cfg.Nginx))
 	manager.Register(NewUptimeKumaChecker(cfg.UptimeKuma))
 	manager.Register(NewGuacamoleChecker(cfg.Guacamole))
-	manager.Register(NewRustFSChecker(cfg.Storage))
+	manager.Register(NewS3Checker(cfg.Storage))
 
 	return manager
 }

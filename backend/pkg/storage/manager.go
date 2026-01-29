@@ -34,7 +34,7 @@ func NewManager(cfg config.StorageConfig) (*Manager, error) {
 		switch backend.Type {
 		case "local":
 			s, err = NewLocalStorage(backend.Name, backend.Path)
-		case "rustfs", "s3":
+		case "s3":
 			s, err = NewS3Storage(
 				backend.Name,
 				backend.Type,

@@ -122,9 +122,14 @@ func NewGuacamoleChecker(cfg config.GuacamoleConfig) *HTTPChecker {
 	return NewHTTPChecker("guacamole", cfg.Endpoint, cfg.Enabled)
 }
 
-// NewRustFSChecker 创建RustFS健康检查器
-func NewRustFSChecker(cfg config.StorageConfig) *HTTPChecker {
-	endpoint := fmt.Sprintf("%s/health", cfg.RustFS.Endpoint)
-	enabled := cfg.Type == "rustfs"
-	return NewHTTPChecker("rustfs", endpoint, enabled)
+// NewS3Checker 创建S3存储健康检查器
+func NewS3Checker(cfg config.StorageConfig) *HTTPChecker {
+	// 查找启用的 s3 后端
+	for _, backend := range cfg.Backends {
+		if backend.Type == "s3" && backend.Enabled && backend.Endpoint != "" {
+			endpoint := fmt.Sprintf("%s/minio/health/live", backend.Endpoint)
+			return NewHTTPChecker("s3-"+backend.Name, endpoint, true)
+		}
+	}
+	return NewHTTPChecker("s3", "", false)
 }

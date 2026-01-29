@@ -3,16 +3,16 @@ server:
   mode: debug # debug, release, test
 
 database:
-  host: localhost
+  host: 192.168.10.210
   port: 5432 # PostgreSQL端口
   user: remotegpu_user
-  password: changeme_secure_password
+  password: remotegpu_password
   dbname: remotegpu
 
 redis:
-  host: localhost
+  host: 192.168.10.210
   port: 6379
-  password: ""
+  password: "remotegpu_password"
   db: 0
 
 jwt:
@@ -27,18 +27,44 @@ log:
   max_age: 30 # 保留旧日志文件的最大天数
 
 storage:
-  type: local # local, rustfs, s3
-  local_path: "./uploads"
-  rustfs:
-    endpoint: "http://localhost:9000"
-    access_key: "admin"
-    secret_key: "changeme_rustfs_password"
-    bucket: "remotegpu"
-  max_upload_size: 10737418240 # 10GB
+  max_upload_size: 107374182400
+  default: "local-main" # 默认存储的名称
+  # 存储后端列表（支持多个同类型）
+  backends:
+    - name: "local-main"
+      type: local
+      enabled: true
+      path: "./uploads"
+
+    - name: "rustfs-main"
+      type: s3
+      enabled: true
+      endpoint: "http://192.168.10.210:9000"
+      access_key: "EqyHX3vdSlfKj8hsiazR"
+      secret_key: "19IEWuomU63LpKsVtHkJgPCcTx0evdfAOGDqwX7h"
+      bucket: "remotegpu"
+
+    - name: "s3-aws"
+      type: s3
+      enabled: true
+      endpoint: ""
+      region: "us-east-1"
+      access_key: "xxx"
+      secret_key: "xxx"
+      bucket: "bucket1"
+
+    - name: "s3-aliyun"
+      type: s3
+      enabled: true
+      endpoint: "https://oss-cn-hangzhou.aliyuncs.com"
+      region: "cn-hangzhou"
+      access_key: "xxx"
+      secret_key: "xxx"
+      bucket: "bucket2"
 
 harbor:
   enabled: true
-  endpoint: "http://localhost:8082"
+  endpoint: "http://192.168.10.205:8082"
   username: "admin"
   password: "Harbor12345"
   project: "remotegpu"
@@ -46,19 +72,19 @@ harbor:
 etcd:
   enabled: true
   endpoints:
-    - "http://localhost:2379"
+    - "http://192.168.10.210:2379"
   username: ""
   password: ""
   timeout: 5 # 连接超时时间(秒)
 
 prometheus:
   enabled: true
-  endpoint: "http://localhost:19090"
+  endpoint: "http://192.168.10.210:19090"
   port: 19090
 
 jumpserver:
   enabled: true
-  endpoint: "http://localhost:8080"
+  endpoint: "http://192.168.10.249:8080"
   api_key: "your_jumpserver_api_key"
   org_id: "00000000-0000-0000-0000-000000000002"
 
@@ -69,7 +95,7 @@ nginx:
 
 uptime_kuma:
   enabled: true
-  endpoint: "http://localhost:13001"
+  endpoint: "http://192.168.10.210:13001"
   port: 13001
 
 guacamole:
@@ -83,3 +109,28 @@ k8s:
   kubeconfig: "~/.kube/config" # kubeconfig文件路径
   namespace: "default" # 默认命名空间
   in_cluster: false # 是否在集群内运行
+
+hot_reload:
+  enabled: true # 是否启用热更新
+  watch_dirs: # 监控的目录
+    - "./internal"
+    - "./pkg"
+    - "./cmd"
+    - "./config"
+  watch_exts: # 监控的文件扩展名
+    - ".go"
+    - ".yaml"
+    - ".yml"
+  exclude_dirs: # 排除的目录
+    - "vendor"
+    - "node_modules"
+    - ".git"
+    - "tmp"
+    - "logs"
+  build_cmd: "go build -o ./tmp/main ./cmd/main.go" # 构建命令
+  debounce: 1 # 防抖时间(秒)
+
+graceful:
+  shutdown_timeout: 10 # 关闭超时时间(秒)
+  retry_interval: 5 # 重试间隔(秒)
+  max_retries: 0 # 最大重试次数，0表示无限重试
