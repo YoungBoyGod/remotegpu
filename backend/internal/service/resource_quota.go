@@ -6,6 +6,7 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"gorm.io/gorm"
 )
 
@@ -182,20 +183,43 @@ func (s *ResourceQuotaService) CheckQuota(customerID uint, workspaceID *uint, re
 }
 
 // GetUsedResources 获取已使用的资源
-// TODO: 需要等待 Environment 实体实现后才能完成此功能（A5任务）
 func (s *ResourceQuotaService) GetUsedResources(customerID uint, workspaceID *uint) (*UsedResources, error) {
-	// 暂时返回空的已使用资源，等待 Environment 实体实现
-	// 实现逻辑：
-	// 1. 查询所有运行中的环境（status = 'running'）
-	// 2. 根据 customerID 和 workspaceID 过滤
-	// 3. 统计 CPU、Memory、GPU、Storage 使用量
+	db := database.GetDB()
 
-	return &UsedResources{
+	// 查询所有运行中的环境
+	var environments []*entity.Environment
+	query := db.Where("customer_id = ? AND status = ?", customerID, "running")
+
+	// 如果指定了工作空间，则过滤工作空间
+	if workspaceID != nil {
+		query = query.Where("workspace_id = ?", *workspaceID)
+	} else {
+		// 如果没有指定工作空间，则只查询用户级别的环境（workspace_id为空）
+		query = query.Where("workspace_id IS NULL")
+	}
+
+	if err := query.Find(&environments).Error; err != nil {
+		return nil, err
+	}
+
+	// 统计资源使用量
+	used := &UsedResources{
 		CPU:     0,
 		Memory:  0,
 		GPU:     0,
 		Storage: 0,
-	}, nil
+	}
+
+	for _, env := range environments {
+		used.CPU += env.CPU
+		used.Memory += env.Memory
+		used.GPU += env.GPU
+		if env.Storage != nil {
+			used.Storage += *env.Storage
+		}
+	}
+
+	return used, nil
 }
 
 // GetAvailableQuota 获取可用配额
