@@ -1,237 +1,850 @@
 package dao
 
 import (
+	"database/sql"
+	"regexp"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
-	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-func TestWorkspaceDao_CRUD(t *testing.T) {
-	setupTestDB(t)
-
-	// 自动迁移表结构
-	db := database.GetDB()
-	if err := db.AutoMigrate(&entity.Workspace{}, &entity.WorkspaceMember{}); err != nil {
-		t.Fatalf("自动迁移失败: %v", err)
-	}
-
-	workspaceDao := NewWorkspaceDao()
-	customerDao := NewCustomerDao()
-
-	// 先创建测试用户
-	testCustomer := &entity.Customer{
-		Username:     "test-workspace-owner-" + time.Now().Format("20060102150405"),
-		Email:        "workspace-test-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		Status:       "active",
-	}
-	if err := customerDao.Create(testCustomer); err != nil {
-		t.Fatalf("创建测试用户失败: %v", err)
-	}
-	defer customerDao.Delete(testCustomer.ID)
-
-	// 测试 Create Workspace
-	workspace := &entity.Workspace{
-		UUID:        uuid.New(),
-		OwnerID:     testCustomer.ID,
-		Name:        "Test Workspace",
-		Description: "This is a test workspace",
-		Type:        "personal",
-		MemberCount: 1,
-		Status:      "active",
-	}
-	if err := workspaceDao.Create(workspace); err != nil {
-		t.Fatalf("创建工作空间失败: %v", err)
-	}
-	t.Logf("创建工作空间成功, ID: %d", workspace.ID)
-
-	// 测试 GetByID
-	found, err := workspaceDao.GetByID(workspace.ID)
+// setupWorkspaceMockDB 创建Mock数据库连接
+func setupWorkspaceMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
 	if err != nil {
-		t.Fatalf("获取工作空间失败: %v", err)
-	}
-	if found.Name != "Test Workspace" {
-		t.Errorf("工作空间名称不匹配: 期望 'Test Workspace', 实际 '%s'", found.Name)
+		t.Fatalf("创建sqlmock失败: %v", err)
 	}
 
-	// 测试 GetByUUID
-	foundByUUID, err := workspaceDao.GetByUUID(workspace.UUID.String())
+	dialector := postgres.New(postgres.Config{
+		Conn:       sqlDB,
+		DriverName: "postgres",
+	})
+
+	gormDB, err := gorm.Open(dialector, &gorm.Config{})
 	if err != nil {
-		t.Fatalf("根据UUID获取工作空间失败: %v", err)
-	}
-	if foundByUUID.ID != workspace.ID {
-		t.Errorf("工作空间ID不匹配: 期望 %d, 实际 %d", workspace.ID, foundByUUID.ID)
+		t.Fatalf("创建gorm DB失败: %v", err)
 	}
 
-	// 测试 Update
-	workspace.Name = "Updated Workspace"
-	workspace.Description = "Updated description"
-	if err := workspaceDao.Update(workspace); err != nil {
-		t.Fatalf("更新工作空间失败: %v", err)
-	}
-
-	updated, err := workspaceDao.GetByID(workspace.ID)
-	if err != nil {
-		t.Fatalf("获取更新后的工作空间失败: %v", err)
-	}
-	if updated.Name != "Updated Workspace" {
-		t.Errorf("工作空间名称未更新: 期望 'Updated Workspace', 实际 '%s'", updated.Name)
-	}
-
-	// 测试 GetByOwnerID
-	workspaces, err := workspaceDao.GetByOwnerID(testCustomer.ID)
-	if err != nil {
-		t.Fatalf("根据所有者ID获取工作空间失败: %v", err)
-	}
-	if len(workspaces) == 0 {
-		t.Error("应该至少有一个工作空间")
-	}
-
-	// 测试 GetByStatus
-	activeWorkspaces, err := workspaceDao.GetByStatus("active")
-	if err != nil {
-		t.Fatalf("根据状态获取工作空间失败: %v", err)
-	}
-	if len(activeWorkspaces) == 0 {
-		t.Error("应该至少有一个活跃的工作空间")
-	}
-
-	// 测试 List
-	workspaceList, total, err := workspaceDao.List(1, 10)
-	if err != nil {
-		t.Fatalf("获取工作空间列表失败: %v", err)
-	}
-	if total == 0 {
-		t.Error("工作空间总数应该大于0")
-	}
-	t.Logf("工作空间列表: 总数 %d, 当前页 %d 条", total, len(workspaceList))
-
-	// 测试 Delete
-	if err := workspaceDao.Delete(workspace.ID); err != nil {
-		t.Fatalf("删除工作空间失败: %v", err)
-	}
-	t.Logf("删除工作空间成功")
+	return gormDB, mock, sqlDB
 }
 
-func TestWorkspaceMemberDao_CRUD(t *testing.T) {
-	setupTestDB(t)
+// TestWorkspaceDao_Create 测试创建工作空间
+func TestWorkspaceDao_Create(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
 
-	// 自动迁移表结构
-	db := database.GetDB()
-	if err := db.AutoMigrate(&entity.Workspace{}, &entity.WorkspaceMember{}); err != nil {
-		t.Fatalf("自动迁移失败: %v", err)
-	}
+	dao := &WorkspaceDao{db: gormDB}
 
-	workspaceDao := NewWorkspaceDao()
-	memberDao := NewWorkspaceMemberDao()
-	customerDao := NewCustomerDao()
+	t.Run("Success", func(t *testing.T) {
+		workspace := &entity.Workspace{
+			UUID:        uuid.New(),
+			OwnerID:     1,
+			Name:        "Test Workspace",
+			Description: "Test Description",
+			Type:        "personal",
+			MemberCount: 1,
+			Status:      "active",
+		}
 
-	// 创建测试用户（工作空间所有者）
-	owner := &entity.Customer{
-		Username:     "test-member-owner-" + time.Now().Format("20060102150405"),
-		Email:        "member-owner-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		Status:       "active",
-	}
-	if err := customerDao.Create(owner); err != nil {
-		t.Fatalf("创建所有者失败: %v", err)
-	}
-	defer customerDao.Delete(owner.ID)
+		mock.ExpectBegin()
+		mock.ExpectQuery(`INSERT INTO "workspaces"`).
+			WithArgs(
+				sqlmock.AnyArg(), // uuid
+				workspace.OwnerID,
+				workspace.Name,
+				workspace.Description,
+				workspace.Type,
+				workspace.MemberCount,
+				workspace.Status,
+				sqlmock.AnyArg(), // created_at
+				sqlmock.AnyArg(), // updated_at
+				sqlmock.AnyArg(), // deleted_at
+			).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+		mock.ExpectCommit()
 
-	// 创建测试工作空间
-	workspace := &entity.Workspace{
-		UUID:        uuid.New(),
-		OwnerID:     owner.ID,
-		Name:        "Test Workspace for Members",
-		Type:        "team",
-		MemberCount: 1,
-		Status:      "active",
-	}
-	if err := workspaceDao.Create(workspace); err != nil {
-		t.Fatalf("创建工作空间失败: %v", err)
-	}
-	defer workspaceDao.Delete(workspace.ID)
+		err := dao.Create(workspace)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 创建测试成员用户
-	memberUser := &entity.Customer{
-		Username:     "test-member-user-" + time.Now().Format("20060102150405"),
-		Email:        "member-user-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		Status:       "active",
-	}
-	if err := customerDao.Create(memberUser); err != nil {
-		t.Fatalf("创建成员用户失败: %v", err)
-	}
-	defer customerDao.Delete(memberUser.ID)
+	t.Run("DatabaseError", func(t *testing.T) {
+		workspace := &entity.Workspace{
+			UUID:    uuid.New(),
+			OwnerID: 1,
+			Name:    "Test Workspace",
+		}
 
-	// 测试 Create Member
-	member := &entity.WorkspaceMember{
-		WorkspaceID: workspace.ID,
-		CustomerID:  memberUser.ID,
-		Role:        "member",
-		Status:      "active",
-	}
-	if err := memberDao.Create(member); err != nil {
-		t.Fatalf("创建工作空间成员失败: %v", err)
-	}
-	t.Logf("创建工作空间成员成功, ID: %d", member.ID)
+		mock.ExpectBegin()
+		mock.ExpectQuery(`INSERT INTO "workspaces"`).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
 
-	// 测试 GetByID
-	found, err := memberDao.GetByID(member.ID)
-	if err != nil {
-		t.Fatalf("获取工作空间成员失败: %v", err)
-	}
-	if found.Role != "member" {
-		t.Errorf("成员角色不匹配: 期望 'member', 实际 '%s'", found.Role)
-	}
+		err := dao.Create(workspace)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
 
-	// 测试 Update
-	member.Role = "admin"
-	if err := memberDao.Update(member); err != nil {
-		t.Fatalf("更新工作空间成员失败: %v", err)
-	}
+// TestWorkspaceDao_GetByID 测试根据ID获取工作空间
+func TestWorkspaceDao_GetByID(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
 
-	updated, err := memberDao.GetByID(member.ID)
-	if err != nil {
-		t.Fatalf("获取更新后的成员失败: %v", err)
-	}
-	if updated.Role != "admin" {
-		t.Errorf("成员角色未更新: 期望 'admin', 实际 '%s'", updated.Role)
-	}
+	dao := &WorkspaceDao{db: gormDB}
 
-	// 测试 GetByWorkspaceID
-	members, err := memberDao.GetByWorkspaceID(workspace.ID)
-	if err != nil {
-		t.Fatalf("根据工作空间ID获取成员失败: %v", err)
-	}
-	if len(members) == 0 {
-		t.Error("应该至少有一个成员")
-	}
+	t.Run("Success", func(t *testing.T) {
+		workspaceID := uint(1)
+		testUUID := uuid.New()
+		now := time.Now()
 
-	// 测试 GetByCustomerID
-	customerMembers, err := memberDao.GetByCustomerID(memberUser.ID)
-	if err != nil {
-		t.Fatalf("根据客户ID获取成员失败: %v", err)
-	}
-	if len(customerMembers) == 0 {
-		t.Error("应该至少有一个成员记录")
-	}
+		rows := sqlmock.NewRows([]string{
+			"id", "uuid", "owner_id", "name", "description", "type",
+			"member_count", "status", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			workspaceID, testUUID, 1, "Test Workspace", "Test Description", "personal",
+			1, "active", now, now, nil,
+		)
 
-	// 测试 GetByWorkspaceAndCustomer
-	foundMember, err := memberDao.GetByWorkspaceAndCustomer(workspace.ID, memberUser.ID)
-	if err != nil {
-		t.Fatalf("根据工作空间和客户ID获取成员失败: %v", err)
-	}
-	if foundMember.ID != member.ID {
-		t.Errorf("成员ID不匹配: 期望 %d, 实际 %d", member.ID, foundMember.ID)
-	}
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE id = .+`).
+			WithArgs(workspaceID).
+			WillReturnRows(rows)
 
-	// 测试 Delete
-	if err := memberDao.Delete(member.ID); err != nil {
-		t.Fatalf("删除工作空间成员失败: %v", err)
-	}
-	t.Logf("删除工作空间成员成功")
+		workspace, err := dao.GetByID(workspaceID)
+		assert.NoError(t, err)
+		assert.NotNil(t, workspace)
+		assert.Equal(t, workspaceID, workspace.ID)
+		assert.Equal(t, "Test Workspace", workspace.Name)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		workspaceID := uint(999)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE id = .+`).
+			WithArgs(workspaceID).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		workspace, err := dao.GetByID(workspaceID)
+		assert.Error(t, err)
+		assert.Nil(t, workspace)
+		assert.Equal(t, gorm.ErrRecordNotFound, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		workspaceID := uint(1)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE id = .+`).
+			WithArgs(workspaceID).
+			WillReturnError(sql.ErrConnDone)
+
+		workspace, err := dao.GetByID(workspaceID)
+		assert.Error(t, err)
+		assert.Nil(t, workspace)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceDao_GetByUUID 测试根据UUID获取工作空间
+func TestWorkspaceDao_GetByUUID(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		testUUID := uuid.New()
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "uuid", "owner_id", "name", "description", "type",
+			"member_count", "status", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, testUUID, 1, "Test Workspace", "Test Description", "personal",
+			1, "active", now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE uuid = .+`).
+			WithArgs(testUUID.String()).
+			WillReturnRows(rows)
+
+		workspace, err := dao.GetByUUID(testUUID.String())
+		assert.NoError(t, err)
+		assert.NotNil(t, workspace)
+		assert.Equal(t, testUUID, workspace.UUID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		testUUID := uuid.New()
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE uuid = .+`).
+			WithArgs(testUUID.String()).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		workspace, err := dao.GetByUUID(testUUID.String())
+		assert.Error(t, err)
+		assert.Nil(t, workspace)
+		assert.Equal(t, gorm.ErrRecordNotFound, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		testUUID := uuid.New()
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE uuid = .+`).
+			WithArgs(testUUID.String()).
+			WillReturnError(sql.ErrConnDone)
+
+		workspace, err := dao.GetByUUID(testUUID.String())
+		assert.Error(t, err)
+		assert.Nil(t, workspace)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceDao_Update 测试更新工作空间
+func TestWorkspaceDao_Update(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		workspace := &entity.Workspace{
+			ID:          1,
+			UUID:        uuid.New(),
+			OwnerID:     1,
+			Name:        "Updated Workspace",
+			Description: "Updated Description",
+			Type:        "team",
+			MemberCount: 5,
+			Status:      "active",
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "workspaces"`).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
+
+		err := dao.Update(workspace)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		workspace := &entity.Workspace{
+			ID:   1,
+			Name: "Updated Workspace",
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "workspaces"`).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Update(workspace)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceDao_Delete 测试删除工作空间（软删除）
+func TestWorkspaceDao_Delete(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		workspaceID := uint(1)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "workspaces" SET "deleted_at"=.+ WHERE "workspaces"."id" = .+`).
+			WithArgs(sqlmock.AnyArg(), workspaceID).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
+
+		err := dao.Delete(workspaceID)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		workspaceID := uint(1)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "workspaces" SET "deleted_at"=.+ WHERE "workspaces"."id" = .+`).
+			WithArgs(sqlmock.AnyArg(), workspaceID).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Delete(workspaceID)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceDao_GetByOwnerID 测试根据所有者ID获取工作空间列表
+func TestWorkspaceDao_GetByOwnerID(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		ownerID := uint(1)
+		now := time.Now()
+		testUUID1 := uuid.New()
+		testUUID2 := uuid.New()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "uuid", "owner_id", "name", "description", "type",
+			"member_count", "status", "created_at", "updated_at", "deleted_at",
+		}).
+			AddRow(1, testUUID1, ownerID, "Workspace 1", "Desc 1", "personal",
+				1, "active", now, now, nil).
+			AddRow(2, testUUID2, ownerID, "Workspace 2", "Desc 2", "team",
+				5, "active", now, now, nil)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE owner_id = .+`).
+			WithArgs(ownerID).
+			WillReturnRows(rows)
+
+		workspaces, err := dao.GetByOwnerID(ownerID)
+		assert.NoError(t, err)
+		assert.Len(t, workspaces, 2)
+		assert.Equal(t, ownerID, workspaces[0].OwnerID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("EmptyResult", func(t *testing.T) {
+		ownerID := uint(999)
+
+		rows := sqlmock.NewRows([]string{
+			"id", "uuid", "owner_id", "name", "description", "type",
+			"member_count", "status", "created_at", "updated_at", "deleted_at",
+		})
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE owner_id = .+`).
+			WithArgs(ownerID).
+			WillReturnRows(rows)
+
+		workspaces, err := dao.GetByOwnerID(ownerID)
+		assert.NoError(t, err)
+		assert.Len(t, workspaces, 0)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		ownerID := uint(1)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE owner_id = .+`).
+			WithArgs(ownerID).
+			WillReturnError(sql.ErrConnDone)
+
+		workspaces, err := dao.GetByOwnerID(ownerID)
+		assert.Error(t, err)
+		assert.Nil(t, workspaces)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceDao_List 测试分页获取工作空间列表
+func TestWorkspaceDao_List(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		now := time.Now()
+		testUUID1 := uuid.New()
+		testUUID2 := uuid.New()
+
+		// Mock Count query
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "workspaces"`).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+
+		// Mock List query
+		rows := sqlmock.NewRows([]string{
+			"id", "uuid", "owner_id", "name", "description", "type",
+			"member_count", "status", "created_at", "updated_at", "deleted_at",
+		}).
+			AddRow(1, testUUID1, 1, "Workspace 1", "Desc 1", "personal",
+				1, "active", now, now, nil).
+			AddRow(2, testUUID2, 2, "Workspace 2", "Desc 2", "team",
+				5, "active", now, now, nil)
+
+		mock.ExpectQuery(`SELECT \* FROM "workspaces" LIMIT .+ OFFSET .+`).
+			WithArgs(10, 0).
+			WillReturnRows(rows)
+
+		workspaces, total, err := dao.List(1, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), total)
+		assert.Len(t, workspaces, 2)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("CountError", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "workspaces"`).
+			WillReturnError(sql.ErrConnDone)
+
+		workspaces, total, err := dao.List(1, 10)
+		assert.Error(t, err)
+		assert.Nil(t, workspaces)
+		assert.Equal(t, int64(0), total)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("ListError", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "workspaces"`).
+			WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
+
+		mock.ExpectQuery(`SELECT \* FROM "workspaces" LIMIT .+ OFFSET .+`).
+			WithArgs(10, 0).
+			WillReturnError(sql.ErrConnDone)
+
+		workspaces, total, err := dao.List(1, 10)
+		assert.Error(t, err)
+		assert.Nil(t, workspaces)
+		assert.Equal(t, int64(0), total)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceDao_GetByStatus 测试根据状态获取工作空间列表
+func TestWorkspaceDao_GetByStatus(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		status := "active"
+		now := time.Now()
+		testUUID := uuid.New()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "uuid", "owner_id", "name", "description", "type",
+			"member_count", "status", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, testUUID, 1, "Active Workspace", "Desc", "personal",
+			1, status, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE status = .+`).
+			WithArgs(status).
+			WillReturnRows(rows)
+
+		workspaces, err := dao.GetByStatus(status)
+		assert.NoError(t, err)
+		assert.Len(t, workspaces, 1)
+		assert.Equal(t, status, workspaces[0].Status)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("EmptyResult", func(t *testing.T) {
+		status := "archived"
+
+		rows := sqlmock.NewRows([]string{
+			"id", "uuid", "owner_id", "name", "description", "type",
+			"member_count", "status", "created_at", "updated_at", "deleted_at",
+		})
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE status = .+`).
+			WithArgs(status).
+			WillReturnRows(rows)
+
+		workspaces, err := dao.GetByStatus(status)
+		assert.NoError(t, err)
+		assert.Len(t, workspaces, 0)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		status := "active"
+
+		mock.ExpectQuery(`SELECT .* FROM "workspaces" WHERE status = .+`).
+			WithArgs(status).
+			WillReturnError(sql.ErrConnDone)
+
+		workspaces, err := dao.GetByStatus(status)
+		assert.Error(t, err)
+		assert.Nil(t, workspaces)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceMemberDao_Create 测试创建工作空间成员
+func TestWorkspaceMemberDao_Create(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceMemberDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		member := &entity.WorkspaceMember{
+			WorkspaceID: 1,
+			UserID:  2,
+			Role:        "member",
+			Status:      "active",
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectQuery(`INSERT INTO "workspace_members"`).
+			WithArgs(
+				member.WorkspaceID,
+				member.UserID,
+				member.Role,
+				member.Status,
+				sqlmock.AnyArg(), // joined_at
+				sqlmock.AnyArg(), // created_at
+			).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+		mock.ExpectCommit()
+
+		err := dao.Create(member)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		member := &entity.WorkspaceMember{
+			WorkspaceID: 1,
+			UserID:  2,
+			Role:        "member",
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectQuery(`INSERT INTO "workspace_members"`).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Create(member)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceMemberDao_GetByID 测试根据ID获取工作空间成员
+func TestWorkspaceMemberDao_GetByID(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceMemberDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		memberID := uint(1)
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "workspace_id", "customer_id", "role", "status", "joined_at", "created_at",
+		}).AddRow(
+			memberID, 1, 2, "member", "active", now, now,
+		)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE id = .+`).
+			WithArgs(memberID).
+			WillReturnRows(rows)
+
+		member, err := dao.GetByID(memberID)
+		assert.NoError(t, err)
+		assert.NotNil(t, member)
+		assert.Equal(t, memberID, member.ID)
+		assert.Equal(t, "member", member.Role)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		memberID := uint(999)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE id = .+`).
+			WithArgs(memberID).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		member, err := dao.GetByID(memberID)
+		assert.Error(t, err)
+		assert.Nil(t, member)
+		assert.Equal(t, gorm.ErrRecordNotFound, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		memberID := uint(1)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE id = .+`).
+			WithArgs(memberID).
+			WillReturnError(sql.ErrConnDone)
+
+		member, err := dao.GetByID(memberID)
+		assert.Error(t, err)
+		assert.Nil(t, member)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceMemberDao_Update 测试更新工作空间成员
+func TestWorkspaceMemberDao_Update(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceMemberDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		member := &entity.WorkspaceMember{
+			ID:          1,
+			WorkspaceID: 1,
+			UserID:  2,
+			Role:        "admin",
+			Status:      "active",
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "workspace_members"`).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
+
+		err := dao.Update(member)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		member := &entity.WorkspaceMember{
+			ID:   1,
+			Role: "admin",
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "workspace_members"`).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Update(member)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceMemberDao_Delete 测试删除工作空间成员
+func TestWorkspaceMemberDao_Delete(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceMemberDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		memberID := uint(1)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`DELETE FROM "workspace_members" WHERE "workspace_members"."id" = .+`).
+			WithArgs(memberID).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
+
+		err := dao.Delete(memberID)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		memberID := uint(1)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`DELETE FROM "workspace_members" WHERE "workspace_members"."id" = .+`).
+			WithArgs(memberID).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Delete(memberID)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceMemberDao_GetByWorkspaceID 测试根据工作空间ID获取成员列表
+func TestWorkspaceMemberDao_GetByWorkspaceID(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceMemberDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		workspaceID := uint(1)
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "workspace_id", "customer_id", "role", "status", "joined_at", "created_at",
+		}).
+			AddRow(1, workspaceID, 2, "admin", "active", now, now).
+			AddRow(2, workspaceID, 3, "member", "active", now, now)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE workspace_id = .+`).
+			WithArgs(workspaceID).
+			WillReturnRows(rows)
+
+		members, err := dao.GetByWorkspaceID(workspaceID)
+		assert.NoError(t, err)
+		assert.Len(t, members, 2)
+		assert.Equal(t, workspaceID, members[0].WorkspaceID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("EmptyResult", func(t *testing.T) {
+		workspaceID := uint(999)
+
+		rows := sqlmock.NewRows([]string{
+			"id", "workspace_id", "customer_id", "role", "status", "joined_at", "created_at",
+		})
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE workspace_id = .+`).
+			WithArgs(workspaceID).
+			WillReturnRows(rows)
+
+		members, err := dao.GetByWorkspaceID(workspaceID)
+		assert.NoError(t, err)
+		assert.Len(t, members, 0)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		workspaceID := uint(1)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE workspace_id = .+`).
+			WithArgs(workspaceID).
+			WillReturnError(sql.ErrConnDone)
+
+		members, err := dao.GetByWorkspaceID(workspaceID)
+		assert.Error(t, err)
+		assert.Nil(t, members)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceMemberDao_GetByUserID 测试根据客户ID获取成员列表
+func TestWorkspaceMemberDao_GetByUserID(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceMemberDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		customerID := uint(2)
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "workspace_id", "customer_id", "role", "status", "joined_at", "created_at",
+		}).
+			AddRow(1, 1, customerID, "admin", "active", now, now).
+			AddRow(2, 2, customerID, "member", "active", now, now)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE customer_id = .+`).
+			WithArgs(customerID).
+			WillReturnRows(rows)
+
+		members, err := dao.GetByUserID(customerID)
+		assert.NoError(t, err)
+		assert.Len(t, members, 2)
+		assert.Equal(t, customerID, members[0].UserID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("EmptyResult", func(t *testing.T) {
+		customerID := uint(999)
+
+		rows := sqlmock.NewRows([]string{
+			"id", "workspace_id", "customer_id", "role", "status", "joined_at", "created_at",
+		})
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE customer_id = .+`).
+			WithArgs(customerID).
+			WillReturnRows(rows)
+
+		members, err := dao.GetByUserID(customerID)
+		assert.NoError(t, err)
+		assert.Len(t, members, 0)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		customerID := uint(2)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE customer_id = .+`).
+			WithArgs(customerID).
+			WillReturnError(sql.ErrConnDone)
+
+		members, err := dao.GetByUserID(customerID)
+		assert.Error(t, err)
+		assert.Nil(t, members)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestWorkspaceMemberDao_GetByWorkspaceAndCustomer 测试根据工作空间ID和客户ID获取成员
+func TestWorkspaceMemberDao_GetByWorkspaceAndCustomer(t *testing.T) {
+	gormDB, mock, sqlDB := setupWorkspaceMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &WorkspaceMemberDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		workspaceID := uint(1)
+		customerID := uint(2)
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "workspace_id", "customer_id", "role", "status", "joined_at", "created_at",
+		}).AddRow(
+			1, workspaceID, customerID, "admin", "active", now, now,
+		)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE workspace_id = .+ AND customer_id = .+`).
+			WithArgs(workspaceID, customerID).
+			WillReturnRows(rows)
+
+		member, err := dao.GetByWorkspaceAndCustomer(workspaceID, customerID)
+		assert.NoError(t, err)
+		assert.NotNil(t, member)
+		assert.Equal(t, workspaceID, member.WorkspaceID)
+		assert.Equal(t, customerID, member.UserID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		workspaceID := uint(1)
+		customerID := uint(999)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE workspace_id = .+ AND customer_id = .+`).
+			WithArgs(workspaceID, customerID).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		member, err := dao.GetByWorkspaceAndCustomer(workspaceID, customerID)
+		assert.Error(t, err)
+		assert.Nil(t, member)
+		assert.Equal(t, gorm.ErrRecordNotFound, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		workspaceID := uint(1)
+		customerID := uint(2)
+
+		mock.ExpectQuery(`SELECT .* FROM "workspace_members" WHERE workspace_id = .+ AND customer_id = .+`).
+			WithArgs(workspaceID, customerID).
+			WillReturnError(sql.ErrConnDone)
+
+		member, err := dao.GetByWorkspaceAndCustomer(workspaceID, customerID)
+		assert.Error(t, err)
+		assert.Nil(t, member)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }

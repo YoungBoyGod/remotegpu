@@ -25,10 +25,10 @@ func TestWorkspaceService_CRUD(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	testCustomer := &entity.Customer{
+	testCustomer := &entity.User{
 		Username:     "test-ws-service-" + time.Now().Format("20060102150405"),
 		Email:        "ws-service-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -112,10 +112,10 @@ func TestWorkspaceService_MemberManagement(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户（所有者）
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "test-ws-owner-" + time.Now().Format("20060102150405"),
 		Email:        "ws-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -140,7 +140,7 @@ func TestWorkspaceService_MemberManagement(t *testing.T) {
 	defer service.DeleteWorkspace(workspace.ID)
 
 	// 创建测试成员用户
-	member1 := &entity.Customer{
+	member1 := &entity.User{
 		Username:     "test-member1-" + time.Now().Format("20060102150405"),
 		Email:        "member1-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -199,7 +199,7 @@ func TestWorkspaceService_MemberManagement(t *testing.T) {
 	}
 
 	// 创建另一个用户（非成员）
-	nonMember := &entity.Customer{
+	nonMember := &entity.User{
 		Username:     "test-nonmember-" + time.Now().Format("20060102150405"),
 		Email:        "nonmember-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -250,10 +250,10 @@ func TestWorkspaceService_CreateWorkspace_Validation(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	testCustomer := &entity.Customer{
+	testCustomer := &entity.User{
 		Username:     "test-validation-" + time.Now().Format("20060102150405"),
 		Email:        "validation-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -344,10 +344,10 @@ func TestWorkspaceService_AddMember_RoleValidation(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "test-role-owner-" + time.Now().Format("20060102150405"),
 		Email:        "role-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -358,7 +358,7 @@ func TestWorkspaceService_AddMember_RoleValidation(t *testing.T) {
 	}
 	defer customerDao.Delete(owner.ID)
 
-	member := &entity.Customer{
+	member := &entity.User{
 		Username:     "test-role-member-" + time.Now().Format("20060102150405"),
 		Email:        "role-member-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -396,7 +396,7 @@ func TestWorkspaceService_AddMember_RoleValidation(t *testing.T) {
 		validRoles := []string{"owner", "admin", "member", "viewer"}
 		for i, role := range validRoles {
 			// 为每个角色创建一个新成员
-			newMember := &entity.Customer{
+			newMember := &entity.User{
 				Username:     fmt.Sprintf("test-member-%d-%s", i, time.Now().Format("20060102150405")),
 				Email:        fmt.Sprintf("member-%d-%s@example.com", i, time.Now().Format("20060102150405")),
 				PasswordHash: "test-hash",
@@ -416,7 +416,7 @@ func TestWorkspaceService_AddMember_RoleValidation(t *testing.T) {
 
 	// 测试默认角色
 	t.Run("DefaultRole", func(t *testing.T) {
-		defaultMember := &entity.Customer{
+		defaultMember := &entity.User{
 			Username:     "test-default-" + time.Now().Format("20060102150405"),
 			Email:        "default-" + time.Now().Format("20060102150405") + "@example.com",
 			PasswordHash: "test-hash",
@@ -436,7 +436,7 @@ func TestWorkspaceService_AddMember_RoleValidation(t *testing.T) {
 		members, _ := service.ListMembers(workspace.ID)
 		found := false
 		for _, m := range members {
-			if m.CustomerID == defaultMember.ID && m.Role == "member" {
+			if m.UserID == defaultMember.ID && m.Role == "member" {
 				found = true
 				break
 			}
@@ -457,10 +457,10 @@ func TestWorkspaceService_CheckPermission_ArchivedWorkspace(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "test-archived-owner-" + time.Now().Format("20060102150405"),
 		Email:        "archived-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -525,10 +525,10 @@ func TestWorkspaceService_UpdateWorkspace_ErrorCases(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "test-update-owner-" + time.Now().Format("20060102150405"),
 		Email:        "update-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -569,7 +569,7 @@ func TestWorkspaceService_UpdateWorkspace_ErrorCases(t *testing.T) {
 	// 测试修改OwnerID
 	t.Run("ChangeOwnerID", func(t *testing.T) {
 		// 创建另一个用户
-		newOwner := &entity.Customer{
+		newOwner := &entity.User{
 			Username:     "test-new-owner-" + time.Now().Format("20060102150405"),
 			Email:        "new-owner-" + time.Now().Format("20060102150405") + "@example.com",
 			PasswordHash: "test-hash",
@@ -605,10 +605,10 @@ func TestWorkspaceService_AddMember_ErrorCases(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "test-addmember-owner-" + time.Now().Format("20060102150405"),
 		Email:        "addmember-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -619,7 +619,7 @@ func TestWorkspaceService_AddMember_ErrorCases(t *testing.T) {
 	}
 	defer customerDao.Delete(owner.ID)
 
-	member := &entity.Customer{
+	member := &entity.User{
 		Username:     "test-addmember-member-" + time.Now().Format("20060102150405"),
 		Email:        "addmember-member-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -679,10 +679,10 @@ func TestWorkspaceService_RemoveMember_ErrorCases(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "test-removemember-owner-" + time.Now().Format("20060102150405"),
 		Email:        "removemember-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -693,7 +693,7 @@ func TestWorkspaceService_RemoveMember_ErrorCases(t *testing.T) {
 	}
 	defer customerDao.Delete(owner.ID)
 
-	member := &entity.Customer{
+	member := &entity.User{
 		Username:     "test-removemember-member-" + time.Now().Format("20060102150405"),
 		Email:        "removemember-member-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -748,10 +748,10 @@ func TestWorkspaceService_CheckPermission_ErrorCases(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		Username:     "test-permission-" + time.Now().Format("20060102150405"),
 		Email:        "permission-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -808,10 +808,10 @@ func TestWorkspaceService_RemoveMember_MemberCount(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "test-count-owner-" + time.Now().Format("20060102150405"),
 		Email:        "count-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -822,7 +822,7 @@ func TestWorkspaceService_RemoveMember_MemberCount(t *testing.T) {
 	}
 	defer customerDao.Delete(owner.ID)
 
-	member := &entity.Customer{
+	member := &entity.User{
 		Username:     "test-count-member-" + time.Now().Format("20060102150405"),
 		Email:        "count-member-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",

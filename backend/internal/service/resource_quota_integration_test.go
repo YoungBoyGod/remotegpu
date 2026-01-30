@@ -14,10 +14,10 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-integration-" + uuid.New().String()[:8],
 		Email:        "integration-" + uuid.New().String()[:8] + "@example.com",
@@ -32,7 +32,7 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 	// 场景1：设置配额 → 检查配额（足够）
 	t.Run("Scenario1: Set quota and check (sufficient)", func(t *testing.T) {
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
@@ -64,7 +64,7 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 	// 场景2：设置配额 → 检查配额（不足）→ 拒绝
 	t.Run("Scenario2: Set quota and check (insufficient)", func(t *testing.T) {
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         8,
 			Memory:      16384,
@@ -97,7 +97,7 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 	t.Run("Scenario3: Update quota and recheck", func(t *testing.T) {
 		// 设置初始配额
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         8,
 			Memory:      16384,
@@ -143,10 +143,10 @@ func TestResourceQuotaIntegration_AvailableQuota(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-available-" + uuid.New().String()[:8],
 		Email:        "available-" + uuid.New().String()[:8] + "@example.com",
@@ -160,7 +160,7 @@ func TestResourceQuotaIntegration_AvailableQuota(t *testing.T) {
 
 	// 设置配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         16,
 		Memory:      32768,

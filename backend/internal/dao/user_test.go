@@ -39,10 +39,10 @@ func TestCustomerDao_Create(t *testing.T) {
 	gormDB, mock, sqlDB := setupMockDB(t)
 	defer sqlDB.Close()
 
-	dao := &CustomerDao{db: gormDB}
+	dao := &UserDao{db: gormDB}
 
 	t.Run("Success", func(t *testing.T) {
-		customer := &entity.Customer{
+		customer := &entity.User{
 			Username:     "testuser",
 			Email:        "test@example.com",
 			PasswordHash: "hashedpassword",
@@ -82,7 +82,7 @@ func TestCustomerDao_Create(t *testing.T) {
 	})
 
 	t.Run("DatabaseError", func(t *testing.T) {
-		customer := &entity.Customer{
+		customer := &entity.User{
 			Username:     "testuser",
 			Email:        "test@example.com",
 			PasswordHash: "hashedpassword",
@@ -104,7 +104,7 @@ func TestCustomerDao_GetByID(t *testing.T) {
 	gormDB, mock, sqlDB := setupMockDB(t)
 	defer sqlDB.Close()
 
-	dao := &CustomerDao{db: gormDB}
+	dao := &UserDao{db: gormDB}
 
 	t.Run("Success", func(t *testing.T) {
 		userID := uint(1)
@@ -167,7 +167,7 @@ func TestCustomerDao_GetByUsername(t *testing.T) {
 	gormDB, mock, sqlDB := setupMockDB(t)
 	defer sqlDB.Close()
 
-	dao := &CustomerDao{db: gormDB}
+	dao := &UserDao{db: gormDB}
 
 	t.Run("Success", func(t *testing.T) {
 		username := "testuser"
@@ -216,7 +216,7 @@ func TestCustomerDao_GetByEmail(t *testing.T) {
 	gormDB, mock, sqlDB := setupMockDB(t)
 	defer sqlDB.Close()
 
-	dao := &CustomerDao{db: gormDB}
+	dao := &UserDao{db: gormDB}
 
 	t.Run("Success", func(t *testing.T) {
 		email := "test@example.com"
@@ -265,10 +265,10 @@ func TestCustomerDao_Update(t *testing.T) {
 	gormDB, mock, sqlDB := setupMockDB(t)
 	defer sqlDB.Close()
 
-	dao := &CustomerDao{db: gormDB}
+	dao := &UserDao{db: gormDB}
 
 	t.Run("Success", func(t *testing.T) {
-		customer := &entity.Customer{
+		customer := &entity.User{
 			ID:           1,
 			UUID:         uuid.New(),
 			Username:     "testuser",
@@ -291,7 +291,7 @@ func TestCustomerDao_Update(t *testing.T) {
 	})
 
 	t.Run("DatabaseError", func(t *testing.T) {
-		customer := &entity.Customer{
+		customer := &entity.User{
 			ID:           1,
 			Username:     "testuser",
 			Email:        "test@example.com",
@@ -314,7 +314,7 @@ func TestCustomerDao_Delete(t *testing.T) {
 	gormDB, mock, sqlDB := setupMockDB(t)
 	defer sqlDB.Close()
 
-	dao := &CustomerDao{db: gormDB}
+	dao := &UserDao{db: gormDB}
 
 	t.Run("Success", func(t *testing.T) {
 		userID := uint(1)
@@ -350,7 +350,7 @@ func TestCustomerDao_List(t *testing.T) {
 	gormDB, mock, sqlDB := setupMockDB(t)
 	defer sqlDB.Close()
 
-	dao := &CustomerDao{db: gormDB}
+	dao := &UserDao{db: gormDB}
 
 	t.Run("Success", func(t *testing.T) {
 		page := 1

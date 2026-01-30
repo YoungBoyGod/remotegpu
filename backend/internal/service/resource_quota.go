@@ -65,9 +65,9 @@ func (s *ResourceQuotaService) SetQuota(quota *entity.ResourceQuota) error {
 	var err error
 
 	if quota.WorkspaceID != nil {
-		existing, err = s.quotaDao.GetByCustomerAndWorkspace(quota.CustomerID, *quota.WorkspaceID)
+		existing, err = s.quotaDao.GetByUserAndWorkspace(quota.UserID, *quota.WorkspaceID)
 	} else {
-		existing, err = s.quotaDao.GetByCustomerID(quota.CustomerID)
+		existing, err = s.quotaDao.GetByUserID(quota.UserID)
 	}
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
@@ -84,11 +84,11 @@ func (s *ResourceQuotaService) SetQuota(quota *entity.ResourceQuota) error {
 }
 
 // GetQuota 获取资源配额
-func (s *ResourceQuotaService) GetQuota(customerID uint, workspaceID *uint) (*entity.ResourceQuota, error) {
+func (s *ResourceQuotaService) GetQuota(userID uint, workspaceID *uint) (*entity.ResourceQuota, error) {
 	if workspaceID != nil {
-		return s.quotaDao.GetByCustomerAndWorkspace(customerID, *workspaceID)
+		return s.quotaDao.GetByUserAndWorkspace(userID, *workspaceID)
 	}
-	return s.quotaDao.GetByCustomerID(customerID)
+	return s.quotaDao.GetByUserID(userID)
 }
 
 // GetQuotaByID 根据ID获取资源配额
@@ -136,7 +136,7 @@ func (s *ResourceQuotaService) UpdateQuota(quota *entity.ResourceQuota) error {
 	}
 
 	// 获取已使用资源
-	used, err := s.GetUsedResources(existing.CustomerID, existing.WorkspaceID)
+	used, err := s.GetUsedResources(existing.UserID, existing.WorkspaceID)
 	if err != nil {
 		return fmt.Errorf("获取已使用资源失败: %w", err)
 	}
@@ -347,7 +347,7 @@ func (s *ResourceQuotaService) GetAvailableQuota(customerID uint, workspaceID *u
 	}
 
 	available := &entity.ResourceQuota{
-		CustomerID:  customerID,
+		UserID:  customerID,
 		WorkspaceID: workspaceID,
 		CPU:         availableCPU,
 		Memory:      availableMemory,

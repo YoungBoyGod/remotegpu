@@ -27,7 +27,7 @@ func (PortMapping) TableName() string {
 // Environment 开发环境实体
 type Environment struct {
 	ID           string     `gorm:"primaryKey;size:64" json:"id"`
-	CustomerID   uint       `gorm:"column:customer_id;not null;index:idx_environments_customer" json:"customer_id"`
+	UserID       uint       `gorm:"column:user_id;not null;index:idx_environments_user" json:"user_id"`
 	WorkspaceID  *uint      `gorm:"column:workspace_id;index:idx_environments_workspace" json:"workspace_id"`
 	HostID       string     `gorm:"column:host_id;size:64;not null;index:idx_environments_host" json:"host_id"`
 	Name         string     `gorm:"size:128;not null" json:"name"`
@@ -49,7 +49,7 @@ type Environment struct {
 	StoppedAt    *time.Time `gorm:"column:stopped_at" json:"stopped_at"`
 
 	// 关联关系
-	Customer     *Customer      `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
+	User         *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Workspace    *Workspace     `gorm:"foreignKey:WorkspaceID" json:"workspace,omitempty"`
 	Host         *Host          `gorm:"foreignKey:HostID" json:"host,omitempty"`
 	PortMappings []*PortMapping `gorm:"foreignKey:EnvID" json:"port_mappings,omitempty"`

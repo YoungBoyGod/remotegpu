@@ -39,7 +39,7 @@ func NewEnvironmentService() *EnvironmentService {
 
 // CreateEnvironmentRequest 创建环境请求
 type CreateEnvironmentRequest struct {
-	CustomerID  uint    `json:"customer_id"`
+	UserID      uint    `json:"user_id"`
 	WorkspaceID *uint   `json:"workspace_id"`
 	Name        string  `json:"name"`
 	Description string  `json:"description"`
@@ -185,7 +185,7 @@ func (s *EnvironmentService) CreateEnvironment(req *CreateEnvironmentRequest) (*
 		quotaReq.Storage = *req.Storage
 	}
 
-	ok, err := s.quotaService.CheckQuota(req.CustomerID, req.WorkspaceID, quotaReq)
+	ok, err := s.quotaService.CheckQuota(req.UserID, req.WorkspaceID, quotaReq)
 	if err != nil {
 		return nil, fmt.Errorf("配额检查失败: %w", err)
 	}
@@ -214,7 +214,7 @@ func (s *EnvironmentService) CreateEnvironment(req *CreateEnvironmentRequest) (*
 		// 创建 Environment 记录
 		env = &entity.Environment{
 			ID:          envID,
-			CustomerID:  req.CustomerID,
+			UserID:  req.UserID,
 			WorkspaceID: req.WorkspaceID,
 			HostID:      host.ID,
 			Name:        req.Name,
@@ -456,7 +456,7 @@ func (s *EnvironmentService) ListEnvironments(customerID uint, workspaceID *uint
 	if workspaceID != nil {
 		return s.envDao.GetByWorkspaceID(*workspaceID)
 	}
-	return s.envDao.GetByCustomerID(customerID)
+	return s.envDao.GetByUserID(customerID)
 }
 
 // GetStatus 获取环境状态

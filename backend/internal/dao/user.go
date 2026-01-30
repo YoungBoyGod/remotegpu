@@ -6,35 +6,35 @@ import (
 	"gorm.io/gorm"
 )
 
-// CustomerDaoInterface 定义CustomerDao的接口
-type CustomerDaoInterface interface {
-	Create(customer *entity.Customer) error
-	GetByID(id uint) (*entity.Customer, error)
-	GetByUsername(username string) (*entity.Customer, error)
-	GetByEmail(email string) (*entity.Customer, error)
-	Update(customer *entity.Customer) error
+// UserDaoInterface 定义CustomerDao的接口
+type UserDaoInterface interface {
+	Create(customer *entity.User) error
+	GetByID(id uint) (*entity.User, error)
+	GetByUsername(username string) (*entity.User, error)
+	GetByEmail(email string) (*entity.User, error)
+	Update(customer *entity.User) error
 	Delete(id uint) error
-	List(page, pageSize int) ([]*entity.Customer, int64, error)
+	List(page, pageSize int) ([]*entity.User, int64, error)
 }
 
-type CustomerDao struct {
+type UserDao struct {
 	db *gorm.DB
 }
 
-func NewCustomerDao() *CustomerDao {
-	return &CustomerDao{
+func NewUserDao() *UserDao {
+	return &UserDao{
 		db: database.GetDB(),
 	}
 }
 
 // Create 创建客户
-func (d *CustomerDao) Create(customer *entity.Customer) error {
+func (d *UserDao) Create(customer *entity.User) error {
 	return d.db.Create(customer).Error
 }
 
 // GetByID 根据ID获取客户
-func (d *CustomerDao) GetByID(id uint) (*entity.Customer, error) {
-	var customer entity.Customer
+func (d *UserDao) GetByID(id uint) (*entity.User, error) {
+	var customer entity.User
 	err := d.db.Where("id = ?", id).First(&customer).Error
 	if err != nil {
 		return nil, err
@@ -43,8 +43,8 @@ func (d *CustomerDao) GetByID(id uint) (*entity.Customer, error) {
 }
 
 // GetByUsername 根据用户名获取客户
-func (d *CustomerDao) GetByUsername(username string) (*entity.Customer, error) {
-	var customer entity.Customer
+func (d *UserDao) GetByUsername(username string) (*entity.User, error) {
+	var customer entity.User
 	err := d.db.Where("username = ?", username).First(&customer).Error
 	if err != nil {
 		return nil, err
@@ -53,8 +53,8 @@ func (d *CustomerDao) GetByUsername(username string) (*entity.Customer, error) {
 }
 
 // GetByEmail 根据邮箱获取客户
-func (d *CustomerDao) GetByEmail(email string) (*entity.Customer, error) {
-	var customer entity.Customer
+func (d *UserDao) GetByEmail(email string) (*entity.User, error) {
+	var customer entity.User
 	err := d.db.Where("email = ?", email).First(&customer).Error
 	if err != nil {
 		return nil, err
@@ -63,23 +63,23 @@ func (d *CustomerDao) GetByEmail(email string) (*entity.Customer, error) {
 }
 
 // Update 更新客户
-func (d *CustomerDao) Update(customer *entity.Customer) error {
+func (d *UserDao) Update(customer *entity.User) error {
 	return d.db.Save(customer).Error
 }
 
 // Delete 删除客户
-func (d *CustomerDao) Delete(id uint) error {
-	return d.db.Delete(&entity.Customer{}, id).Error
+func (d *UserDao) Delete(id uint) error {
+	return d.db.Delete(&entity.User{}, id).Error
 }
 
 // List 获取客户列表
-func (d *CustomerDao) List(page, pageSize int) ([]*entity.Customer, int64, error) {
-	var customers []*entity.Customer
+func (d *UserDao) List(page, pageSize int) ([]*entity.User, int64, error) {
+	var customers []*entity.User
 	var total int64
 
 	offset := (page - 1) * pageSize
 
-	if err := d.db.Model(&entity.Customer{}).Count(&total).Error; err != nil {
+	if err := d.db.Model(&entity.User{}).Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
 

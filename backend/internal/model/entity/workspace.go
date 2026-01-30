@@ -22,7 +22,7 @@ type Workspace struct {
 	DeletedAt   gorm.DeletedAt `gorm:"index" json:"-"`
 
 	// 关联关系
-	Owner   *Customer          `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
+	Owner   *User          `gorm:"foreignKey:OwnerID" json:"owner,omitempty"`
 	Members []*WorkspaceMember `gorm:"foreignKey:WorkspaceID" json:"members,omitempty"`
 }
 
@@ -34,8 +34,8 @@ func (Workspace) TableName() string {
 // WorkspaceMember 工作空间成员实体
 type WorkspaceMember struct {
 	ID          uint      `gorm:"primarykey" json:"id"`
-	WorkspaceID uint      `gorm:"not null;uniqueIndex:idx_workspace_customer" json:"workspace_id"`
-	CustomerID  uint      `gorm:"not null;uniqueIndex:idx_workspace_customer;index:idx_workspace_members_customer" json:"customer_id"`
+	WorkspaceID uint      `gorm:"not null;uniqueIndex:idx_workspace_user" json:"workspace_id"`
+	UserID      uint      `gorm:"not null;uniqueIndex:idx_workspace_user;index:idx_workspace_members_user" json:"user_id"`
 	Role        string    `gorm:"size:32;default:'member';index:idx_workspace_members_role;comment:角色 owner/admin/member/viewer" json:"role"`
 	Status      string    `gorm:"size:32;default:'active';comment:状态 active/invited/suspended" json:"status"`
 	JoinedAt    time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"joined_at"`
@@ -43,7 +43,7 @@ type WorkspaceMember struct {
 
 	// 关联关系
 	Workspace *Workspace `gorm:"foreignKey:WorkspaceID" json:"workspace,omitempty"`
-	Customer  *Customer  `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
+	User      *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 }
 
 // TableName 指定表名

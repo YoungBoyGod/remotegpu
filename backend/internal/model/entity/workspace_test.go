@@ -57,7 +57,7 @@ func TestWorkspaceMember_Create(t *testing.T) {
 	member := WorkspaceMember{
 		ID:          1,
 		WorkspaceID: 10,
-		CustomerID:  100,
+		UserID:  100,
 		Role:        "member",
 		Status:      "active",
 		JoinedAt:    now,
@@ -66,7 +66,7 @@ func TestWorkspaceMember_Create(t *testing.T) {
 
 	assert.Equal(t, uint(1), member.ID)
 	assert.Equal(t, uint(10), member.WorkspaceID)
-	assert.Equal(t, uint(100), member.CustomerID)
+	assert.Equal(t, uint(100), member.UserID)
 	assert.Equal(t, "member", member.Role)
 	assert.Equal(t, "active", member.Status)
 	assert.Equal(t, now, member.JoinedAt)

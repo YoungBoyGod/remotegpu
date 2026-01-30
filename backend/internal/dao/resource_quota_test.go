@@ -22,11 +22,11 @@ func TestResourceQuotaDao_CRUD(t *testing.T) {
 	setupResourceQuotaTest(t)
 
 	dao := NewResourceQuotaDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 	workspaceDao := NewWorkspaceDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-quota-user-" + time.Now().Format("20060102150405"),
 		Email:        "quota-test-" + time.Now().Format("20060102150405") + "@example.com",
@@ -57,7 +57,7 @@ func TestResourceQuotaDao_CRUD(t *testing.T) {
 
 	// 测试 Create - 用户级别配额
 	userQuota := &entity.ResourceQuota{
-		CustomerID:       customer.ID,
+		UserID:       customer.ID,
 		WorkspaceID:      nil,
 		QuotaLevel:       "pro",
 		CPU:              16,
@@ -82,8 +82,8 @@ func TestResourceQuotaDao_CRUD(t *testing.T) {
 	}
 	t.Log("获取配额成功")
 
-	// 测试 GetByCustomerID
-	customerQuota, err := dao.GetByCustomerID(customer.ID)
+	// 测试 GetByUserID
+	customerQuota, err := dao.GetByUserID(customer.ID)
 	if err != nil {
 		t.Fatalf("根据客户ID获取配额失败: %v", err)
 	}
@@ -119,11 +119,11 @@ func TestResourceQuotaDao_WorkspaceQuota(t *testing.T) {
 	setupResourceQuotaTest(t)
 
 	dao := NewResourceQuotaDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 	workspaceDao := NewWorkspaceDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-ws-quota-user-" + time.Now().Format("20060102150405"),
 		Email:        "ws-quota-test-" + time.Now().Format("20060102150405") + "@example.com",
@@ -154,7 +154,7 @@ func TestResourceQuotaDao_WorkspaceQuota(t *testing.T) {
 
 	// 创建工作空间级别配额
 	wsQuota := &entity.ResourceQuota{
-		CustomerID:       customer.ID,
+		UserID:       customer.ID,
 		WorkspaceID:      &workspace.ID,
 		QuotaLevel:       "basic",
 		CPU:              8,
@@ -179,8 +179,8 @@ func TestResourceQuotaDao_WorkspaceQuota(t *testing.T) {
 	}
 	t.Log("根据工作空间ID获取配额成功")
 
-	// 测试 GetByCustomerAndWorkspace
-	found2, err := dao.GetByCustomerAndWorkspace(customer.ID, workspace.ID)
+	// 测试 GetByUserAndWorkspace
+	found2, err := dao.GetByUserAndWorkspace(customer.ID, workspace.ID)
 	if err != nil {
 		t.Fatalf("根据客户和工作空间ID获取配额失败: %v", err)
 	}
@@ -196,10 +196,10 @@ func TestResourceQuotaDao_List(t *testing.T) {
 	setupResourceQuotaTest(t)
 
 	dao := NewResourceQuotaDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-list-quota-user-" + time.Now().Format("20060102150405"),
 		Email:        "list-quota-test-" + time.Now().Format("20060102150405") + "@example.com",
@@ -215,7 +215,7 @@ func TestResourceQuotaDao_List(t *testing.T) {
 
 	// 创建多个配额记录
 	quota1 := &entity.ResourceQuota{
-		CustomerID:       customer.ID,
+		UserID:       customer.ID,
 		WorkspaceID:      nil,
 		QuotaLevel:       "free",
 		CPU:              8,
@@ -261,13 +261,13 @@ func TestResourceQuotaDao_ErrorScenarios(t *testing.T) {
 		t.Logf("GetByID 不存在的ID测试通过: %v", err)
 	})
 
-	// 测试 GetByCustomerID - 不存在的客户ID
-	t.Run("GetByCustomerID_NotFound", func(t *testing.T) {
-		_, err := dao.GetByCustomerID(99999)
+	// 测试 GetByUserID - 不存在的客户ID
+	t.Run("GetByUserID_NotFound", func(t *testing.T) {
+		_, err := dao.GetByUserID(99999)
 		if err == nil {
 			t.Error("获取不存在客户的配额应该返回错误")
 		}
-		t.Logf("GetByCustomerID 不存在的客户ID测试通过: %v", err)
+		t.Logf("GetByUserID 不存在的客户ID测试通过: %v", err)
 	})
 
 	// 测试 GetByWorkspaceID - 不存在的工作空间ID
@@ -279,13 +279,13 @@ func TestResourceQuotaDao_ErrorScenarios(t *testing.T) {
 		t.Logf("GetByWorkspaceID 不存在的工作空间ID测试通过: %v", err)
 	})
 
-	// 测试 GetByCustomerAndWorkspace - 不存在的组合
-	t.Run("GetByCustomerAndWorkspace_NotFound", func(t *testing.T) {
-		_, err := dao.GetByCustomerAndWorkspace(99999, 99999)
+	// 测试 GetByUserAndWorkspace - 不存在的组合
+	t.Run("GetByUserAndWorkspace_NotFound", func(t *testing.T) {
+		_, err := dao.GetByUserAndWorkspace(99999, 99999)
 		if err == nil {
 			t.Error("获取不存在的客户和工作空间组合配额应该返回错误")
 		}
-		t.Logf("GetByCustomerAndWorkspace 不存在的组合测试通过: %v", err)
+		t.Logf("GetByUserAndWorkspace 不存在的组合测试通过: %v", err)
 	})
 
 	t.Log("错误场景测试通过")
@@ -296,10 +296,10 @@ func TestResourceQuotaDao_ListEdgeCases(t *testing.T) {
 	setupResourceQuotaTest(t)
 
 	dao := NewResourceQuotaDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-list-edge-" + time.Now().Format("20060102150405"),
 		Email:        "list-edge-" + time.Now().Format("20060102150405") + "@example.com",
@@ -315,7 +315,7 @@ func TestResourceQuotaDao_ListEdgeCases(t *testing.T) {
 
 	// 创建测试配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         8,
 		Memory:      16384,
@@ -390,10 +390,10 @@ func TestResourceQuotaDao_GetByQuotaLevel(t *testing.T) {
 	setupResourceQuotaTest(t)
 
 	dao := NewResourceQuotaDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 
 	// 创建测试客户
-	customer1 := &entity.Customer{
+	customer1 := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-level-user1-" + time.Now().Format("20060102150405"),
 		Email:        "level-test1-" + time.Now().Format("20060102150405") + "@example.com",
@@ -407,7 +407,7 @@ func TestResourceQuotaDao_GetByQuotaLevel(t *testing.T) {
 	}
 	defer customerDao.Delete(customer1.ID)
 
-	customer2 := &entity.Customer{
+	customer2 := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-level-user2-" + time.Now().Format("20060102150405"),
 		Email:        "level-test2-" + time.Now().Format("20060102150405") + "@example.com",
@@ -423,7 +423,7 @@ func TestResourceQuotaDao_GetByQuotaLevel(t *testing.T) {
 
 	// 创建不同级别的配额
 	quotaPro := &entity.ResourceQuota{
-		CustomerID:       customer1.ID,
+		UserID:       customer1.ID,
 		WorkspaceID:      nil,
 		QuotaLevel:       "pro",
 		CPU:              16,
@@ -439,7 +439,7 @@ func TestResourceQuotaDao_GetByQuotaLevel(t *testing.T) {
 	defer dao.Delete(quotaPro.ID)
 
 	quotaBasic := &entity.ResourceQuota{
-		CustomerID:       customer2.ID,
+		UserID:       customer2.ID,
 		WorkspaceID:      nil,
 		QuotaLevel:       "basic",
 		CPU:              8,
@@ -481,7 +481,7 @@ func TestResourceQuotaDao_CheckQuota(t *testing.T) {
 	setupResourceQuotaTest(t)
 
 	dao := NewResourceQuotaDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 
 	// 自动迁移Host和Environment表
 	db := database.GetDB()
@@ -490,7 +490,7 @@ func TestResourceQuotaDao_CheckQuota(t *testing.T) {
 	}
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-check-user-" + time.Now().Format("20060102150405"),
 		Email:        "check-test-" + time.Now().Format("20060102150405") + "@example.com",
@@ -506,7 +506,7 @@ func TestResourceQuotaDao_CheckQuota(t *testing.T) {
 
 	// 创建配额：CPU=16, Memory=32768, GPU=4, Storage=1000
 	quota := &entity.ResourceQuota{
-		CustomerID:       customer.ID,
+		UserID:       customer.ID,
 		WorkspaceID:      nil,
 		QuotaLevel:       "pro",
 		CPU:              16,
@@ -541,7 +541,7 @@ func TestResourceQuotaDao_CheckQuota(t *testing.T) {
 	// 创建一个运行中的环境：CPU=8, Memory=16384, GPU=2, Storage=500
 	env := &entity.Environment{
 		ID:          "test-env-" + uuid.New().String(),
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		HostID:      host.ID,
 		Name:        "Test Environment",
@@ -634,7 +634,7 @@ func TestResourceQuotaDao_GetAvailableQuota(t *testing.T) {
 	setupResourceQuotaTest(t)
 
 	dao := NewResourceQuotaDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 
 	// 自动迁移Host和Environment表
 	db := database.GetDB()
@@ -643,7 +643,7 @@ func TestResourceQuotaDao_GetAvailableQuota(t *testing.T) {
 	}
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-available-user-" + time.Now().Format("20060102150405"),
 		Email:        "available-test-" + time.Now().Format("20060102150405") + "@example.com",
@@ -659,7 +659,7 @@ func TestResourceQuotaDao_GetAvailableQuota(t *testing.T) {
 
 	// 创建配额：CPU=16, Memory=32768, GPU=4, Storage=1000
 	quota := &entity.ResourceQuota{
-		CustomerID:       customer.ID,
+		UserID:       customer.ID,
 		WorkspaceID:      nil,
 		QuotaLevel:       "pro",
 		CPU:              16,
@@ -694,7 +694,7 @@ func TestResourceQuotaDao_GetAvailableQuota(t *testing.T) {
 	// 创建一个运行中的环境：CPU=8, Memory=16384, GPU=2, Storage=500
 	env := &entity.Environment{
 		ID:          "test-env-" + uuid.New().String(),
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		HostID:      host.ID,
 		Name:        "Test Environment",

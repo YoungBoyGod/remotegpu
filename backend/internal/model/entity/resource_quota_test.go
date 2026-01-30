@@ -21,7 +21,7 @@ func TestResourceQuota_Create(t *testing.T) {
 
 	quota := ResourceQuota{
 		ID:          1,
-		CustomerID:  100,
+		UserID:  100,
 		WorkspaceID: &workspaceID,
 		CPU:         8,
 		Memory:      16384,
@@ -32,7 +32,7 @@ func TestResourceQuota_Create(t *testing.T) {
 	}
 
 	assert.Equal(t, uint(1), quota.ID)
-	assert.Equal(t, uint(100), quota.CustomerID)
+	assert.Equal(t, uint(100), quota.UserID)
 	assert.NotNil(t, quota.WorkspaceID)
 	assert.Equal(t, uint(10), *quota.WorkspaceID)
 	assert.Equal(t, 8, quota.CPU)
@@ -49,7 +49,7 @@ func TestResourceQuota_CreateWithNilWorkspace(t *testing.T) {
 
 	quota := ResourceQuota{
 		ID:          1,
-		CustomerID:  100,
+		UserID:  100,
 		WorkspaceID: nil,
 		CPU:         16,
 		Memory:      32768,
@@ -60,7 +60,7 @@ func TestResourceQuota_CreateWithNilWorkspace(t *testing.T) {
 	}
 
 	assert.Equal(t, uint(1), quota.ID)
-	assert.Equal(t, uint(100), quota.CustomerID)
+	assert.Equal(t, uint(100), quota.UserID)
 	assert.Nil(t, quota.WorkspaceID)
 	assert.Equal(t, 16, quota.CPU)
 	assert.Equal(t, int64(32768), quota.Memory)
@@ -171,7 +171,7 @@ func TestResourceQuota_ZeroValues(t *testing.T) {
 	quota := ResourceQuota{}
 
 	assert.Equal(t, uint(0), quota.ID)
-	assert.Equal(t, uint(0), quota.CustomerID)
+	assert.Equal(t, uint(0), quota.UserID)
 	assert.Nil(t, quota.WorkspaceID)
 	assert.Equal(t, 0, quota.CPU)
 	assert.Equal(t, int64(0), quota.Memory)

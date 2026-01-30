@@ -24,41 +24,41 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-// MockCustomerDao 是 CustomerDao 的 mock 实现
+// MockCustomerDao 是 UserDao 的 mock 实现
 type MockCustomerDao struct {
 	mock.Mock
 }
 
-func (m *MockCustomerDao) Create(customer *entity.Customer) error {
+func (m *MockCustomerDao) Create(customer *entity.User) error {
 	args := m.Called(customer)
 	return args.Error(0)
 }
 
-func (m *MockCustomerDao) GetByID(id uint) (*entity.Customer, error) {
+func (m *MockCustomerDao) GetByID(id uint) (*entity.User, error) {
 	args := m.Called(id)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.Customer), args.Error(1)
+	return args.Get(0).(*entity.User), args.Error(1)
 }
 
-func (m *MockCustomerDao) GetByUsername(username string) (*entity.Customer, error) {
+func (m *MockCustomerDao) GetByUsername(username string) (*entity.User, error) {
 	args := m.Called(username)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.Customer), args.Error(1)
+	return args.Get(0).(*entity.User), args.Error(1)
 }
 
-func (m *MockCustomerDao) GetByEmail(email string) (*entity.Customer, error) {
+func (m *MockCustomerDao) GetByEmail(email string) (*entity.User, error) {
 	args := m.Called(email)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
 	}
-	return args.Get(0).(*entity.Customer), args.Error(1)
+	return args.Get(0).(*entity.User), args.Error(1)
 }
 
-func (m *MockCustomerDao) Update(customer *entity.Customer) error {
+func (m *MockCustomerDao) Update(customer *entity.User) error {
 	args := m.Called(customer)
 	return args.Error(0)
 }
@@ -68,12 +68,12 @@ func (m *MockCustomerDao) Delete(id uint) error {
 	return args.Error(0)
 }
 
-func (m *MockCustomerDao) List(page, pageSize int) ([]*entity.Customer, int64, error) {
+func (m *MockCustomerDao) List(page, pageSize int) ([]*entity.User, int64, error) {
 	args := m.Called(page, pageSize)
 	if args.Get(0) == nil {
 		return nil, args.Get(1).(int64), args.Error(2)
 	}
-	return args.Get(0).([]*entity.Customer), args.Get(1).(int64), args.Error(2)
+	return args.Get(0).([]*entity.User), args.Get(1).(int64), args.Error(2)
 }
 
 // TestUserService_Register_Success 测试注册成功
@@ -95,7 +95,7 @@ func TestUserService_Register_Success(t *testing.T) {
 	// Mock GetByEmail - 邮箱不存在
 	mockDao.On("GetByEmail", req.Email).Return(nil, gorm.ErrRecordNotFound)
 	// Mock Create - 创建成功
-	mockDao.On("Create", mock.AnythingOfType("*entity.Customer")).Return(nil)
+	mockDao.On("Create", mock.AnythingOfType("*entity.User")).Return(nil)
 
 	err := service.Register(req)
 	assert.NoError(t, err)
@@ -115,7 +115,7 @@ func TestUserService_Register_DuplicateUsername(t *testing.T) {
 		Password: "password123",
 	}
 
-	existingUser := &entity.Customer{
+	existingUser := &entity.User{
 		ID:       1,
 		Username: "existinguser",
 	}
@@ -142,7 +142,7 @@ func TestUserService_Register_DuplicateEmail(t *testing.T) {
 		Password: "password123",
 	}
 
-	existingUser := &entity.Customer{
+	existingUser := &entity.User{
 		ID:    1,
 		Email: "existing@example.com",
 	}
@@ -173,7 +173,7 @@ func TestUserService_Login_Success(t *testing.T) {
 		Password: password,
 	}
 
-	existingUser := &entity.Customer{
+	existingUser := &entity.User{
 		ID:           1,
 		UUID:         uuid.New(),
 		Username:     "testuser",
@@ -211,7 +211,7 @@ func TestUserService_Login_WrongPassword(t *testing.T) {
 		Password: "wrongpassword",
 	}
 
-	existingUser := &entity.Customer{
+	existingUser := &entity.User{
 		ID:           1,
 		Username:     "testuser",
 		PasswordHash: string(hashedPassword),
@@ -265,7 +265,7 @@ func TestUserService_Login_UserSuspended(t *testing.T) {
 		Password: password,
 	}
 
-	existingUser := &entity.Customer{
+	existingUser := &entity.User{
 		ID:           1,
 		Username:     "testuser",
 		PasswordHash: string(hashedPassword),
@@ -290,7 +290,7 @@ func TestUserService_GetUserInfo(t *testing.T) {
 	}
 
 	userID := uint(1)
-	existingUser := &entity.Customer{
+	existingUser := &entity.User{
 		ID:          userID,
 		UUID:        uuid.New(),
 		Username:    "testuser",
@@ -321,7 +321,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 	}
 
 	userID := uint(1)
-	existingUser := &entity.Customer{
+	existingUser := &entity.User{
 		ID:          userID,
 		Username:    "testuser",
 		Email:       "test@example.com",
@@ -337,7 +337,7 @@ func TestUserService_UpdateUser(t *testing.T) {
 	// Mock GetByID - 用户存在
 	mockDao.On("GetByID", userID).Return(existingUser, nil)
 	// Mock Update - 更新成功
-	mockDao.On("Update", mock.AnythingOfType("*entity.Customer")).Return(nil)
+	mockDao.On("Update", mock.AnythingOfType("*entity.User")).Return(nil)
 
 	err := service.UpdateUser(userID, req)
 	assert.NoError(t, err)

@@ -7,8 +7,8 @@ import (
 	"gorm.io/gorm"
 )
 
-// Customer 客户实体（用户表）
-type Customer struct {
+// User 用户实体
+type User struct {
 	ID            uint           `gorm:"primarykey" json:"id"`
 	UUID          uuid.UUID      `gorm:"type:uuid;uniqueIndex;not null;default:uuid_generate_v4()" json:"uuid"`
 	Username      string         `gorm:"uniqueIndex;size:64;not null" json:"username"`
@@ -31,6 +31,6 @@ type Customer struct {
 }
 
 // TableName 指定表名
-func (Customer) TableName() string {
-	return "customers"
+func (User) TableName() string {
+	return "users"
 }

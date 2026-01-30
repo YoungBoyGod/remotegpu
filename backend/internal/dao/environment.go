@@ -27,7 +27,7 @@ func (d *EnvironmentDao) Create(env *entity.Environment) error {
 // GetByID 根据ID获取环境
 func (d *EnvironmentDao) GetByID(id string) (*entity.Environment, error) {
 	var env entity.Environment
-	err := d.db.Preload("Customer").Preload("Workspace").Preload("Host").Preload("PortMappings").
+	err := d.db.Preload("User").Preload("Workspace").Preload("Host").Preload("PortMappings").
 		Where("id = ?", id).First(&env).Error
 	if err != nil {
 		return nil, err
@@ -45,10 +45,10 @@ func (d *EnvironmentDao) Delete(id string) error {
 	return d.db.Delete(&entity.Environment{}, "id = ?", id).Error
 }
 
-// GetByCustomerID 根据客户ID获取环境列表
-func (d *EnvironmentDao) GetByCustomerID(customerID uint) ([]*entity.Environment, error) {
+// GetByUserID 根据用户ID获取环境列表
+func (d *EnvironmentDao) GetByUserID(userID uint) ([]*entity.Environment, error) {
 	var envs []*entity.Environment
-	err := d.db.Where("customer_id = ?", customerID).Find(&envs).Error
+	err := d.db.Where("user_id = ?", userID).Find(&envs).Error
 	if err != nil {
 		return nil, err
 	}

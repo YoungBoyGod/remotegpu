@@ -27,7 +27,7 @@ func TestEnvironmentIntegration_CreateAndDelete(t *testing.T) {
 	defer cleanupTestData(t)
 
 	// 准备测试数据：创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test_user_integration",
 		Email:        "test_integration@example.com",
@@ -71,7 +71,7 @@ func TestEnvironmentIntegration_CreateAndDelete(t *testing.T) {
 
 	// 准备测试数据：创建资源配额
 	quota := &entity.ResourceQuota{
-		CustomerID: customer.ID,
+		UserID: customer.ID,
 		CPU:        100,
 		Memory:     200000,
 		GPU:        10,

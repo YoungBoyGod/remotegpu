@@ -48,7 +48,7 @@ func (m *MockEnvironmentDao) GetByID(id string) (*entity.Environment, error) {
 	return args.Get(0).(*entity.Environment), args.Error(1)
 }
 
-func (m *MockEnvironmentDao) GetByCustomerID(customerID uint) ([]*entity.Environment, error) {
+func (m *MockEnvironmentDao) GetByUserID(customerID uint) ([]*entity.Environment, error) {
 	args := m.Called(customerID)
 	if args.Get(0) == nil {
 		return nil, args.Error(1)
@@ -319,10 +319,10 @@ func TestGetEnvironment_NotFound(t *testing.T) {
 func TestListEnvironments_ByCustomer(t *testing.T) {
 	mockEnvDao := new(MockEnvironmentDao)
 	expectedEnvs := []*entity.Environment{
-		{ID: "env-1", Name: "env1", CustomerID: 1},
-		{ID: "env-2", Name: "env2", CustomerID: 1},
+		{ID: "env-1", Name: "env1", UserID: 1},
+		{ID: "env-2", Name: "env2", UserID: 1},
 	}
-	mockEnvDao.On("GetByCustomerID", uint(1)).Return(expectedEnvs, nil)
+	mockEnvDao.On("GetByUserID", uint(1)).Return(expectedEnvs, nil)
 
 	service := &EnvironmentService{
 		envDao: mockEnvDao,
@@ -460,7 +460,7 @@ func TestCreateEnvironment_QuotaCheckFailed(t *testing.T) {
 	mockQuotaService := new(MockResourceQuotaService)
 
 	req := &CreateEnvironmentRequest{
-		CustomerID: 1,
+		UserID: 1,
 		Name:       "test-env",
 		Image:      "ubuntu:20.04",
 		CPU:        4,
@@ -490,7 +490,7 @@ func TestCreateEnvironment_HostSelectionFailed(t *testing.T) {
 	mockQuotaService := new(MockResourceQuotaService)
 
 	req := &CreateEnvironmentRequest{
-		CustomerID: 1,
+		UserID: 1,
 		Name:       "test-env",
 		Image:      "ubuntu:20.04",
 		CPU:        4,

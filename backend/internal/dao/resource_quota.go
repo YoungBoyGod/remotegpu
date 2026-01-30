@@ -49,10 +49,10 @@ func (d *ResourceQuotaDao) GetByID(id uint) (*entity.ResourceQuota, error) {
 	return &quota, nil
 }
 
-// GetByCustomerID 根据客户ID获取资源配额（用户级别配额，workspace_id为空）
-func (d *ResourceQuotaDao) GetByCustomerID(customerID uint) (*entity.ResourceQuota, error) {
+// GetByUserID 根据用户ID获取资源配额（用户级别配额，workspace_id为空）
+func (d *ResourceQuotaDao) GetByUserID(userID uint) (*entity.ResourceQuota, error) {
 	var quota entity.ResourceQuota
-	err := d.db.Where("customer_id = ? AND workspace_id IS NULL", customerID).First(&quota).Error
+	err := d.db.Where("user_id = ? AND workspace_id IS NULL", userID).First(&quota).Error
 	if err != nil {
 		return nil, err
 	}
@@ -69,10 +69,10 @@ func (d *ResourceQuotaDao) GetByWorkspaceID(workspaceID uint) (*entity.ResourceQ
 	return &quota, nil
 }
 
-// GetByCustomerAndWorkspace 根据客户ID和工作空间ID获取资源配额
-func (d *ResourceQuotaDao) GetByCustomerAndWorkspace(customerID, workspaceID uint) (*entity.ResourceQuota, error) {
+// GetByUserAndWorkspace 根据用户ID和工作空间ID获取资源配额
+func (d *ResourceQuotaDao) GetByUserAndWorkspace(userID, workspaceID uint) (*entity.ResourceQuota, error) {
 	var quota entity.ResourceQuota
-	err := d.db.Where("customer_id = ? AND workspace_id = ?", customerID, workspaceID).First(&quota).Error
+	err := d.db.Where("user_id = ? AND workspace_id = ?", userID, workspaceID).First(&quota).Error
 	if err != nil {
 		return nil, err
 	}
@@ -129,13 +129,13 @@ func (d *ResourceQuotaDao) GetByQuotaLevel(level string) ([]*entity.ResourceQuot
 }
 
 // GetUsedResources 统计用户所有运行中环境的资源使用情况
-func (d *ResourceQuotaDao) GetUsedResources(customerID uint) (*UsedResources, error) {
+func (d *ResourceQuotaDao) GetUsedResources(userID uint) (*UsedResources, error) {
 	var result UsedResources
 
 	// 查询用户所有运行中的环境，统计资源使用
 	err := d.db.Model(&entity.Environment{}).
 		Select("COALESCE(SUM(cpu), 0) as cpu, COALESCE(SUM(memory), 0) as memory, COALESCE(SUM(gpu), 0) as gpu, COALESCE(SUM(storage), 0) as storage").
-		Where("customer_id = ? AND status = ?", customerID, "running").
+		Where("user_id = ? AND status = ?", userID, "running").
 		Scan(&result).Error
 
 	if err != nil {
@@ -146,15 +146,15 @@ func (d *ResourceQuotaDao) GetUsedResources(customerID uint) (*UsedResources, er
 }
 
 // GetAvailableQuota 计算用户的可用配额
-func (d *ResourceQuotaDao) GetAvailableQuota(customerID uint) (*AvailableQuota, error) {
+func (d *ResourceQuotaDao) GetAvailableQuota(userID uint) (*AvailableQuota, error) {
 	// 获取用户配额
-	quota, err := d.GetByCustomerID(customerID)
+	quota, err := d.GetByUserID(userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// 获取已使用的资源
-	used, err := d.GetUsedResources(customerID)
+	used, err := d.GetUsedResources(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -171,15 +171,15 @@ func (d *ResourceQuotaDao) GetAvailableQuota(customerID uint) (*AvailableQuota, 
 }
 
 // CheckQuota 检查用户请求的资源是否超过配额限制
-func (d *ResourceQuotaDao) CheckQuota(customerID uint, cpu int, memory int64, gpu int, storage int64) (bool, error) {
+func (d *ResourceQuotaDao) CheckQuota(userID uint, cpu int, memory int64, gpu int, storage int64) (bool, error) {
 	// 获取用户配额
-	quota, err := d.GetByCustomerID(customerID)
+	quota, err := d.GetByUserID(userID)
 	if err != nil {
 		return false, err
 	}
 
 	// 获取已使用的资源
-	used, err := d.GetUsedResources(customerID)
+	used, err := d.GetUsedResources(userID)
 	if err != nil {
 		return false, err
 	}

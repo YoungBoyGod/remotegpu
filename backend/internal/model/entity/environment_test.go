@@ -24,7 +24,7 @@ func TestEnvironment_Create(t *testing.T) {
 
 	env := Environment{
 		ID:          "env-test-001",
-		CustomerID:  100,
+		UserID:  100,
 		WorkspaceID: &workspaceID,
 		HostID:      "host-001",
 		Name:        "Test Environment",
@@ -46,7 +46,7 @@ func TestEnvironment_Create(t *testing.T) {
 	}
 
 	assert.Equal(t, "env-test-001", env.ID)
-	assert.Equal(t, uint(100), env.CustomerID)
+	assert.Equal(t, uint(100), env.UserID)
 	assert.Equal(t, uint(10), *env.WorkspaceID)
 	assert.Equal(t, "host-001", env.HostID)
 	assert.Equal(t, "Test Environment", env.Name)
@@ -102,7 +102,7 @@ func TestEnvironment_PointerFields(t *testing.T) {
 	// 测试所有指针字段为 nil 的情况
 	env := Environment{
 		ID:         "env-test-002",
-		CustomerID: 100,
+		UserID: 100,
 		HostID:     "host-001",
 		Name:       "Test Environment",
 		Image:      "ubuntu:22.04",
@@ -155,7 +155,7 @@ func TestEnvironment_StatusValues(t *testing.T) {
 	for _, status := range validStatuses {
 		env := Environment{
 			ID:         "env-test-" + status,
-			CustomerID: 100,
+			UserID: 100,
 			HostID:     "host-001",
 			Name:       "Test Environment",
 			Image:      "ubuntu:22.04",
@@ -238,7 +238,7 @@ func TestPortMapping_ReleasedAt(t *testing.T) {
 func TestEnvironment_MinimalFields(t *testing.T) {
 	env := Environment{
 		ID:         "env-minimal",
-		CustomerID: 1,
+		UserID: 1,
 		HostID:     "host-001",
 		Name:       "Minimal Env",
 		Image:      "ubuntu:22.04",
@@ -247,7 +247,7 @@ func TestEnvironment_MinimalFields(t *testing.T) {
 	}
 
 	assert.Equal(t, "env-minimal", env.ID)
-	assert.Equal(t, uint(1), env.CustomerID)
+	assert.Equal(t, uint(1), env.UserID)
 	assert.Equal(t, "host-001", env.HostID)
 	assert.Equal(t, "Minimal Env", env.Name)
 	assert.Equal(t, "ubuntu:22.04", env.Image)

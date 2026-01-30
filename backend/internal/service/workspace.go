@@ -119,7 +119,7 @@ func (s *WorkspaceService) ListWorkspaces(ownerID uint, page, pageSize int) ([]*
 }
 
 // AddMember 添加工作空间成员
-func (s *WorkspaceService) AddMember(workspaceID, customerID uint, role string) error {
+func (s *WorkspaceService) AddMember(workspaceID, userID uint, role string) error {
 	// 检查工作空间是否存在
 	workspace, err := s.workspaceDao.GetByID(workspaceID)
 	if err != nil {
@@ -130,7 +130,7 @@ func (s *WorkspaceService) AddMember(workspaceID, customerID uint, role string) 
 	}
 
 	// 检查成员是否已存在
-	existing, err := s.memberDao.GetByWorkspaceAndCustomer(workspaceID, customerID)
+	existing, err := s.memberDao.GetByWorkspaceAndUser(workspaceID, userID)
 	if err == nil && existing != nil {
 		return fmt.Errorf("成员已存在")
 	}
@@ -154,7 +154,7 @@ func (s *WorkspaceService) AddMember(workspaceID, customerID uint, role string) 
 	// 创建成员
 	member := &entity.WorkspaceMember{
 		WorkspaceID: workspaceID,
-		CustomerID:  customerID,
+		UserID:      userID,
 		Role:        role,
 		Status:      "active",
 	}
@@ -169,7 +169,7 @@ func (s *WorkspaceService) AddMember(workspaceID, customerID uint, role string) 
 }
 
 // RemoveMember 移除工作空间成员
-func (s *WorkspaceService) RemoveMember(workspaceID, customerID uint) error {
+func (s *WorkspaceService) RemoveMember(workspaceID, userID uint) error {
 	// 检查工作空间是否存在
 	workspace, err := s.workspaceDao.GetByID(workspaceID)
 	if err != nil {
@@ -180,7 +180,7 @@ func (s *WorkspaceService) RemoveMember(workspaceID, customerID uint) error {
 	}
 
 	// 检查成员是否存在
-	member, err := s.memberDao.GetByWorkspaceAndCustomer(workspaceID, customerID)
+	member, err := s.memberDao.GetByWorkspaceAndUser(workspaceID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return fmt.Errorf("成员不存在")
@@ -189,7 +189,7 @@ func (s *WorkspaceService) RemoveMember(workspaceID, customerID uint) error {
 	}
 
 	// 不允许移除所有者
-	if workspace.OwnerID == customerID {
+	if workspace.OwnerID == userID {
 		return fmt.Errorf("不允许移除工作空间所有者")
 	}
 
@@ -211,7 +211,7 @@ func (s *WorkspaceService) ListMembers(workspaceID uint) ([]*entity.WorkspaceMem
 }
 
 // CheckPermission 检查用户是否有工作空间权限
-func (s *WorkspaceService) CheckPermission(workspaceID, customerID uint) (bool, error) {
+func (s *WorkspaceService) CheckPermission(workspaceID, userID uint) (bool, error) {
 	// 检查工作空间是否存在
 	workspace, err := s.workspaceDao.GetByID(workspaceID)
 	if err != nil {
@@ -227,12 +227,12 @@ func (s *WorkspaceService) CheckPermission(workspaceID, customerID uint) (bool, 
 	}
 
 	// 检查是否是所有者
-	if workspace.OwnerID == customerID {
+	if workspace.OwnerID == userID {
 		return true, nil
 	}
 
 	// 检查是否是成员
-	member, err := s.memberDao.GetByWorkspaceAndCustomer(workspaceID, customerID)
+	member, err := s.memberDao.GetByWorkspaceAndCustomer(workspaceID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil

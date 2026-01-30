@@ -21,12 +21,12 @@ func TestEnvironmentDao_CRUD(t *testing.T) {
 	}
 
 	envDao := NewEnvironmentDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 	workspaceDao := NewWorkspaceDao()
 	hostDao := NewHostDao()
 
 	// 创建测试用户
-	testCustomer := &entity.Customer{
+	testCustomer := &entity.User{
 		Username:     "test-env-customer-" + time.Now().Format("20060102150405"),
 		Email:        "env-test-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -72,7 +72,7 @@ func TestEnvironmentDao_CRUD(t *testing.T) {
 	storage := int64(10737418240) // 10GB
 	env := &entity.Environment{
 		ID:          "env-test-" + time.Now().Format("20060102150405"),
-		CustomerID:  testCustomer.ID,
+		UserID:  testCustomer.ID,
 		WorkspaceID: &testWorkspace.ID,
 		HostID:      testHost.ID,
 		Name:        "Test Environment",
@@ -113,8 +113,8 @@ func TestEnvironmentDao_CRUD(t *testing.T) {
 		t.Errorf("环境状态未更新: 期望 'running', 实际 '%s'", updated.Status)
 	}
 
-	// 测试 GetByCustomerID
-	envs, err := envDao.GetByCustomerID(testCustomer.ID)
+	// 测试 GetByUserID
+	envs, err := envDao.GetByUserID(testCustomer.ID)
 	if err != nil {
 		t.Fatalf("根据客户ID获取环境失败: %v", err)
 	}
@@ -177,11 +177,11 @@ func TestPortMappingDao_CRUD(t *testing.T) {
 
 	pmDao := NewPortMappingDao()
 	envDao := NewEnvironmentDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 	hostDao := NewHostDao()
 
 	// 创建测试用户
-	testCustomer := &entity.Customer{
+	testCustomer := &entity.User{
 		Username:     "test-pm-customer-" + time.Now().Format("20060102150405"),
 		Email:        "pm-test-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -211,7 +211,7 @@ func TestPortMappingDao_CRUD(t *testing.T) {
 	// 创建测试环境
 	testEnv := &entity.Environment{
 		ID:         "env-pm-test-" + time.Now().Format("20060102150405"),
-		CustomerID: testCustomer.ID,
+		UserID: testCustomer.ID,
 		HostID:     testHost.ID,
 		Name:       "Test Env for PM",
 		Image:      "ubuntu:22.04",
@@ -284,11 +284,11 @@ func TestPortMappingDao_ConcurrentAllocate(t *testing.T) {
 
 	pmDao := NewPortMappingDao()
 	envDao := NewEnvironmentDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 	hostDao := NewHostDao()
 
 	// 创建测试用户
-	testCustomer := &entity.Customer{
+	testCustomer := &entity.User{
 		Username:     "test-concurrent-" + time.Now().Format("20060102150405"),
 		Email:        "concurrent-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -318,7 +318,7 @@ func TestPortMappingDao_ConcurrentAllocate(t *testing.T) {
 	// 创建测试环境
 	testEnv := &entity.Environment{
 		ID:         "env-concurrent-" + time.Now().Format("20060102150405"),
-		CustomerID: testCustomer.ID,
+		UserID: testCustomer.ID,
 		HostID:     testHost.ID,
 		Name:       "Test Env for Concurrent",
 		Image:      "ubuntu:22.04",
@@ -405,8 +405,8 @@ func TestEnvironmentDao_ErrorScenarios(t *testing.T) {
 	})
 
 	// 测试查询不存在的客户ID
-	t.Run("GetByCustomerID_Empty", func(t *testing.T) {
-		envs, err := envDao.GetByCustomerID(999999)
+	t.Run("GetByUserID_Empty", func(t *testing.T) {
+		envs, err := envDao.GetByUserID(999999)
 		if err != nil {
 			t.Errorf("不应该返回错误: %v", err)
 		}
@@ -506,11 +506,11 @@ func TestPortMappingDao_PortBoundary(t *testing.T) {
 
 	pmDao := NewPortMappingDao()
 	envDao := NewEnvironmentDao()
-	customerDao := NewCustomerDao()
+	customerDao := NewUserDao()
 	hostDao := NewHostDao()
 
 	// 创建测试用户
-	testCustomer := &entity.Customer{
+	testCustomer := &entity.User{
 		Username:     "test-boundary-customer-" + time.Now().Format("20060102150405"),
 		Email:        "boundary-test-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -541,7 +541,7 @@ func TestPortMappingDao_PortBoundary(t *testing.T) {
 	// 创建测试环境
 	testEnv := &entity.Environment{
 		ID:         "test-boundary-env-" + time.Now().Format("20060102150405"),
-		CustomerID: testCustomer.ID,
+		UserID: testCustomer.ID,
 		HostID:     testHost.ID,
 		Name:       "Test Boundary Environment",
 		Image:      "ubuntu:22.04",

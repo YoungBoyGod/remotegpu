@@ -12,12 +12,12 @@ import (
 )
 
 type UserService struct {
-	customerDao dao.CustomerDaoInterface
+	customerDao dao.UserDaoInterface
 }
 
 func NewUserService() *UserService {
 	return &UserService{
-		customerDao: dao.NewCustomerDao(),
+		customerDao: dao.NewUserDao(),
 	}
 }
 
@@ -40,7 +40,7 @@ func (s *UserService) Register(req *v1.RegisterRequest) error {
 	}
 
 	// 创建用户
-	user := &entity.Customer{
+	user := &entity.User{
 		Username:     req.Username,
 		Email:        req.Email,
 		PasswordHash: string(hashedPassword),

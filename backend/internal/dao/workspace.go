@@ -138,20 +138,20 @@ func (d *WorkspaceMemberDao) GetByWorkspaceID(workspaceID uint) ([]*entity.Works
 	return members, nil
 }
 
-// GetByCustomerID 根据客户ID获取成员列表
-func (d *WorkspaceMemberDao) GetByCustomerID(customerID uint) ([]*entity.WorkspaceMember, error) {
+// GetByUserID 根据用户ID获取成员列表
+func (d *WorkspaceMemberDao) GetByUserID(userID uint) ([]*entity.WorkspaceMember, error) {
 	var members []*entity.WorkspaceMember
-	err := d.db.Where("customer_id = ?", customerID).Find(&members).Error
+	err := d.db.Where("user_id = ?", userID).Find(&members).Error
 	if err != nil {
 		return nil, err
 	}
 	return members, nil
 }
 
-// GetByWorkspaceAndCustomer 根据工作空间ID和客户ID获取成员
-func (d *WorkspaceMemberDao) GetByWorkspaceAndCustomer(workspaceID, customerID uint) (*entity.WorkspaceMember, error) {
+// GetByWorkspaceAndUser 根据工作空间ID和用户ID获取成员
+func (d *WorkspaceMemberDao) GetByWorkspaceAndUser(workspaceID, userID uint) (*entity.WorkspaceMember, error) {
 	var member entity.WorkspaceMember
-	err := d.db.Where("workspace_id = ? AND customer_id = ?", workspaceID, customerID).First(&member).Error
+	err := d.db.Where("workspace_id = ? AND user_id = ?", workspaceID, userID).First(&member).Error
 	if err != nil {
 		return nil, err
 	}

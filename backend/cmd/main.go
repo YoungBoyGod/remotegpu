@@ -102,7 +102,7 @@ func initInfrastructure() error {
 	}
 
 	// 自动迁移数据库表
-	if err := database.GetDB().AutoMigrate(&entity.Customer{}); err != nil {
+	if err := database.GetDB().AutoMigrate(&entity.User{}); err != nil {
 		return fmt.Errorf("数据库迁移失败: %w", err)
 	}
 	logger.GetLogger().Info("数据库表迁移完成")

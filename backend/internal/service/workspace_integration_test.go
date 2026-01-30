@@ -21,10 +21,10 @@ func TestWorkspaceIntegration_FullLifecycle(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 1. 创建所有者
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "integration-owner-" + time.Now().Format("20060102150405"),
 		Email:        "integration-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -49,9 +49,9 @@ func TestWorkspaceIntegration_FullLifecycle(t *testing.T) {
 	t.Logf("✓ 步骤2: 创建工作空间成功 (ID: %d, UUID: %s)", workspace.ID, workspace.UUID)
 
 	// 3. 添加多个成员
-	members := make([]*entity.Customer, 3)
+	members := make([]*entity.User, 3)
 	for i := 0; i < 3; i++ {
-		member := &entity.Customer{
+		member := &entity.User{
 			Username:     fmt.Sprintf("integration-member%d-%s", i, time.Now().Format("20060102150405")),
 			Email:        fmt.Sprintf("integration-member%d-%s@example.com", i, time.Now().Format("20060102150405")),
 			PasswordHash: "test-hash",
@@ -142,10 +142,10 @@ func TestWorkspaceIntegration_MemberManagement(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 1. 创建工作空间和所有者
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "member-mgmt-owner-" + time.Now().Format("20060102150405"),
 		Email:        "member-mgmt-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -168,7 +168,7 @@ func TestWorkspaceIntegration_MemberManagement(t *testing.T) {
 	t.Logf("✓ 步骤1: 创建工作空间成功")
 
 	// 2. 添加成员A（member角色）
-	memberA := &entity.Customer{
+	memberA := &entity.User{
 		Username:     "member-a-" + time.Now().Format("20060102150405"),
 		Email:        "member-a-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -185,7 +185,7 @@ func TestWorkspaceIntegration_MemberManagement(t *testing.T) {
 	t.Logf("✓ 步骤2: 添加成员A（member角色）成功")
 
 	// 3. 添加成员B（admin角色）
-	memberB := &entity.Customer{
+	memberB := &entity.User{
 		Username:     "member-b-" + time.Now().Format("20060102150405"),
 		Email:        "member-b-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -246,10 +246,10 @@ func TestWorkspaceIntegration_PermissionCheck(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 1. 创建工作空间和所有者
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "perm-owner-" + time.Now().Format("20060102150405"),
 		Email:        "perm-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -283,7 +283,7 @@ func TestWorkspaceIntegration_PermissionCheck(t *testing.T) {
 	t.Logf("✓ 步骤2: 所有者权限检查通过")
 
 	// 3. 添加成员并测试成员权限
-	member := &entity.Customer{
+	member := &entity.User{
 		Username:     "perm-member-" + time.Now().Format("20060102150405"),
 		Email:        "perm-member-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -308,7 +308,7 @@ func TestWorkspaceIntegration_PermissionCheck(t *testing.T) {
 	t.Logf("✓ 步骤3: 成员权限检查通过")
 
 	// 4. 测试非成员权限（应该拒绝）
-	nonMember := &entity.Customer{
+	nonMember := &entity.User{
 		Username:     "perm-nonmember-" + time.Now().Format("20060102150405"),
 		Email:        "perm-nonmember-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",
@@ -356,10 +356,10 @@ func TestWorkspaceIntegration_ConcurrentCreation(t *testing.T) {
 	}
 
 	service := NewWorkspaceService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试用户
-	owner := &entity.Customer{
+	owner := &entity.User{
 		Username:     "concurrent-owner-" + time.Now().Format("20060102150405"),
 		Email:        "concurrent-owner-" + time.Now().Format("20060102150405") + "@example.com",
 		PasswordHash: "test-hash",

@@ -22,7 +22,7 @@ type EnvironmentDaoInterface interface {
 	Create(env *entity.Environment) error
 	Update(env *entity.Environment) error
 	GetByID(id string) (*entity.Environment, error)
-	GetByCustomerID(customerID uint) ([]*entity.Environment, error)
+	GetByUserID(userID uint) ([]*entity.Environment, error)
 	GetByWorkspaceID(workspaceID uint) ([]*entity.Environment, error)
 }
 

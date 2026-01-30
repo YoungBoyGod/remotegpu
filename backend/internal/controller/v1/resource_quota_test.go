@@ -21,10 +21,10 @@ func TestResourceQuotaController_SetQuota(t *testing.T) {
 	r := setupRouter()
 
 	quotaCtrl := NewResourceQuotaController()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-quota-ctrl-" + uuid.New().String()[:8],
 		Email:        "quota-ctrl-" + uuid.New().String()[:8] + "@example.com",
@@ -40,7 +40,7 @@ func TestResourceQuotaController_SetQuota(t *testing.T) {
 
 	// 测试设置用户级别配额
 	req := SetQuotaRequest{
-		CustomerID: customer.ID,
+		UserID: customer.ID,
 		CPU:        16,
 		Memory:     32768,
 		GPU:        4,
@@ -75,10 +75,10 @@ func TestResourceQuotaController_GetQuota(t *testing.T) {
 	r := setupRouter()
 
 	quotaCtrl := NewResourceQuotaController()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-get-quota-" + uuid.New().String()[:8],
 		Email:        "get-quota-" + uuid.New().String()[:8] + "@example.com",
@@ -93,7 +93,7 @@ func TestResourceQuotaController_GetQuota(t *testing.T) {
 	// 先设置配额
 	quotaService := quotaCtrl.quotaService
 	quota := &entity.ResourceQuota{
-		CustomerID: customer.ID,
+		UserID: customer.ID,
 		CPU:        8,
 		Memory:     16384,
 		GPU:        2,
@@ -129,10 +129,10 @@ func TestResourceQuotaController_UpdateQuota(t *testing.T) {
 	r := setupRouter()
 
 	quotaCtrl := NewResourceQuotaController()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-update-quota-" + uuid.New().String()[:8],
 		Email:        "update-quota-" + uuid.New().String()[:8] + "@example.com",
@@ -147,7 +147,7 @@ func TestResourceQuotaController_UpdateQuota(t *testing.T) {
 	// 先设置配额
 	quotaService := quotaCtrl.quotaService
 	quota := &entity.ResourceQuota{
-		CustomerID: customer.ID,
+		UserID: customer.ID,
 		CPU:        8,
 		Memory:     16384,
 		GPU:        2,
@@ -183,10 +183,10 @@ func TestResourceQuotaController_DeleteQuota(t *testing.T) {
 	r := setupRouter()
 
 	quotaCtrl := NewResourceQuotaController()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-delete-quota-" + uuid.New().String()[:8],
 		Email:        "delete-quota-" + uuid.New().String()[:8] + "@example.com",
@@ -201,7 +201,7 @@ func TestResourceQuotaController_DeleteQuota(t *testing.T) {
 	// 先设置配额
 	quotaService := quotaCtrl.quotaService
 	quota := &entity.ResourceQuota{
-		CustomerID: customer.ID,
+		UserID: customer.ID,
 		CPU:        8,
 		Memory:     16384,
 		GPU:        2,
@@ -233,11 +233,11 @@ func TestResourceQuotaController_GetUsage(t *testing.T) {
 	r := setupRouter()
 
 	quotaCtrl := NewResourceQuotaController()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 	workspaceDao := dao.NewWorkspaceDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-usage-" + uuid.New().String()[:8],
 		Email:        "usage-" + uuid.New().String()[:8] + "@example.com",
@@ -263,7 +263,7 @@ func TestResourceQuotaController_GetUsage(t *testing.T) {
 	// 设置配额
 	quotaService := quotaCtrl.quotaService
 	quota := &entity.ResourceQuota{
-		CustomerID: customer.ID,
+		UserID: customer.ID,
 		CPU:        16,
 		Memory:     32768,
 		GPU:        4,
@@ -318,12 +318,12 @@ func TestResourceQuotaController_EnvironmentIntegration(t *testing.T) {
 	r := setupRouter()
 
 	quotaCtrl := NewResourceQuotaController()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 	workspaceDao := dao.NewWorkspaceDao()
 	envDao := dao.NewEnvironmentDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-env-integration-" + uuid.New().String()[:8],
 		Email:        "env-integration-" + uuid.New().String()[:8] + "@example.com",
@@ -353,7 +353,7 @@ func TestResourceQuotaController_EnvironmentIntegration(t *testing.T) {
 		r.POST("/quotas", quotaCtrl.SetQuota)
 
 		req := SetQuotaRequest{
-			CustomerID: customer.ID,
+			UserID: customer.ID,
 			CPU:        16,
 			Memory:     32768,
 			GPU:        4,
@@ -395,7 +395,7 @@ func TestResourceQuotaController_EnvironmentIntegration(t *testing.T) {
 		env1 := &entity.Environment{
 			ID:          "env-integration-1-" + uuid.New().String()[:8],
 			Name:        "env-integration-1",
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: &workspace.ID,
 			HostID:      host.ID,
 			Status:      "running",

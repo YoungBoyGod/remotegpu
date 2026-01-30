@@ -33,10 +33,10 @@ func TestResourceQuotaService_SetAndGetQuota(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-quota-service-" + uuid.New().String()[:8],
 		Email:        "quota-service-" + uuid.New().String()[:8] + "@example.com",
@@ -50,7 +50,7 @@ func TestResourceQuotaService_SetAndGetQuota(t *testing.T) {
 
 	// 测试设置用户级别配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         16,
 		Memory:      32768,
@@ -78,10 +78,10 @@ func TestResourceQuotaService_UpdateQuota(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-update-quota-" + uuid.New().String()[:8],
 		Email:        "update-quota-" + uuid.New().String()[:8] + "@example.com",
@@ -95,7 +95,7 @@ func TestResourceQuotaService_UpdateQuota(t *testing.T) {
 
 	// 设置初始配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         8,
 		Memory:      16384,
@@ -129,10 +129,10 @@ func TestResourceQuotaService_CheckQuota(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-check-quota-" + uuid.New().String()[:8],
 		Email:        "check-quota-" + uuid.New().String()[:8] + "@example.com",
@@ -146,7 +146,7 @@ func TestResourceQuotaService_CheckQuota(t *testing.T) {
 
 	// 设置配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         16,
 		Memory:      32768,
@@ -191,10 +191,10 @@ func TestResourceQuotaService_GetAvailableQuota(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-available-quota-" + uuid.New().String()[:8],
 		Email:        "available-quota-" + uuid.New().String()[:8] + "@example.com",
@@ -208,7 +208,7 @@ func TestResourceQuotaService_GetAvailableQuota(t *testing.T) {
 
 	// 设置配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         16,
 		Memory:      32768,
@@ -239,10 +239,10 @@ func TestResourceQuotaService_CheckQuota_AllResourceTypes(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-all-resources-" + uuid.New().String()[:8],
 		Email:        "all-resources-" + uuid.New().String()[:8] + "@example.com",
@@ -256,7 +256,7 @@ func TestResourceQuotaService_CheckQuota_AllResourceTypes(t *testing.T) {
 
 	// 设置配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         16,
 		Memory:      32768,
@@ -338,11 +338,11 @@ func TestResourceQuotaService_CheckQuotaInTx(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 	db := database.GetDB()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-quota-tx-" + uuid.New().String()[:8],
 		Email:        "quota-tx-" + uuid.New().String()[:8] + "@example.com",
@@ -356,7 +356,7 @@ func TestResourceQuotaService_CheckQuotaInTx(t *testing.T) {
 
 	// 设置配额
 	quota := &entity.ResourceQuota{
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: nil,
 		CPU:         16,
 		Memory:      32768,
@@ -476,10 +476,10 @@ func TestResourceQuotaService_SetQuota_BoundaryConditions(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-setquota-boundary-" + uuid.New().String()[:8],
 		Email:        "setquota-boundary-" + uuid.New().String()[:8] + "@example.com",
@@ -494,7 +494,7 @@ func TestResourceQuotaService_SetQuota_BoundaryConditions(t *testing.T) {
 	// 测试负数配额值
 	t.Run("Negative quota values", func(t *testing.T) {
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         -1,
 			Memory:      16384,
@@ -510,7 +510,7 @@ func TestResourceQuotaService_SetQuota_BoundaryConditions(t *testing.T) {
 	// 测试零配额值（应该允许）
 	t.Run("Zero quota values", func(t *testing.T) {
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         0,
 			Memory:      0,
@@ -532,7 +532,7 @@ func TestResourceQuotaService_SetQuota_BoundaryConditions(t *testing.T) {
 	t.Run("Duplicate set quota", func(t *testing.T) {
 		// 第一次设置
 		quota1 := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         8,
 			Memory:      16384,
@@ -544,7 +544,7 @@ func TestResourceQuotaService_SetQuota_BoundaryConditions(t *testing.T) {
 
 		// 第二次设置（应该更新）
 		quota2 := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
@@ -571,10 +571,10 @@ func TestResourceQuotaService_DeleteQuota(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-delete-quota-" + uuid.New().String()[:8],
 		Email:        "delete-quota-" + uuid.New().String()[:8] + "@example.com",
@@ -598,7 +598,7 @@ func TestResourceQuotaService_DeleteQuota(t *testing.T) {
 	t.Run("Delete existing quota", func(t *testing.T) {
 		// 先创建配额
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         8,
 			Memory:      16384,
@@ -629,12 +629,12 @@ func TestResourceQuotaService_GetUsedResources(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 	workspaceDao := dao.NewWorkspaceDao()
 	db := database.GetDB()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-used-resources-" + uuid.New().String()[:8],
 		Email:        "used-resources-" + uuid.New().String()[:8] + "@example.com",
@@ -689,7 +689,7 @@ func TestResourceQuotaService_GetUsedResources(t *testing.T) {
 	env1 := &entity.Environment{
 		ID:          "env-running-" + uuid.New().String()[:8],
 		Name:        "env-running",
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: &workspace.ID,
 		HostID:      host.ID,
 		Status:      "running",
@@ -707,7 +707,7 @@ func TestResourceQuotaService_GetUsedResources(t *testing.T) {
 	env2 := &entity.Environment{
 		ID:          "env-creating-" + uuid.New().String()[:8],
 		Name:        "env-creating",
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: &workspace.ID,
 		HostID:      host.ID,
 		Status:      "creating",
@@ -724,7 +724,7 @@ func TestResourceQuotaService_GetUsedResources(t *testing.T) {
 	env3 := &entity.Environment{
 		ID:          "env-stopped-" + uuid.New().String()[:8],
 		Name:        "env-stopped",
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: &workspace.ID,
 		HostID:      host.ID,
 		Status:      "stopped",
@@ -766,10 +766,10 @@ func TestResourceQuotaService_UpdateQuota_ErrorCases(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-update-error-" + uuid.New().String()[:8],
 		Email:        "update-error-" + uuid.New().String()[:8] + "@example.com",
@@ -800,7 +800,7 @@ func TestResourceQuotaService_UpdateQuota_ErrorCases(t *testing.T) {
 	t.Run("Update with negative values", func(t *testing.T) {
 		// 先创建配额
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         8,
 			Memory:      16384,
@@ -858,7 +858,7 @@ func TestResourceQuotaService_UpdateQuota_ErrorCases(t *testing.T) {
 
 		// 创建配额
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
@@ -873,7 +873,7 @@ func TestResourceQuotaService_UpdateQuota_ErrorCases(t *testing.T) {
 		env := &entity.Environment{
 			ID:          "env-test-" + uuid.New().String()[:8],
 			Name:        "env-test",
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: &workspace.ID,
 			HostID:      host.ID,
 			Status:      "running",
@@ -917,10 +917,10 @@ func TestResourceQuotaService_GetAvailableQuota_EdgeCases(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-available-edge-" + uuid.New().String()[:8],
 		Email:        "available-edge-" + uuid.New().String()[:8] + "@example.com",
@@ -973,7 +973,7 @@ func TestResourceQuotaService_GetAvailableQuota_EdgeCases(t *testing.T) {
 
 		// 创建较小的配额
 		quota := &entity.ResourceQuota{
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: nil,
 			CPU:         4,
 			Memory:      8192,
@@ -988,7 +988,7 @@ func TestResourceQuotaService_GetAvailableQuota_EdgeCases(t *testing.T) {
 		env := &entity.Environment{
 			ID:          "env-exceed-" + uuid.New().String()[:8],
 			Name:        "env-exceed",
-			CustomerID:  customer.ID,
+			UserID:  customer.ID,
 			WorkspaceID: &workspace.ID,
 			HostID:      host.ID,
 			Status:      "running",
@@ -1025,11 +1025,11 @@ func TestResourceQuotaService_GetQuota_ErrorCases(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 	workspaceDao := dao.NewWorkspaceDao()
 
 	// 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-getquota-error-" + uuid.New().String()[:8],
 		Email:        "getquota-error-" + uuid.New().String()[:8] + "@example.com",
@@ -1135,12 +1135,12 @@ func TestResourceQuotaService_GetUsedResources_Bug3Fix(t *testing.T) {
 	setupResourceQuotaServiceTest(t)
 
 	service := NewResourceQuotaService()
-	customerDao := dao.NewCustomerDao()
+	customerDao := dao.NewUserDao()
 	workspaceDao := dao.NewWorkspaceDao()
 	envDao := dao.NewEnvironmentDao()
 
 	// 1. 创建测试客户
-	customer := &entity.Customer{
+	customer := &entity.User{
 		UUID:         uuid.New(),
 		Username:     "test-bug3-" + uuid.New().String()[:8],
 		Email:        "bug3-" + uuid.New().String()[:8] + "@example.com",
@@ -1215,7 +1215,7 @@ func TestResourceQuotaService_GetUsedResources_Bug3Fix(t *testing.T) {
 	storage1 := int64(10 * 1024 * 1024 * 1024) // 10GB
 	env1 := &entity.Environment{
 		ID:          "env-ws1-1-" + uuid.New().String()[:8],
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: &workspace1.ID,
 		HostID:      "host-1",
 		Name:        "env-ws1-1",
@@ -1232,7 +1232,7 @@ func TestResourceQuotaService_GetUsedResources_Bug3Fix(t *testing.T) {
 
 	env2 := &entity.Environment{
 		ID:          "env-ws1-2-" + uuid.New().String()[:8],
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: &workspace1.ID,
 		HostID:      "host-1",
 		Name:        "env-ws1-2",
@@ -1253,7 +1253,7 @@ func TestResourceQuotaService_GetUsedResources_Bug3Fix(t *testing.T) {
 	storage2 := int64(5 * 1024 * 1024 * 1024) // 5GB
 	env3 := &entity.Environment{
 		ID:          "env-ws2-1-" + uuid.New().String()[:8],
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: &workspace2.ID,
 		HostID:      "host-2",
 		Name:        "env-ws2-1",
@@ -1273,7 +1273,7 @@ func TestResourceQuotaService_GetUsedResources_Bug3Fix(t *testing.T) {
 	// 6. 创建1个creating状态的环境（应该也被统计）
 	env4 := &entity.Environment{
 		ID:          "env-ws1-3-" + uuid.New().String()[:8],
-		CustomerID:  customer.ID,
+		UserID:  customer.ID,
 		WorkspaceID: &workspace1.ID,
 		HostID:      "host-1",
 		Name:        "env-ws1-3",

@@ -7,8 +7,8 @@ import (
 // ResourceQuota 资源配额实体
 type ResourceQuota struct {
 	ID                uint      `gorm:"primarykey" json:"id"`
-	CustomerID        uint      `gorm:"not null;uniqueIndex:idx_customer_workspace" json:"customer_id"`
-	WorkspaceID       *uint     `gorm:"uniqueIndex:idx_customer_workspace" json:"workspace_id"`
+	UserID            uint      `gorm:"not null;uniqueIndex:idx_user_workspace" json:"user_id"`
+	WorkspaceID       *uint     `gorm:"uniqueIndex:idx_user_workspace" json:"workspace_id"`
 	QuotaLevel        string    `gorm:"size:20;not null;default:'free';comment:配额级别 free/basic/pro/enterprise" json:"quota_level"`
 	CPU               int       `gorm:"not null;default:0;comment:CPU核心数配额" json:"cpu"`
 	Memory            int64     `gorm:"not null;default:0;comment:内存配额(MB)" json:"memory"`
@@ -19,7 +19,7 @@ type ResourceQuota struct {
 	UpdatedAt         time.Time `json:"updated_at"`
 
 	// 关联关系
-	Customer  *Customer  `gorm:"foreignKey:CustomerID" json:"customer,omitempty"`
+	User      *User      `gorm:"foreignKey:UserID" json:"user,omitempty"`
 	Workspace *Workspace `gorm:"foreignKey:WorkspaceID" json:"workspace,omitempty"`
 }
 
