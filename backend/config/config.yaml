@@ -16,7 +16,7 @@ redis:
   db: 0
 
 jwt:
-  secret: "remotegpu"
+  secret: "remotegpu-jwt-secret-key-change-in-production-32chars-min"
   expire_time: 24 # JWT过期时间(小时)
 
 log:
