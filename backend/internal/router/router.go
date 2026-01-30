@@ -11,6 +11,8 @@ func InitRouter(r *gin.Engine) {
 	// 初始化控制器
 	userController := v1.NewUserController()
 	healthController := v1.NewHealthController()
+	hostController := v1.NewHostController()
+	gpuController := v1.NewGPUController()
 
 	// API v1 路由组
 	apiV1 := r.Group("/api/v1")
@@ -46,6 +48,20 @@ func InitRouter(r *gin.Engine) {
 			// 健康检查
 			admin.GET("/health/all", healthController.CheckAll)
 			admin.GET("/health/:service", healthController.CheckService)
+
+			// 主机管理
+			admin.POST("/hosts", hostController.Create)
+			admin.GET("/hosts", hostController.List)
+			admin.GET("/hosts/:id", hostController.GetByID)
+			admin.PUT("/hosts/:id", hostController.Update)
+			admin.DELETE("/hosts/:id", hostController.Delete)
+			admin.POST("/hosts/:id/heartbeat", hostController.Heartbeat)
+
+			// GPU管理
+			admin.POST("/gpus", gpuController.Create)
+			admin.GET("/gpus/:id", gpuController.GetByID)
+			admin.GET("/hosts/:host_id/gpus", gpuController.GetByHostID)
+			admin.DELETE("/gpus/:id", gpuController.Delete)
 		}
 	}
 }
