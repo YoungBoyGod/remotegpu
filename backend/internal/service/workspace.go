@@ -6,12 +6,14 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
 // WorkspaceService 工作空间服务
 type WorkspaceService struct {
+	db           *gorm.DB
 	workspaceDao *dao.WorkspaceDao
 	memberDao    *dao.WorkspaceMemberDao
 }
@@ -19,6 +21,7 @@ type WorkspaceService struct {
 // NewWorkspaceService 创建工作空间服务实例
 func NewWorkspaceService() *WorkspaceService {
 	return &WorkspaceService{
+		db:           database.GetDB(),
 		workspaceDao: dao.NewWorkspaceDao(),
 		memberDao:    dao.NewWorkspaceMemberDao(),
 	}
@@ -26,6 +29,22 @@ func NewWorkspaceService() *WorkspaceService {
 
 // CreateWorkspace 创建工作空间
 func (s *WorkspaceService) CreateWorkspace(workspace *entity.Workspace) error {
+	// 验证名称
+	if workspace.Name == "" {
+		return fmt.Errorf("工作空间名称不能为空")
+	}
+	if len(workspace.Name) > 128 {
+		return fmt.Errorf("工作空间名称不能超过128个字符")
+	}
+
+	// 验证 Type 有效性
+	if workspace.Type != "" {
+		validTypes := map[string]bool{"personal": true, "team": true, "enterprise": true}
+		if !validTypes[workspace.Type] {
+			return fmt.Errorf("无效的工作空间类型: %s", workspace.Type)
+		}
+	}
+
 	// 生成 UUID
 	if workspace.UUID == uuid.Nil {
 		workspace.UUID = uuid.New()
@@ -71,19 +90,20 @@ func (s *WorkspaceService) UpdateWorkspace(workspace *entity.Workspace) error {
 
 // DeleteWorkspace 删除工作空间
 func (s *WorkspaceService) DeleteWorkspace(id uint) error {
-	// 先删除所有成员
-	members, err := s.memberDao.GetByWorkspaceID(id)
-	if err != nil {
-		return err
-	}
-
-	for _, member := range members {
-		if err := s.memberDao.Delete(member.ID); err != nil {
-			return err
+	// 使用事务确保数据一致性
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// 在事务中删除所有成员
+		if err := tx.Where("workspace_id = ?", id).Delete(&entity.WorkspaceMember{}).Error; err != nil {
+			return fmt.Errorf("删除工作空间成员失败: %w", err)
 		}
-	}
 
-	return s.workspaceDao.Delete(id)
+		// 在事务中删除工作空间
+		if err := tx.Delete(&entity.Workspace{}, id).Error; err != nil {
+			return fmt.Errorf("删除工作空间失败: %w", err)
+		}
+
+		return nil
+	})
 }
 
 // ListWorkspaces 获取工作空间列表
@@ -118,6 +138,17 @@ func (s *WorkspaceService) AddMember(workspaceID, customerID uint, role string) 
 	// 设置默认角色
 	if role == "" {
 		role = "member"
+	}
+
+	// 验证角色有效性
+	validRoles := map[string]bool{
+		"owner":  true,
+		"admin":  true,
+		"member": true,
+		"viewer": true,
+	}
+	if !validRoles[role] {
+		return fmt.Errorf("无效的角色: %s", role)
 	}
 
 	// 创建成员
@@ -188,6 +219,11 @@ func (s *WorkspaceService) CheckPermission(workspaceID, customerID uint) (bool, 
 			return false, fmt.Errorf("工作空间不存在")
 		}
 		return false, err
+	}
+
+	// 检查工作空间状态
+	if workspace.Status == "archived" {
+		return false, fmt.Errorf("工作空间已归档")
 	}
 
 	// 检查是否是所有者
