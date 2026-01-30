@@ -7,8 +7,8 @@ import (
 // ResourceQuota 资源配额实体
 type ResourceQuota struct {
 	ID          uint      `gorm:"primarykey" json:"id"`
-	CustomerID  uint      `gorm:"not null;index:idx_resource_quotas_customer" json:"customer_id"`
-	WorkspaceID *uint     `gorm:"index:idx_resource_quotas_workspace" json:"workspace_id"`
+	CustomerID  uint      `gorm:"not null;uniqueIndex:idx_customer_workspace" json:"customer_id"`
+	WorkspaceID *uint     `gorm:"uniqueIndex:idx_customer_workspace" json:"workspace_id"`
 	CPU         int       `gorm:"not null;default:0;comment:CPU核心数配额" json:"cpu"`
 	Memory      int64     `gorm:"not null;default:0;comment:内存配额(MB)" json:"memory"`
 	GPU         int       `gorm:"not null;default:0;comment:GPU数量配额" json:"gpu"`

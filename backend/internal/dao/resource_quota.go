@@ -75,6 +75,17 @@ func (d *ResourceQuotaDao) Delete(id uint) error {
 
 // List 获取资源配额列表（分页）
 func (d *ResourceQuotaDao) List(page, pageSize int) ([]*entity.ResourceQuota, int64, error) {
+	// 参数验证
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100 // 限制最大页面大小，防止内存溢出
+	}
+
 	var quotas []*entity.ResourceQuota
 	var total int64
 

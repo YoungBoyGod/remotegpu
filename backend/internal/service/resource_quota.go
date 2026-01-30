@@ -130,6 +130,26 @@ func (s *ResourceQuotaService) UpdateQuota(quota *entity.ResourceQuota) error {
 		return err
 	}
 
+	// 获取已使用资源
+	used, err := s.GetUsedResources(existing.CustomerID, existing.WorkspaceID)
+	if err != nil {
+		return fmt.Errorf("获取已使用资源失败: %w", err)
+	}
+
+	// 验证新配额是否小于已使用资源
+	if quota.CPU < used.CPU {
+		return fmt.Errorf("CPU配额不能小于已使用量: 已使用%d，新配额%d", used.CPU, quota.CPU)
+	}
+	if quota.Memory < used.Memory {
+		return fmt.Errorf("内存配额不能小于已使用量: 已使用%dMB，新配额%dMB", used.Memory, quota.Memory)
+	}
+	if quota.GPU < used.GPU {
+		return fmt.Errorf("GPU配额不能小于已使用量: 已使用%d，新配额%d", used.GPU, quota.GPU)
+	}
+	if quota.Storage < used.Storage {
+		return fmt.Errorf("存储配额不能小于已使用量: 已使用%dGB，新配额%dGB", used.Storage, quota.Storage)
+	}
+
 	// 更新字段
 	existing.CPU = quota.CPU
 	existing.Memory = quota.Memory
@@ -247,27 +267,23 @@ func (s *ResourceQuotaService) checkQuota(tx *gorm.DB, customerID uint, workspac
 // GetUsedResources 获取已使用的资源
 //
 // 资源统计范围说明：
-// - workspaceID != nil: 统计指定工作空间内的所有运行中环境的资源使用
-// - workspaceID == nil: 统计用户级别（workspace_id IS NULL）的所有运行中环境的资源使用
+// - workspaceID != nil: 统计指定工作空间内的所有运行中和创建中环境的资源使用
+// - workspaceID == nil: 统计用户在所有工作空间的所有运行中和创建中环境的资源使用总和
 //
-// 注意：当前实现中，用户级别配额和工作空间级别配额是隔离的。
-// 即用户级别配额检查不会包含工作空间内的资源使用。
-// 如果业务需求是用户级别配额应该包含所有工作空间的资源，需要修改此逻辑。
+// 注意：用户级别配额会统计该用户在所有工作空间中的资源使用，确保用户总资源不超限。
 func (s *ResourceQuotaService) GetUsedResources(customerID uint, workspaceID *uint) (*UsedResources, error) {
 	db := database.GetDB()
 
-	// 查询所有运行中的环境
+	// 查询所有运行中和创建中的环境（创建中的环境也占用资源）
 	var environments []*entity.Environment
-	query := db.Where("customer_id = ? AND status = ?", customerID, "running")
+	query := db.Where("customer_id = ? AND status IN ?", customerID, []string{"running", "creating"})
 
 	// 根据 workspaceID 过滤环境范围
 	if workspaceID != nil {
 		// 工作空间级别：只统计该工作空间的环境
 		query = query.Where("workspace_id = ?", *workspaceID)
-	} else {
-		// 用户级别：只统计 workspace_id 为 NULL 的环境
-		query = query.Where("workspace_id IS NULL")
 	}
+	// 用户级别（workspaceID == nil）：统计该用户所有环境，不添加workspace_id过滤条件
 
 	if err := query.Find(&environments).Error; err != nil {
 		return nil, err
@@ -307,14 +323,31 @@ func (s *ResourceQuotaService) GetAvailableQuota(customerID uint, workspaceID *u
 		return nil, err
 	}
 
-	// 3. 计算可用配额
+	// 3. 计算可用配额（确保不为负数）
+	availableCPU := quota.CPU - used.CPU
+	if availableCPU < 0 {
+		availableCPU = 0
+	}
+	availableMemory := quota.Memory - used.Memory
+	if availableMemory < 0 {
+		availableMemory = 0
+	}
+	availableGPU := quota.GPU - used.GPU
+	if availableGPU < 0 {
+		availableGPU = 0
+	}
+	availableStorage := quota.Storage - used.Storage
+	if availableStorage < 0 {
+		availableStorage = 0
+	}
+
 	available := &entity.ResourceQuota{
 		CustomerID:  customerID,
 		WorkspaceID: workspaceID,
-		CPU:         quota.CPU - used.CPU,
-		Memory:      quota.Memory - used.Memory,
-		GPU:         quota.GPU - used.GPU,
-		Storage:     quota.Storage - used.Storage,
+		CPU:         availableCPU,
+		Memory:      availableMemory,
+		GPU:         availableGPU,
+		Storage:     availableStorage,
 	}
 
 	return available, nil

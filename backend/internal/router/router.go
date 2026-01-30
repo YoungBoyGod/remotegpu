@@ -13,6 +13,7 @@ func InitRouter(r *gin.Engine) {
 	healthController := v1.NewHealthController()
 	hostController := v1.NewHostController()
 	gpuController := v1.NewGPUController()
+	environmentController := v1.NewEnvironmentController()
 
 	// API v1 路由组
 	apiV1 := r.Group("/api/v1")
@@ -59,9 +60,21 @@ func InitRouter(r *gin.Engine) {
 
 			// GPU管理
 			admin.POST("/gpus", gpuController.Create)
+			admin.GET("/gpus", gpuController.List)
 			admin.GET("/gpus/:id", gpuController.GetByID)
-			admin.GET("/hosts/:host_id/gpus", gpuController.GetByHostID)
+			admin.PUT("/gpus/:id", gpuController.Update)
 			admin.DELETE("/gpus/:id", gpuController.Delete)
+			admin.POST("/gpus/:id/allocate", gpuController.Allocate)
+			admin.POST("/gpus/:id/release", gpuController.Release)
+			admin.GET("/hosts/:host_id/gpus", gpuController.GetByHostID)
+
+			// 环境管理
+			admin.POST("/environments", environmentController.Create)
+			admin.GET("/environments", environmentController.List)
+			admin.GET("/environments/:id", environmentController.GetByID)
+			admin.DELETE("/environments/:id", environmentController.Delete)
+			admin.POST("/environments/:id/start", environmentController.Start)
+			admin.POST("/environments/:id/stop", environmentController.Stop)
 		}
 	}
 }
