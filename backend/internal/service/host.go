@@ -13,8 +13,8 @@ import (
 
 // HostService 主机服务
 type HostService struct {
-	hostDao *dao.HostDao
-	gpuDao  *dao.GPUDao
+	hostDao HostDaoInterface
+	gpuDao  GPUDaoInterface
 }
 
 // NewHostService 创建主机服务实例

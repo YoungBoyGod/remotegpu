@@ -9,7 +9,7 @@ import (
 
 // GPUService GPU服务
 type GPUService struct {
-	gpuDao *dao.GPUDao
+	gpuDao GPUDaoInterface
 }
 
 // NewGPUService 创建GPU服务实例

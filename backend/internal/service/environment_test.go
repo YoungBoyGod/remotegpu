@@ -25,6 +25,47 @@ func (m *MockHostDao) ListByStatus(status string) ([]*entity.Host, error) {
 	return args.Get(0).([]*entity.Host), args.Error(1)
 }
 
+func (m *MockHostDao) Create(host *entity.Host) error {
+	args := m.Called(host)
+	return args.Error(0)
+}
+
+func (m *MockHostDao) GetByID(id string) (*entity.Host, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.Host), args.Error(1)
+}
+
+func (m *MockHostDao) Update(host *entity.Host) error {
+	args := m.Called(host)
+	return args.Error(0)
+}
+
+func (m *MockHostDao) Delete(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
+func (m *MockHostDao) List(page, pageSize int) ([]*entity.Host, int64, error) {
+	args := m.Called(page, pageSize)
+	if args.Get(0) == nil {
+		return nil, args.Get(1).(int64), args.Error(2)
+	}
+	return args.Get(0).([]*entity.Host), args.Get(1).(int64), args.Error(2)
+}
+
+func (m *MockHostDao) UpdateStatus(id, status string) error {
+	args := m.Called(id, status)
+	return args.Error(0)
+}
+
+func (m *MockHostDao) UpdateHeartbeat(id string) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
 // MockEnvironmentDao 模拟 EnvironmentDao
 type MockEnvironmentDao struct {
 	mock.Mock

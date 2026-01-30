@@ -9,12 +9,29 @@ import (
 
 // HostDaoInterface 主机DAO接口
 type HostDaoInterface interface {
+	Create(host *entity.Host) error
+	GetByID(id string) (*entity.Host, error)
+	Update(host *entity.Host) error
+	Delete(id string) error
+	List(page, pageSize int) ([]*entity.Host, int64, error)
 	ListByStatus(status string) ([]*entity.Host, error)
+	UpdateStatus(id, status string) error
+	UpdateHeartbeat(id string) error
 }
 
 // GPUDaoInterface GPU DAO接口
 type GPUDaoInterface interface {
-	// 这里定义GPU相关的方法
+	Create(gpu *entity.GPU) error
+	GetByID(id uint) (*entity.GPU, error)
+	GetByHostID(hostID string) ([]*entity.GPU, error)
+	Update(gpu *entity.GPU) error
+	Delete(id uint) error
+	DeleteByHostID(hostID string) error
+	UpdateStatus(id uint, status string) error
+	List(page, pageSize int) ([]*entity.GPU, int64, error)
+	GetByStatus(status string) ([]*entity.GPU, error)
+	Allocate(id uint, allocatedTo string) error
+	Release(id uint) error
 }
 
 // EnvironmentDaoInterface 环境DAO接口
