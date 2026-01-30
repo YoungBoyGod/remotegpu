@@ -238,3 +238,26 @@ GET    /api/v1/admin/environments/:id/logs     - 获取日志（管理员）
 
 ---
 
+
+### 7. Health 模块 ✅
+
+**状态**: 完全实现（仅Controller层，无需Service层）
+
+#### Service层
+- **无需Service层** - 直接使用 `pkg/health.Manager` 进行健康检查
+
+#### Controller层 (`internal/controller/v1/health.go`)
+- `CheckAll(c *gin.Context)` - 检查所有服务健康状态
+- `CheckService(c *gin.Context)` - 检查指定服务健康状态
+
+
+#### API路由
+```
+GET    /api/v1/admin/health/all        - 检查所有服务健康状态（管理员）
+GET    /api/v1/admin/health/:service   - 检查指定服务健康状态（管理员）
+```
+
+**说明**: Health 模块直接使用 `pkg/health.Manager` 进行健康检查，无需额外的 Service 层。
+
+---
+
