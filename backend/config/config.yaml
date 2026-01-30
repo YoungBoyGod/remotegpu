@@ -106,7 +106,7 @@ guacamole:
 
 k8s:
   enabled: true
-  kubeconfig: "~/.kube/config" # kubeconfig文件路径
+  kubeconfig: "/home/luo/.kube/config" # kubeconfig文件路径
   namespace: "default" # 默认命名空间
   in_cluster: false # 是否在集群内运行
 
