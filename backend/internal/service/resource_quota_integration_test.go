@@ -7,6 +7,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // TestResourceQuotaIntegration_QuotaCheckFlow 测试配额检查流程
@@ -40,7 +41,7 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 			Storage:     1000,
 		}
 		err := service.SetQuota(quota)
-		assert.NoError(t, err)
+		require.NoError(t, err, "SetQuota should succeed")
 
 		// 检查配额（请求资源少于配额）
 		request := &ResourceRequest{
@@ -72,7 +73,7 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 			Storage:     500,
 		}
 		err := service.SetQuota(quota)
-		assert.NoError(t, err)
+		require.NoError(t, err, "SetQuota should succeed")
 
 		// 检查配额（请求资源超过配额）
 		request := &ResourceRequest{
@@ -105,7 +106,7 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 			Storage:     500,
 		}
 		err := service.SetQuota(quota)
-		assert.NoError(t, err)
+		require.NoError(t, err, "SetQuota should succeed")
 
 		// 请求资源（超过当前配额）
 		request := &ResourceRequest{
@@ -119,7 +120,9 @@ func TestResourceQuotaIntegration_QuotaCheckFlow(t *testing.T) {
 		assert.False(t, ok)
 
 		// 更新配额（增加配额）
-		retrieved, _ := service.GetQuota(customer.ID, nil)
+		retrieved, err := service.GetQuota(customer.ID, nil)
+		require.NoError(t, err, "GetQuota should succeed")
+		require.NotNil(t, retrieved, "Retrieved quota should not be nil")
 		retrieved.CPU = 32
 		retrieved.Memory = 65536
 		retrieved.GPU = 8
