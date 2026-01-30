@@ -11,15 +11,33 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+// ResourceQuotaDaoInterface 资源配额DAO接口（用于测试mock）
+type ResourceQuotaDaoInterface interface {
+	Create(quota *entity.ResourceQuota) error
+	GetByID(id uint) (*entity.ResourceQuota, error)
+	GetByUserID(userID uint) (*entity.ResourceQuota, error)
+	GetByWorkspaceID(workspaceID uint) (*entity.ResourceQuota, error)
+	GetByUserAndWorkspace(userID, workspaceID uint) (*entity.ResourceQuota, error)
+	Update(quota *entity.ResourceQuota) error
+	Delete(id uint) error
+}
+
 // ResourceQuotaService 资源配额服务
 type ResourceQuotaService struct {
-	quotaDao *dao.ResourceQuotaDao
+	quotaDao ResourceQuotaDaoInterface
 }
 
 // NewResourceQuotaService 创建资源配额服务实例
 func NewResourceQuotaService() *ResourceQuotaService {
 	return &ResourceQuotaService{
 		quotaDao: dao.NewResourceQuotaDao(),
+	}
+}
+
+// NewResourceQuotaServiceWithDao 创建资源配额服务实例（用于测试注入mock）
+func NewResourceQuotaServiceWithDao(quotaDao ResourceQuotaDaoInterface) *ResourceQuotaService {
+	return &ResourceQuotaService{
+		quotaDao: quotaDao,
 	}
 }
 
