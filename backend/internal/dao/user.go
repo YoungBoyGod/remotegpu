@@ -6,6 +6,17 @@ import (
 	"gorm.io/gorm"
 )
 
+// CustomerDaoInterface 定义CustomerDao的接口
+type CustomerDaoInterface interface {
+	Create(customer *entity.Customer) error
+	GetByID(id uint) (*entity.Customer, error)
+	GetByUsername(username string) (*entity.Customer, error)
+	GetByEmail(email string) (*entity.Customer, error)
+	Update(customer *entity.Customer) error
+	Delete(id uint) error
+	List(page, pageSize int) ([]*entity.Customer, int64, error)
+}
+
 type CustomerDao struct {
 	db *gorm.DB
 }
