@@ -59,3 +59,40 @@ func (d *GPUDao) DeleteByHostID(hostID string) error {
 func (d *GPUDao) UpdateStatus(id uint, status string) error {
 	return d.db.Model(&entity.GPU{}).Where("id = ?", id).Update("status", status).Error
 }
+
+// List 分页获取GPU列表
+func (d *GPUDao) List(page, pageSize int) ([]*entity.GPU, int64, error) {
+	var gpus []*entity.GPU
+	var total int64
+
+	d.db.Model(&entity.GPU{}).Count(&total)
+
+	offset := (page - 1) * pageSize
+	err := d.db.Offset(offset).Limit(pageSize).Order("id DESC").Find(&gpus).Error
+	return gpus, total, err
+}
+
+// GetByStatus 根据状态获取GPU列表
+func (d *GPUDao) GetByStatus(status string) ([]*entity.GPU, error) {
+	var gpus []*entity.GPU
+	err := d.db.Where("status = ?", status).Find(&gpus).Error
+	return gpus, err
+}
+
+// Allocate 分配GPU
+func (d *GPUDao) Allocate(id uint, allocatedTo string) error {
+	return d.db.Model(&entity.GPU{}).Where("id = ?", id).Updates(map[string]any{
+		"status":       "allocated",
+		"allocated_to": allocatedTo,
+		"allocated_at": gorm.Expr("NOW()"),
+	}).Error
+}
+
+// Release 释放GPU
+func (d *GPUDao) Release(id uint) error {
+	return d.db.Model(&entity.GPU{}).Where("id = ?", id).Updates(map[string]any{
+		"status":       "available",
+		"allocated_to": "",
+		"allocated_at": nil,
+	}).Error
+}

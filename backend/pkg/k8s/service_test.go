@@ -87,6 +87,18 @@ func TestServiceConfig_Validate(t *testing.T) {
 			},
 			wantErr: true,
 		},
+		{
+			name: "invalid target port",
+			config: &ServiceConfig{
+				Name:      "test-service",
+				Namespace: "default",
+				Selector:  map[string]string{"app": "test"},
+				Ports: []ServicePort{
+					{Port: 80, TargetPort: -1},
+				},
+			},
+			wantErr: true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -100,40 +112,81 @@ func TestServiceConfig_Validate(t *testing.T) {
 }
 
 func TestClient_CreateService(t *testing.T) {
-	// 创建fake clientset
 	fakeClientset := fake.NewSimpleClientset()
 	client := NewClientWithClientset(fakeClientset, "default")
 
-	config := &ServiceConfig{
-		Name:      "test-service",
-		Namespace: "default",
-		Type:      ServiceTypeClusterIP,
-		Selector:  map[string]string{"app": "test"},
-		Ports: []ServicePort{
-			{
-				Name:       "http",
-				Protocol:   corev1.ProtocolTCP,
-				Port:       80,
-				TargetPort: 8080,
+	t.Run("create ClusterIP service", func(t *testing.T) {
+		config := &ServiceConfig{
+			Name:      "test-service",
+			Namespace: "default",
+			Type:      ServiceTypeClusterIP,
+			Selector:  map[string]string{"app": "test"},
+			Ports: []ServicePort{
+				{
+					Name:       "http",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       80,
+					TargetPort: 8080,
+				},
 			},
-		},
-		Labels: map[string]string{"env": "test"},
-	}
+			Labels: map[string]string{"env": "test"},
+		}
 
-	service, err := client.CreateService(config)
-	if err != nil {
-		t.Fatalf("CreateService() error = %v", err)
-	}
+		service, err := client.CreateService(config)
+		if err != nil {
+			t.Fatalf("CreateService() error = %v", err)
+		}
 
-	if service.Name != config.Name {
-		t.Errorf("CreateService() name = %v, want %v", service.Name, config.Name)
-	}
-	if service.Namespace != config.Namespace {
-		t.Errorf("CreateService() namespace = %v, want %v", service.Namespace, config.Namespace)
-	}
-	if len(service.Spec.Ports) != 1 {
-		t.Errorf("CreateService() ports count = %v, want 1", len(service.Spec.Ports))
-	}
+		if service.Name != config.Name {
+			t.Errorf("CreateService() name = %v, want %v", service.Name, config.Name)
+		}
+		if service.Namespace != config.Namespace {
+			t.Errorf("CreateService() namespace = %v, want %v", service.Namespace, config.Namespace)
+		}
+		if len(service.Spec.Ports) != 1 {
+			t.Errorf("CreateService() ports count = %v, want 1", len(service.Spec.Ports))
+		}
+	})
+
+	t.Run("create NodePort service", func(t *testing.T) {
+		config := &ServiceConfig{
+			Name:      "test-nodeport",
+			Namespace: "default",
+			Type:      ServiceTypeNodePort,
+			Selector:  map[string]string{"app": "test"},
+			Ports: []ServicePort{
+				{
+					Name:       "http",
+					Protocol:   corev1.ProtocolTCP,
+					Port:       80,
+					TargetPort: 8080,
+				},
+			},
+		}
+
+		service, err := client.CreateService(config)
+		if err != nil {
+			t.Fatalf("CreateService() error = %v", err)
+		}
+
+		if string(service.Spec.Type) != string(corev1.ServiceTypeNodePort) {
+			t.Errorf("CreateService() type = %v, want NodePort", service.Spec.Type)
+		}
+	})
+
+	t.Run("create with invalid config", func(t *testing.T) {
+		config := &ServiceConfig{
+			Name:      "",
+			Namespace: "default",
+			Selector:  map[string]string{"app": "test"},
+			Ports:     []ServicePort{{Port: 80}},
+		}
+
+		_, err := client.CreateService(config)
+		if err == nil {
+			t.Error("CreateService() should return error for invalid config")
+		}
+	})
 }
 
 func TestClient_GetService(t *testing.T) {
@@ -181,6 +234,46 @@ func TestClient_DeleteService(t *testing.T) {
 	}
 }
 
+func TestClient_DeleteService_ErrorCases(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	client := NewClientWithClientset(fakeClientset, "default")
+
+	tests := []struct {
+		name      string
+		namespace string
+		svcName   string
+		wantErr   bool
+	}{
+		{
+			name:      "empty namespace",
+			namespace: "",
+			svcName:   "test-service",
+			wantErr:   true,
+		},
+		{
+			name:      "empty name",
+			namespace: "default",
+			svcName:   "",
+			wantErr:   true,
+		},
+		{
+			name:      "both empty",
+			namespace: "",
+			svcName:   "",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := client.DeleteService(tt.namespace, tt.svcName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeleteService() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
 func TestClient_ListServices(t *testing.T) {
 	// 创建fake clientset并预先创建多个Service
 	fakeClientset := fake.NewSimpleClientset(
@@ -225,6 +318,12 @@ func TestClient_ListServices(t *testing.T) {
 	if len(services.Items) != 2 {
 		t.Errorf("ListServices() with selector count = %v, want 2", len(services.Items))
 	}
+
+	// 测试空命名空间错误
+	_, err = client.ListServices("", "")
+	if err == nil {
+		t.Error("ListServices() should return error for empty namespace")
+	}
 }
 
 func TestClient_UpdateService(t *testing.T) {
@@ -255,5 +354,51 @@ func TestClient_UpdateService(t *testing.T) {
 
 	if updatedService.Labels["version"] != "v2" {
 		t.Errorf("UpdateService() label = %v, want v2", updatedService.Labels["version"])
+	}
+}
+
+func TestClient_UpdateService_ErrorCases(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	client := NewClientWithClientset(fakeClientset, "default")
+
+	tests := []struct {
+		name    string
+		service *corev1.Service
+		wantErr bool
+	}{
+		{
+			name:    "nil service",
+			service: nil,
+			wantErr: true,
+		},
+		{
+			name: "empty name",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "",
+					Namespace: "default",
+				},
+			},
+			wantErr: true,
+		},
+		{
+			name: "empty namespace",
+			service: &corev1.Service{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-service",
+					Namespace: "",
+				},
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := client.UpdateService(tt.service)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("UpdateService() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

@@ -15,12 +15,13 @@ import (
 
 // EnvironmentService 环境服务
 type EnvironmentService struct {
-	envDao          *dao.EnvironmentDao
-	portMappingDao  *dao.PortMappingDao
+	envDao          EnvironmentDaoInterface
+	portMappingDao  PortMappingDaoInterface
 	hostDao         HostDaoInterface
 	gpuDao          *dao.GPUDao
-	quotaService    *ResourceQuotaService
-	k8sClient       *k8s.Client
+	quotaService    ResourceQuotaServiceInterface
+	k8sClient       K8sClientInterface
+	db              DBInterface
 }
 
 // NewEnvironmentService 创建环境服务实例

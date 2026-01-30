@@ -1,14 +1,18 @@
 package service
 
 import (
+	"database/sql"
 	"fmt"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/google/uuid"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
 func TestWorkspaceService_CRUD(t *testing.T) {
@@ -857,4 +861,88 @@ func TestWorkspaceService_RemoveMember_MemberCount(t *testing.T) {
 		t.Fatalf("获取工作空间失败: %v", err)
 	}
 	t.Logf("移除成员后的MemberCount: %d", ws.MemberCount)
+}
+
+// setupMockDB 创建Mock数据库连接
+func setupMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
+	sqlDB, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("创建sqlmock失败: %v", err)
+	}
+
+	dialector := postgres.New(postgres.Config{
+		Conn:       sqlDB,
+		DriverName: "postgres",
+	})
+
+	gormDB, err := gorm.Open(dialector, &gorm.Config{})
+	if err != nil {
+		t.Fatalf("创建gorm DB失败: %v", err)
+	}
+
+	return gormDB, mock, sqlDB
+}
+
+// TestWorkspaceService_DeleteWorkspace_TransactionError 测试删除工作空间时的事务错误
+func TestWorkspaceService_DeleteWorkspace_TransactionError(t *testing.T) {
+	gormDB, mock, sqlDB := setupMockDB(t)
+	defer sqlDB.Close()
+
+	service := &WorkspaceService{
+		db:           gormDB,
+		workspaceDao: dao.NewWorkspaceDao(),
+		memberDao:    dao.NewWorkspaceMemberDao(),
+	}
+
+	workspaceID := uint(1)
+
+	// 测试场景1: 删除成员失败
+	t.Run("DeleteMembersFails", func(t *testing.T) {
+		mock.ExpectBegin()
+		mock.ExpectExec("DELETE FROM \"workspace_members\"").
+			WillReturnError(fmt.Errorf("database error: connection lost"))
+		mock.ExpectRollback()
+
+		err := service.DeleteWorkspace(workspaceID)
+		if err == nil {
+			t.Error("删除成员失败时应该返回错误")
+		}
+		if err != nil && err.Error() != "删除工作空间成员失败: database error: connection lost" {
+			t.Logf("错误信息: %v", err)
+		}
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("未满足的期望: %v", err)
+		}
+	})
+
+	// 测试场景2: 删除工作空间失败
+	t.Run("DeleteWorkspaceFails", func(t *testing.T) {
+		mock.ExpectBegin()
+		mock.ExpectExec("DELETE FROM \"workspace_members\"").
+			WillReturnResult(sqlmock.NewResult(0, 0))
+		mock.ExpectExec("UPDATE \"workspaces\"").
+			WillReturnError(fmt.Errorf("database error: disk full"))
+		mock.ExpectRollback()
+
+		err := service.DeleteWorkspace(workspaceID)
+		if err == nil {
+			t.Error("删除工作空间失败时应该返回错误")
+		}
+		if err != nil && err.Error() != "删除工作空间失败: database error: disk full" {
+			t.Logf("错误信息: %v", err)
+		}
+
+		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("未满足的期望: %v", err)
+		}
+	})
+}
+
+// TestWorkspaceService_RemoveMember_DatabaseError 测试移除成员时的数据库错误
+func TestWorkspaceService_RemoveMember_DatabaseError(t *testing.T) {
+	// 由于DAO层使用全局数据库，我们无法Mock它
+	// 这个测试需要重构DAO层以支持依赖注入
+	// 暂时跳过这个测试
+	t.Skip("DAO层使用全局数据库，需要重构以支持Mock测试")
 }

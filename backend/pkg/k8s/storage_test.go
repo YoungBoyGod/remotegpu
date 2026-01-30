@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"testing"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -75,28 +76,63 @@ func TestClient_CreatePVC(t *testing.T) {
 	fakeClientset := fake.NewSimpleClientset()
 	client := NewClientWithClientset(fakeClientset, "default")
 
-	config := &PVCConfig{
-		Name:             "test-pvc",
-		Namespace:        "default",
-		Size:             "10Gi",
-		StorageClassName: "standard",
-		AccessModes: []PVCAccessMode{
-			ReadWriteOnce,
-		},
-		Labels: map[string]string{"env": "test"},
-	}
+	t.Run("create with valid config", func(t *testing.T) {
+		config := &PVCConfig{
+			Name:             "test-pvc",
+			Namespace:        "default",
+			Size:             "10Gi",
+			StorageClassName: "standard",
+			AccessModes: []PVCAccessMode{
+				ReadWriteOnce,
+			},
+			Labels: map[string]string{"env": "test"},
+		}
 
-	pvc, err := client.CreatePVC(config)
-	if err != nil {
-		t.Fatalf("CreatePVC() error = %v", err)
-	}
+		pvc, err := client.CreatePVC(config)
+		if err != nil {
+			t.Fatalf("CreatePVC() error = %v", err)
+		}
 
-	if pvc.Name != config.Name {
-		t.Errorf("CreatePVC() name = %v, want %v", pvc.Name, config.Name)
-	}
-	if pvc.Namespace != config.Namespace {
-		t.Errorf("CreatePVC() namespace = %v, want %v", pvc.Namespace, config.Namespace)
-	}
+		if pvc.Name != config.Name {
+			t.Errorf("CreatePVC() name = %v, want %v", pvc.Name, config.Name)
+		}
+		if pvc.Namespace != config.Namespace {
+			t.Errorf("CreatePVC() namespace = %v, want %v", pvc.Namespace, config.Namespace)
+		}
+	})
+
+	t.Run("create with ReadWriteMany", func(t *testing.T) {
+		config := &PVCConfig{
+			Name:      "test-pvc-rwx",
+			Namespace: "default",
+			Size:      "5Gi",
+			AccessModes: []PVCAccessMode{
+				ReadWriteMany,
+			},
+		}
+
+		pvc, err := client.CreatePVC(config)
+		if err != nil {
+			t.Fatalf("CreatePVC() error = %v", err)
+		}
+
+		if len(pvc.Spec.AccessModes) != 1 {
+			t.Errorf("CreatePVC() access modes count = %v, want 1", len(pvc.Spec.AccessModes))
+		}
+	})
+
+	t.Run("create with invalid config", func(t *testing.T) {
+		config := &PVCConfig{
+			Name:      "",
+			Namespace: "default",
+			Size:      "10Gi",
+		}
+
+		_, err := client.CreatePVC(config)
+		if err == nil {
+			t.Error("CreatePVC() should return error for invalid config")
+		}
+	})
 }
 
 func TestClient_GetPVC(t *testing.T) {
@@ -141,6 +177,12 @@ func TestClient_GetPVCStatus(t *testing.T) {
 	if status != "Bound" {
 		t.Errorf("GetPVCStatus() status = %v, want Bound", status)
 	}
+
+	// Test error case
+	_, err = client.GetPVCStatus("default", "non-existing-pvc")
+	if err == nil {
+		t.Error("GetPVCStatus() should return error for non-existing PVC")
+	}
 }
 
 func TestClient_DeletePVC(t *testing.T) {
@@ -160,5 +202,64 @@ func TestClient_DeletePVC(t *testing.T) {
 	_, err = client.GetPVC("default", "test-pvc")
 	if err == nil {
 		t.Error("DeletePVC() PVC still exists after deletion")
+	}
+}
+
+func TestClient_DeletePVC_ErrorCases(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	client := NewClientWithClientset(fakeClientset, "default")
+
+	tests := []struct {
+		name      string
+		namespace string
+		pvcName   string
+		wantErr   bool
+	}{
+		{
+			name:      "empty namespace",
+			namespace: "",
+			pvcName:   "test-pvc",
+			wantErr:   true,
+		},
+		{
+			name:      "empty name",
+			namespace: "default",
+			pvcName:   "",
+			wantErr:   true,
+		},
+		{
+			name:      "both empty",
+			namespace: "",
+			pvcName:   "",
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := client.DeletePVC(tt.namespace, tt.pvcName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeletePVC() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestClient_WaitForPVCBound(t *testing.T) {
+	// 测试PVC已经绑定的情况
+	fakeClientset := fake.NewSimpleClientset(&corev1.PersistentVolumeClaim{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "test-pvc",
+			Namespace: "default",
+		},
+		Status: corev1.PersistentVolumeClaimStatus{
+			Phase: corev1.ClaimBound,
+		},
+	})
+	client := NewClientWithClientset(fakeClientset, "default")
+
+	err := client.WaitForPVCBound("default", "test-pvc", 5*time.Second)
+	if err != nil {
+		t.Errorf("WaitForPVCBound() error = %v, want nil", err)
 	}
 }

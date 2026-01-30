@@ -1,8 +1,8 @@
-version: '3.8'
+version: "3.8"
 
 services:
   redis:
-    image: redis:7-alpine
+    image: redis:8.4.0-alpine
     container_name: remotegpu-redis
     restart: always
     ports:

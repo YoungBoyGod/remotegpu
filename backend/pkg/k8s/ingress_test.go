@@ -112,32 +112,79 @@ func TestClient_CreateIngress(t *testing.T) {
 	fakeClientset := fake.NewSimpleClientset()
 	client := NewClientWithClientset(fakeClientset, "default")
 
-	config := &IngressConfig{
-		Name:      "test-ingress",
-		Namespace: "default",
-		Rules: []IngressRule{
-			{
-				Host:        "example.com",
-				Path:        "/api",
-				PathType:    PathTypePrefix,
-				ServiceName: "test-service",
-				ServicePort: 80,
+	t.Run("create with single rule", func(t *testing.T) {
+		config := &IngressConfig{
+			Name:      "test-ingress",
+			Namespace: "default",
+			Rules: []IngressRule{
+				{
+					Host:        "example.com",
+					Path:        "/api",
+					PathType:    PathTypePrefix,
+					ServiceName: "test-service",
+					ServicePort: 80,
+				},
 			},
-		},
-		Labels: map[string]string{"env": "test"},
-	}
+			Labels: map[string]string{"env": "test"},
+		}
 
-	ingress, err := client.CreateIngress(config)
-	if err != nil {
-		t.Fatalf("CreateIngress() error = %v", err)
-	}
+		ingress, err := client.CreateIngress(config)
+		if err != nil {
+			t.Fatalf("CreateIngress() error = %v", err)
+		}
 
-	if ingress.Name != config.Name {
-		t.Errorf("CreateIngress() name = %v, want %v", ingress.Name, config.Name)
-	}
-	if len(ingress.Spec.Rules) != 1 {
-		t.Errorf("CreateIngress() rules count = %v, want 1", len(ingress.Spec.Rules))
-	}
+		if ingress.Name != config.Name {
+			t.Errorf("CreateIngress() name = %v, want %v", ingress.Name, config.Name)
+		}
+		if len(ingress.Spec.Rules) != 1 {
+			t.Errorf("CreateIngress() rules count = %v, want 1", len(ingress.Spec.Rules))
+		}
+	})
+
+	t.Run("create with multiple rules", func(t *testing.T) {
+		config := &IngressConfig{
+			Name:      "test-multi-ingress",
+			Namespace: "default",
+			Rules: []IngressRule{
+				{
+					Host:        "api.example.com",
+					Path:        "/",
+					PathType:    PathTypePrefix,
+					ServiceName: "api-service",
+					ServicePort: 80,
+				},
+				{
+					Host:        "web.example.com",
+					Path:        "/",
+					PathType:    PathTypePrefix,
+					ServiceName: "web-service",
+					ServicePort: 8080,
+				},
+			},
+		}
+
+		ingress, err := client.CreateIngress(config)
+		if err != nil {
+			t.Fatalf("CreateIngress() error = %v", err)
+		}
+
+		if len(ingress.Spec.Rules) != 2 {
+			t.Errorf("CreateIngress() rules count = %v, want 2", len(ingress.Spec.Rules))
+		}
+	})
+
+	t.Run("create with invalid config", func(t *testing.T) {
+		config := &IngressConfig{
+			Name:      "",
+			Namespace: "default",
+			Rules:     []IngressRule{{Host: "example.com"}},
+		}
+
+		_, err := client.CreateIngress(config)
+		if err == nil {
+			t.Error("CreateIngress() should return error for invalid config")
+		}
+	})
 }
 
 func TestClient_GetIngress(t *testing.T) {
@@ -176,5 +223,45 @@ func TestClient_DeleteIngress(t *testing.T) {
 	_, err = client.GetIngress("default", "test-ingress")
 	if err == nil {
 		t.Error("DeleteIngress() ingress still exists after deletion")
+	}
+}
+
+func TestClient_DeleteIngress_ErrorCases(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	client := NewClientWithClientset(fakeClientset, "default")
+
+	tests := []struct {
+		name        string
+		namespace   string
+		ingressName string
+		wantErr     bool
+	}{
+		{
+			name:        "empty namespace",
+			namespace:   "",
+			ingressName: "test-ingress",
+			wantErr:     true,
+		},
+		{
+			name:        "empty name",
+			namespace:   "default",
+			ingressName: "",
+			wantErr:     true,
+		},
+		{
+			name:        "both empty",
+			namespace:   "",
+			ingressName: "",
+			wantErr:     true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := client.DeleteIngress(tt.namespace, tt.ingressName)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("DeleteIngress() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
 	}
 }

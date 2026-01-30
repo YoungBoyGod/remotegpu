@@ -1,6 +1,8 @@
 package service
 
 import (
+	"fmt"
+
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 )
@@ -45,4 +47,38 @@ func (s *GPUService) Delete(id uint) error {
 // UpdateStatus 更新GPU状态
 func (s *GPUService) UpdateStatus(id uint, status string) error {
 	return s.gpuDao.UpdateStatus(id, status)
+}
+
+// List 分页获取GPU列表
+func (s *GPUService) List(page, pageSize int) ([]*entity.GPU, int64, error) {
+	return s.gpuDao.List(page, pageSize)
+}
+
+// GetByStatus 根据状态获取GPU列表
+func (s *GPUService) GetByStatus(status string) ([]*entity.GPU, error) {
+	return s.gpuDao.GetByStatus(status)
+}
+
+// Allocate 分配GPU到环境
+func (s *GPUService) Allocate(id uint, envID string) error {
+	gpu, err := s.gpuDao.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if gpu.Status != "available" {
+		return fmt.Errorf("GPU不可用，当前状态: %s", gpu.Status)
+	}
+	return s.gpuDao.Allocate(id, envID)
+}
+
+// Release 释放GPU
+func (s *GPUService) Release(id uint) error {
+	gpu, err := s.gpuDao.GetByID(id)
+	if err != nil {
+		return err
+	}
+	if gpu.Status != "allocated" {
+		return fmt.Errorf("GPU未分配，当前状态: %s", gpu.Status)
+	}
+	return s.gpuDao.Release(id)
 }

@@ -263,3 +263,51 @@ func TestCreatePodWithVolumes(t *testing.T) {
 	assert.Len(t, pod.Spec.Volumes, 1)
 	assert.Len(t, pod.Spec.Containers[0].VolumeMounts, 1)
 }
+
+func TestClient_WatchPodStatus_ErrorCases(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	client := NewClientWithClientset(fakeClientset, "default")
+
+	tests := []struct {
+		name      string
+		namespace string
+		podName   string
+		callback  func(status string)
+		wantErr   bool
+	}{
+		{
+			name:      "empty pod name",
+			namespace: "default",
+			podName:   "",
+			callback:  func(status string) {},
+			wantErr:   true,
+		},
+		{
+			name:      "nil callback",
+			namespace: "default",
+			podName:   "test-pod",
+			callback:  nil,
+			wantErr:   true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := client.WatchPodStatus(tt.namespace, tt.podName, tt.callback)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("WatchPodStatus() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
+
+func TestClient_GetPodStatus_ErrorCase(t *testing.T) {
+	fakeClientset := fake.NewSimpleClientset()
+	client := NewClientWithClientset(fakeClientset, "default")
+
+	// 测试获取不存在的 Pod 的状态
+	_, err := client.GetPodStatus("default", "non-existent-pod")
+	if err == nil {
+		t.Error("GetPodStatus() should return error for non-existent pod")
+	}
+}

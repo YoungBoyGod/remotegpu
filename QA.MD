@@ -84,3 +84,121 @@ docker exec remotegpu-postgresql psql -U remotegpu_user -d remotegpu -c "\d gpus
 创建 Host 和 GPU 的 Entity、DAO、Service、Controller
 
 ---
+
+## 2026-01-30: 实现 Host 和 GPU 完整功能
+
+### 问题
+需要实现主机和GPU管理的完整后端功能。
+
+### 解决方案
+
+**Entity 层**:
+- `entity/host.go` - Host 实体 (29字段)
+- `entity/gpu.go` - GPU 实体 (18字段)
+
+**DAO 层**:
+- `dao/host.go` - CRUD + 状态更新 + 心跳
+- `dao/gpu.go` - CRUD + 按主机查询
+
+**Service 层**:
+- `service/host.go` - 业务逻辑封装
+- `service/gpu.go` - 业务逻辑封装
+
+**Controller 层**:
+- `controller/v1/host.go` - REST API
+- `controller/v1/gpu.go` - REST API
+
+### API 路由
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| POST | /admin/hosts | 创建主机 |
+| GET | /admin/hosts | 主机列表 |
+| GET | /admin/hosts/:id | 主机详情 |
+| PUT | /admin/hosts/:id | 更新主机 |
+| DELETE | /admin/hosts/:id | 删除主机 |
+| POST | /admin/hosts/:id/heartbeat | 心跳 |
+| POST | /admin/gpus | 创建GPU |
+| GET | /admin/gpus/:id | GPU详情 |
+| GET | /admin/hosts/:host_id/gpus | 主机GPU列表 |
+| DELETE | /admin/gpus/:id | 删除GPU |
+
+---
+
+## 2026-01-30: Host 和 GPU 模块测试完成
+
+### 问题
+需要为 Host 和 GPU 模块的各层编写测试用例。
+
+### 解决方案
+
+**DAO 层测试**:
+- `dao/host_test.go` - Host DAO 测试 (CRUD)
+- `dao/gpu_test.go` - GPU DAO 测试 (CRUD + 按主机查询)
+
+**Service 层测试**:
+- `service/host_test.go` - Host Service 测试
+- `service/gpu_test.go` - GPU Service 测试
+
+**Controller 层测试**:
+- `controller/v1/host_test.go` - Host Controller HTTP 测试
+- `controller/v1/gpu_test.go` - GPU Controller HTTP 测试
+
+### 运行测试
+
+```bash
+# 运行所有 DAO 测试
+go test -v ./internal/dao/...
+
+# 运行所有 Service 测试
+go test -v ./internal/service/...
+
+# 运行所有 Controller 测试
+go test -v ./internal/controller/v1/...
+
+# 运行单个测试
+go test -v ./internal/controller/v1/... -run TestHostController_Create
+go test -v ./internal/controller/v1/... -run TestGPUController_Create
+```
+
+### 修复的问题
+- GPU Controller 测试中 ID 转换错误：`string(rune(int(id)))` 改为 `fmt.Sprintf("/gpus/%d", int(id))`
+
+---
+
+## 2026-01-30: GPU 模块功能补充
+
+### 问题
+GPU 模块缺少 List、Update、Allocate、Release 功能。
+
+### 解决方案
+
+**新增 DAO 方法**:
+- `List(page, pageSize)` - 分页获取GPU列表
+- `GetByStatus(status)` - 按状态查询
+- `Allocate(id, allocatedTo)` - 分配GPU
+- `Release(id)` - 释放GPU
+
+**新增 Service 方法**:
+- `List` / `GetByStatus` / `Allocate` / `Release`
+- Allocate/Release 包含状态校验逻辑
+
+**新增 Controller 接口**:
+- `List` / `Update` / `Allocate` / `Release`
+
+### 新增 API 路由
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | /admin/gpus | GPU列表 |
+| PUT | /admin/gpus/:id | 更新GPU |
+| POST | /admin/gpus/:id/allocate | 分配GPU |
+| POST | /admin/gpus/:id/release | 释放GPU |
+
+### 运行测试
+
+```bash
+go test -v ./internal/dao/... -run TestGPUDao
+```
+
+---

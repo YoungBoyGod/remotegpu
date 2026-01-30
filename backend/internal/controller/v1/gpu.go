@@ -68,3 +68,65 @@ func (ctrl *GPUController) Delete(c *gin.Context) {
 	}
 	response.Success(c, nil)
 }
+
+// List 获取GPU列表
+func (ctrl *GPUController) List(c *gin.Context) {
+	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
+
+	gpus, total, err := ctrl.gpuService.List(page, pageSize)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	response.Success(c, gin.H{
+		"list":  gpus,
+		"total": total,
+	})
+}
+
+// Update 更新GPU
+func (ctrl *GPUController) Update(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var gpu entity.GPU
+	if err := c.ShouldBindJSON(&gpu); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误: "+err.Error())
+		return
+	}
+	gpu.ID = uint(id)
+
+	if err := ctrl.gpuService.Update(&gpu); err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+// Allocate 分配GPU
+func (ctrl *GPUController) Allocate(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	var req struct {
+		EnvID string `json:"env_id" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		response.Error(c, http.StatusBadRequest, "参数错误: "+err.Error())
+		return
+	}
+
+	if err := ctrl.gpuService.Allocate(uint(id), req.EnvID); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
+
+// Release 释放GPU
+func (ctrl *GPUController) Release(c *gin.Context) {
+	id, _ := strconv.ParseUint(c.Param("id"), 10, 32)
+	if err := ctrl.gpuService.Release(uint(id)); err != nil {
+		response.Error(c, http.StatusBadRequest, err.Error())
+		return
+	}
+	response.Success(c, nil)
+}
