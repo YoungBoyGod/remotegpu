@@ -12,7 +12,7 @@ import (
 )
 
 type UserService struct {
-	customerDao *dao.CustomerDao
+	customerDao dao.CustomerDaoInterface
 }
 
 func NewUserService() *UserService {
