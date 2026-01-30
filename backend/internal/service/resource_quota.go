@@ -8,6 +8,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // ResourceQuotaService 资源配额服务
@@ -46,6 +47,9 @@ type QuotaExceededError struct {
 }
 
 func (e *QuotaExceededError) Error() string {
+	if e.Available < 0 {
+		return fmt.Sprintf("%s 配额不足: 需要 %d, 可用 0 (已超额使用 %d)", e.Resource, e.Requested, -e.Available)
+	}
 	return fmt.Sprintf("%s 配额不足: 需要 %d, 可用 %d", e.Resource, e.Requested, e.Available)
 }
 
@@ -85,6 +89,29 @@ func (s *ResourceQuotaService) GetQuota(customerID uint, workspaceID *uint) (*en
 		return s.quotaDao.GetByCustomerAndWorkspace(customerID, *workspaceID)
 	}
 	return s.quotaDao.GetByCustomerID(customerID)
+}
+
+// GetQuotaInTx 在事务中获取资源配额（使用悲观锁 FOR UPDATE）
+// 用于需要并发安全的场景，如环境创建时的配额检查
+func (s *ResourceQuotaService) GetQuotaInTx(tx *gorm.DB, customerID uint, workspaceID *uint) (*entity.ResourceQuota, error) {
+	if tx == nil {
+		return nil, fmt.Errorf("事务不能为空")
+	}
+
+	var quota entity.ResourceQuota
+	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("customer_id = ?", customerID)
+
+	if workspaceID != nil {
+		query = query.Where("workspace_id = ?", *workspaceID)
+	} else {
+		query = query.Where("workspace_id IS NULL")
+	}
+
+	if err := query.First(&quota).Error; err != nil {
+		return nil, err
+	}
+
+	return &quota, nil
 }
 
 // UpdateQuota 更新资源配额
@@ -127,9 +154,44 @@ func (s *ResourceQuotaService) DeleteQuota(id uint) error {
 }
 
 // CheckQuota 检查资源配额是否足够
+// 注意：此方法不保证并发安全。如需在环境创建等场景中使用，请使用 CheckQuotaInTx
 func (s *ResourceQuotaService) CheckQuota(customerID uint, workspaceID *uint, request *ResourceRequest) (bool, error) {
+	return s.checkQuota(nil, customerID, workspaceID, request)
+}
+
+// CheckQuotaInTx 在事务中检查资源配额是否足够（使用悲观锁，保证并发安全）
+// 用于环境创建等需要原子性操作的场景
+// 使用方式：
+//   tx := db.Begin()
+//   ok, err := service.CheckQuotaInTx(tx, customerID, workspaceID, request)
+//   if ok {
+//       // 创建环境...
+//       tx.Commit()
+//   } else {
+//       tx.Rollback()
+//   }
+func (s *ResourceQuotaService) CheckQuotaInTx(tx *gorm.DB, customerID uint, workspaceID *uint, request *ResourceRequest) (bool, error) {
+	if tx == nil {
+		return false, fmt.Errorf("事务不能为空")
+	}
+	return s.checkQuota(tx, customerID, workspaceID, request)
+}
+
+// checkQuota 内部实现：检查资源配额是否足够
+// tx 为 nil 时使用普通查询，不为 nil 时在事务中执行并使用悲观锁
+func (s *ResourceQuotaService) checkQuota(tx *gorm.DB, customerID uint, workspaceID *uint, request *ResourceRequest) (bool, error) {
 	// 1. 获取配额
-	quota, err := s.GetQuota(customerID, workspaceID)
+	var quota *entity.ResourceQuota
+	var err error
+
+	if tx != nil {
+		// 在事务中使用悲观锁获取配额
+		quota, err = s.GetQuotaInTx(tx, customerID, workspaceID)
+	} else {
+		// 普通查询
+		quota, err = s.GetQuota(customerID, workspaceID)
+	}
+
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, fmt.Errorf("未设置资源配额")
@@ -183,6 +245,14 @@ func (s *ResourceQuotaService) CheckQuota(customerID uint, workspaceID *uint, re
 }
 
 // GetUsedResources 获取已使用的资源
+//
+// 资源统计范围说明：
+// - workspaceID != nil: 统计指定工作空间内的所有运行中环境的资源使用
+// - workspaceID == nil: 统计用户级别（workspace_id IS NULL）的所有运行中环境的资源使用
+//
+// 注意：当前实现中，用户级别配额和工作空间级别配额是隔离的。
+// 即用户级别配额检查不会包含工作空间内的资源使用。
+// 如果业务需求是用户级别配额应该包含所有工作空间的资源，需要修改此逻辑。
 func (s *ResourceQuotaService) GetUsedResources(customerID uint, workspaceID *uint) (*UsedResources, error) {
 	db := database.GetDB()
 
@@ -190,11 +260,12 @@ func (s *ResourceQuotaService) GetUsedResources(customerID uint, workspaceID *ui
 	var environments []*entity.Environment
 	query := db.Where("customer_id = ? AND status = ?", customerID, "running")
 
-	// 如果指定了工作空间，则过滤工作空间
+	// 根据 workspaceID 过滤环境范围
 	if workspaceID != nil {
+		// 工作空间级别：只统计该工作空间的环境
 		query = query.Where("workspace_id = ?", *workspaceID)
 	} else {
-		// 如果没有指定工作空间，则只查询用户级别的环境（workspace_id为空）
+		// 用户级别：只统计 workspace_id 为 NULL 的环境
 		query = query.Where("workspace_id IS NULL")
 	}
 
