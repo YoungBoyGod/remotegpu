@@ -1,738 +1,952 @@
 package dao
 
 import (
+	"database/sql"
 	"testing"
 	"time"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
-	"github.com/YoungBoyGod/remotegpu/pkg/database"
-	"github.com/google/uuid"
+	"github.com/stretchr/testify/assert"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
 )
 
-func setupResourceQuotaTest(t *testing.T) {
-	setupTestDB(t)
-	db := database.GetDB()
-	// 自动迁移表结构
-	if err := db.AutoMigrate(&entity.Workspace{}, &entity.ResourceQuota{}); err != nil {
-		t.Fatalf("自动迁移表结构失败: %v", err)
+// setupResourceQuotaMockDB 创建Mock数据库连接
+func setupResourceQuotaMockDB(t *testing.T) (*gorm.DB, sqlmock.Sqlmock, *sql.DB) {
+	sqlDB, mock, err := sqlmock.New(sqlmock.QueryMatcherOption(sqlmock.QueryMatcherRegexp))
+	if err != nil {
+		t.Fatalf("创建sqlmock失败: %v", err)
 	}
+
+	dialector := postgres.New(postgres.Config{
+		Conn:       sqlDB,
+		DriverName: "postgres",
+	})
+
+	gormDB, err := gorm.Open(dialector, &gorm.Config{})
+	if err != nil {
+		t.Fatalf("创建gorm DB失败: %v", err)
+	}
+
+	return gormDB, mock, sqlDB
 }
 
-func TestResourceQuotaDao_CRUD(t *testing.T) {
-	setupResourceQuotaTest(t)
+// TestResourceQuotaDao_Create 测试创建资源配额
+func TestResourceQuotaDao_Create(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
 
-	dao := NewResourceQuotaDao()
-	customerDao := NewUserDao()
-	workspaceDao := NewWorkspaceDao()
+	dao := &ResourceQuotaDao{db: gormDB}
 
-	// 创建测试客户
-	customer := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-quota-user-" + time.Now().Format("20060102150405"),
-		Email:        "quota-test-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test Quota User",
-		Status:       "active",
-	}
-	err := customerDao.Create(customer)
-	if err != nil {
-		t.Fatalf("创建测试客户失败: %v", err)
-	}
-	defer customerDao.Delete(customer.ID)
+	t.Run("Success_UserLevel", func(t *testing.T) {
+		quota := &entity.ResourceQuota{
+			UserID:           1,
+			WorkspaceID:      nil,
+			QuotaLevel:       "pro",
+			CPU:              16,
+			Memory:           32768,
+			GPU:              4,
+			Storage:          1000,
+			EnvironmentQuota: 10,
+		}
 
-	// 创建测试工作空间
-	workspace := &entity.Workspace{
-		UUID:        uuid.New(),
-		OwnerID:     customer.ID,
-		Name:        "Test Quota Workspace",
-		Description: "Test workspace for quota",
-		Type:        "personal",
-		Status:      "active",
-	}
-	err = workspaceDao.Create(workspace)
-	if err != nil {
-		t.Fatalf("创建测试工作空间失败: %v", err)
-	}
-	defer workspaceDao.Delete(workspace.ID)
+		mock.ExpectBegin()
+		mock.ExpectQuery(`INSERT INTO "resource_quotas"`).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(1))
+		mock.ExpectCommit()
 
-	// 测试 Create - 用户级别配额
-	userQuota := &entity.ResourceQuota{
-		UserID:       customer.ID,
-		WorkspaceID:      nil,
-		QuotaLevel:       "pro",
-		CPU:              16,
-		Memory:           32768,
-		GPU:              4,
-		Storage:          1000,
-		EnvironmentQuota: 10,
-	}
-	err = dao.Create(userQuota)
-	if err != nil {
-		t.Fatalf("创建用户级别配额失败: %v", err)
-	}
-	t.Log("创建用户级别配额成功")
+		err := dao.Create(quota)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 测试 GetByID
-	found, err := dao.GetByID(userQuota.ID)
-	if err != nil {
-		t.Fatalf("获取配额失败: %v", err)
-	}
-	if found.CPU != 16 {
-		t.Fatalf("CPU配额不匹配: got %d, want 16", found.CPU)
-	}
-	t.Log("获取配额成功")
+	t.Run("Success_WorkspaceLevel", func(t *testing.T) {
+		workspaceID := uint(1)
+		quota := &entity.ResourceQuota{
+			UserID:           1,
+			WorkspaceID:      &workspaceID,
+			QuotaLevel:       "basic",
+			CPU:              8,
+			Memory:           16384,
+			GPU:              2,
+			Storage:          500,
+			EnvironmentQuota: 5,
+		}
 
-	// 测试 GetByUserID
-	customerQuota, err := dao.GetByUserID(customer.ID)
-	if err != nil {
-		t.Fatalf("根据客户ID获取配额失败: %v", err)
-	}
-	if customerQuota.ID != userQuota.ID {
-		t.Fatalf("配额ID不匹配")
-	}
-	t.Log("根据客户ID获取配额成功")
+		mock.ExpectBegin()
+		mock.ExpectQuery(`INSERT INTO "resource_quotas"`).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(2))
+		mock.ExpectCommit()
 
-	// 测试 Update
-	found.CPU = 32
-	found.Memory = 65536
-	err = dao.Update(found)
-	if err != nil {
-		t.Fatalf("更新配额失败: %v", err)
-	}
-	updated, _ := dao.GetByID(found.ID)
-	if updated.CPU != 32 {
-		t.Fatalf("更新后CPU配额不匹配: got %d, want 32", updated.CPU)
-	}
-	t.Log("更新配额成功")
+		err := dao.Create(quota)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 测试 Delete
-	err = dao.Delete(userQuota.ID)
-	if err != nil {
-		t.Fatalf("删除配额失败: %v", err)
-	}
-	t.Log("删除配额成功")
+	t.Run("DatabaseError", func(t *testing.T) {
+		quota := &entity.ResourceQuota{
+			UserID:     1,
+			QuotaLevel: "pro",
+			CPU:        16,
+		}
 
-	t.Log("ResourceQuota DAO CRUD 测试通过")
+		mock.ExpectBegin()
+		mock.ExpectQuery(`INSERT INTO "resource_quotas"`).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Create(quota)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
-func TestResourceQuotaDao_WorkspaceQuota(t *testing.T) {
-	setupResourceQuotaTest(t)
+// TestResourceQuotaDao_GetByID 测试根据ID获取资源配额
+func TestResourceQuotaDao_GetByID(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
 
-	dao := NewResourceQuotaDao()
-	customerDao := NewUserDao()
-	workspaceDao := NewWorkspaceDao()
+	dao := &ResourceQuotaDao{db: gormDB}
 
-	// 创建测试客户
-	customer := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-ws-quota-user-" + time.Now().Format("20060102150405"),
-		Email:        "ws-quota-test-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test WS Quota User",
-		Status:       "active",
-	}
-	err := customerDao.Create(customer)
-	if err != nil {
-		t.Fatalf("创建测试客户失败: %v", err)
-	}
-	defer customerDao.Delete(customer.ID)
+	t.Run("Success", func(t *testing.T) {
+		quotaID := uint(1)
+		now := time.Now()
 
-	// 创建测试工作空间
-	workspace := &entity.Workspace{
-		UUID:        uuid.New(),
-		OwnerID:     customer.ID,
-		Name:        "Test WS Quota Workspace",
-		Description: "Test workspace for quota",
-		Type:        "personal",
-		Status:      "active",
-	}
-	err = workspaceDao.Create(workspace)
-	if err != nil {
-		t.Fatalf("创建测试工作空间失败: %v", err)
-	}
-	defer workspaceDao.Delete(workspace.ID)
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			quotaID, 1, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
 
-	// 创建工作空间级别配额
-	wsQuota := &entity.ResourceQuota{
-		UserID:       customer.ID,
-		WorkspaceID:      &workspace.ID,
-		QuotaLevel:       "basic",
-		CPU:              8,
-		Memory:           16384,
-		GPU:              2,
-		Storage:          500,
-		EnvironmentQuota: 5,
-	}
-	err = dao.Create(wsQuota)
-	if err != nil {
-		t.Fatalf("创建工作空间级别配额失败: %v", err)
-	}
-	defer dao.Delete(wsQuota.ID)
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(quotaID, 1).
+			WillReturnRows(rows)
 
-	// 测试 GetByWorkspaceID
-	found, err := dao.GetByWorkspaceID(workspace.ID)
-	if err != nil {
-		t.Fatalf("根据工作空间ID获取配额失败: %v", err)
-	}
-	if found.CPU != 8 {
-		t.Fatalf("CPU配额不匹配: got %d, want 8", found.CPU)
-	}
-	t.Log("根据工作空间ID获取配额成功")
+		quota, err := dao.GetByID(quotaID)
+		assert.NoError(t, err)
+		assert.NotNil(t, quota)
+		assert.Equal(t, quotaID, quota.ID)
+		assert.Equal(t, 16, quota.CPU)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 测试 GetByUserAndWorkspace
-	found2, err := dao.GetByUserAndWorkspace(customer.ID, workspace.ID)
-	if err != nil {
-		t.Fatalf("根据客户和工作空间ID获取配额失败: %v", err)
-	}
-	if found2.ID != wsQuota.ID {
-		t.Fatalf("配额ID不匹配")
-	}
-	t.Log("根据客户和工作空间ID获取配额成功")
+	t.Run("NotFound", func(t *testing.T) {
+		quotaID := uint(999)
 
-	t.Log("工作空间配额测试通过")
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(quotaID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		quota, err := dao.GetByID(quotaID)
+		assert.Error(t, err)
+		assert.Nil(t, quota)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		quotaID := uint(1)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(quotaID, 1).
+			WillReturnError(sql.ErrConnDone)
+
+		quota, err := dao.GetByID(quotaID)
+		assert.Error(t, err)
+		assert.Nil(t, quota)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
+// TestResourceQuotaDao_GetByUserID 测试根据用户ID获取资源配额
+func TestResourceQuotaDao_GetByUserID(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &ResourceQuotaDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(rows)
+
+		quota, err := dao.GetByUserID(userID)
+		assert.NoError(t, err)
+		assert.NotNil(t, quota)
+		assert.Equal(t, userID, quota.UserID)
+		assert.Nil(t, quota.WorkspaceID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		userID := uint(999)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		quota, err := dao.GetByUserID(userID)
+		assert.Error(t, err)
+		assert.Nil(t, quota)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		userID := uint(1)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnError(sql.ErrConnDone)
+
+		quota, err := dao.GetByUserID(userID)
+		assert.Error(t, err)
+		assert.Nil(t, quota)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestResourceQuotaDao_GetByWorkspaceID 测试根据工作空间ID获取资源配额
+func TestResourceQuotaDao_GetByWorkspaceID(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &ResourceQuotaDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		workspaceID := uint(1)
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, 1, workspaceID, "basic", 8, 16384,
+			2, 500, 5, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(workspaceID, 1).
+			WillReturnRows(rows)
+
+		quota, err := dao.GetByWorkspaceID(workspaceID)
+		assert.NoError(t, err)
+		assert.NotNil(t, quota)
+		assert.Equal(t, workspaceID, *quota.WorkspaceID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		workspaceID := uint(999)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(workspaceID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		quota, err := dao.GetByWorkspaceID(workspaceID)
+		assert.Error(t, err)
+		assert.Nil(t, quota)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestResourceQuotaDao_GetByUserAndWorkspace 测试根据用户和工作空间ID获取资源配额
+func TestResourceQuotaDao_GetByUserAndWorkspace(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &ResourceQuotaDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		userID := uint(1)
+		workspaceID := uint(1)
+		now := time.Now()
+
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, workspaceID, "basic", 8, 16384,
+			2, 500, 5, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, workspaceID, 1).
+			WillReturnRows(rows)
+
+		quota, err := dao.GetByUserAndWorkspace(userID, workspaceID)
+		assert.NoError(t, err)
+		assert.NotNil(t, quota)
+		assert.Equal(t, userID, quota.UserID)
+		assert.Equal(t, workspaceID, *quota.WorkspaceID)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("NotFound", func(t *testing.T) {
+		userID := uint(999)
+		workspaceID := uint(999)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, workspaceID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		quota, err := dao.GetByUserAndWorkspace(userID, workspaceID)
+		assert.Error(t, err)
+		assert.Nil(t, quota)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestResourceQuotaDao_Update 测试更新资源配额
+func TestResourceQuotaDao_Update(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &ResourceQuotaDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		quota := &entity.ResourceQuota{
+			ID:               1,
+			UserID:           1,
+			WorkspaceID:      nil,
+			QuotaLevel:       "pro",
+			CPU:              32,
+			Memory:           65536,
+			GPU:              8,
+			Storage:          2000,
+			EnvironmentQuota: 20,
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "resource_quotas"`).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
+
+		err := dao.Update(quota)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		quota := &entity.ResourceQuota{
+			ID:     1,
+			UserID: 1,
+			CPU:    32,
+		}
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`UPDATE "resource_quotas"`).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Update(quota)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestResourceQuotaDao_Delete 测试删除资源配额
+func TestResourceQuotaDao_Delete(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &ResourceQuotaDao{db: gormDB}
+
+	t.Run("Success", func(t *testing.T) {
+		quotaID := uint(1)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`DELETE FROM "resource_quotas"`).
+			WillReturnResult(sqlmock.NewResult(1, 1))
+		mock.ExpectCommit()
+
+		err := dao.Delete(quotaID)
+		assert.NoError(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		quotaID := uint(1)
+
+		mock.ExpectBegin()
+		mock.ExpectExec(`DELETE FROM "resource_quotas"`).
+			WillReturnError(sql.ErrConnDone)
+		mock.ExpectRollback()
+
+		err := dao.Delete(quotaID)
+		assert.Error(t, err)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestResourceQuotaDao_List 测试获取资源配额列表
 func TestResourceQuotaDao_List(t *testing.T) {
-	setupResourceQuotaTest(t)
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
 
-	dao := NewResourceQuotaDao()
-	customerDao := NewUserDao()
+	dao := &ResourceQuotaDao{db: gormDB}
 
-	// 创建测试客户
-	customer := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-list-quota-user-" + time.Now().Format("20060102150405"),
-		Email:        "list-quota-test-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test List Quota User",
-		Status:       "active",
-	}
-	err := customerDao.Create(customer)
-	if err != nil {
-		t.Fatalf("创建测试客户失败: %v", err)
-	}
-	defer customerDao.Delete(customer.ID)
+	t.Run("Success", func(t *testing.T) {
+		now := time.Now()
 
-	// 创建多个配额记录
-	quota1 := &entity.ResourceQuota{
-		UserID:       customer.ID,
-		WorkspaceID:      nil,
-		QuotaLevel:       "free",
-		CPU:              8,
-		Memory:           16384,
-		GPU:              2,
-		Storage:          500,
-		EnvironmentQuota: 3,
-	}
-	err = dao.Create(quota1)
-	if err != nil {
-		t.Fatalf("创建配额1失败: %v", err)
-	}
-	defer dao.Delete(quota1.ID)
+		// Mock Count查询
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(2)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "resource_quotas"`).
+			WillReturnRows(countRows)
 
-	// 测试 List
-	quotas, total, err := dao.List(1, 10)
-	if err != nil {
-		t.Fatalf("获取配额列表失败: %v", err)
-	}
-	if total < 1 {
-		t.Fatalf("配额总数不正确: got %d, want >= 1", total)
-	}
-	if len(quotas) < 1 {
-		t.Fatalf("配额列表为空")
-	}
-	t.Logf("获取配额列表成功，总数: %d", total)
+		// Mock List查询
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).
+			AddRow(1, 1, nil, "pro", 16, 32768, 4, 1000, 10, now, now, nil).
+			AddRow(2, 2, nil, "basic", 8, 16384, 2, 500, 5, now, now, nil)
 
-	t.Log("配额列表测试通过")
-}
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnRows(rows)
 
-// TestResourceQuotaDao_ErrorScenarios 测试错误场景
-func TestResourceQuotaDao_ErrorScenarios(t *testing.T) {
-	setupResourceQuotaTest(t)
-
-	dao := NewResourceQuotaDao()
-
-	// 测试 GetByID - 不存在的ID
-	t.Run("GetByID_NotFound", func(t *testing.T) {
-		_, err := dao.GetByID(99999)
-		if err == nil {
-			t.Error("获取不存在的配额应该返回错误")
-		}
-		t.Logf("GetByID 不存在的ID测试通过: %v", err)
+		quotas, total, err := dao.List(1, 10)
+		assert.NoError(t, err)
+		assert.Equal(t, int64(2), total)
+		assert.Len(t, quotas, 2)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
-	// 测试 GetByUserID - 不存在的客户ID
-	t.Run("GetByUserID_NotFound", func(t *testing.T) {
-		_, err := dao.GetByUserID(99999)
-		if err == nil {
-			t.Error("获取不存在客户的配额应该返回错误")
-		}
-		t.Logf("GetByUserID 不存在的客户ID测试通过: %v", err)
-	})
+	t.Run("PageLessThanOne", func(t *testing.T) {
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "resource_quotas"`).
+			WillReturnRows(countRows)
 
-	// 测试 GetByWorkspaceID - 不存在的工作空间ID
-	t.Run("GetByWorkspaceID_NotFound", func(t *testing.T) {
-		_, err := dao.GetByWorkspaceID(99999)
-		if err == nil {
-			t.Error("获取不存在工作空间的配额应该返回错误")
-		}
-		t.Logf("GetByWorkspaceID 不存在的工作空间ID测试通过: %v", err)
-	})
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(1, 1, nil, "pro", 16, 32768, 4, 1000, 10, time.Now(), time.Now(), nil)
 
-	// 测试 GetByUserAndWorkspace - 不存在的组合
-	t.Run("GetByUserAndWorkspace_NotFound", func(t *testing.T) {
-		_, err := dao.GetByUserAndWorkspace(99999, 99999)
-		if err == nil {
-			t.Error("获取不存在的客户和工作空间组合配额应该返回错误")
-		}
-		t.Logf("GetByUserAndWorkspace 不存在的组合测试通过: %v", err)
-	})
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnRows(rows)
 
-	t.Log("错误场景测试通过")
-}
-
-// TestResourceQuotaDao_ListEdgeCases 测试List方法的边界情况
-func TestResourceQuotaDao_ListEdgeCases(t *testing.T) {
-	setupResourceQuotaTest(t)
-
-	dao := NewResourceQuotaDao()
-	customerDao := NewUserDao()
-
-	// 创建测试客户
-	customer := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-list-edge-" + time.Now().Format("20060102150405"),
-		Email:        "list-edge-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test List Edge User",
-		Status:       "active",
-	}
-	err := customerDao.Create(customer)
-	if err != nil {
-		t.Fatalf("创建测试客户失败: %v", err)
-	}
-	defer customerDao.Delete(customer.ID)
-
-	// 创建测试配额
-	quota := &entity.ResourceQuota{
-		UserID:  customer.ID,
-		WorkspaceID: nil,
-		CPU:         8,
-		Memory:      16384,
-		GPU:         2,
-		Storage:     500,
-	}
-	err = dao.Create(quota)
-	if err != nil {
-		t.Fatalf("创建配额失败: %v", err)
-	}
-	defer dao.Delete(quota.ID)
-
-	// 测试 page < 1（应该默认为1）
-	t.Run("List_PageLessThanOne", func(t *testing.T) {
 		quotas, total, err := dao.List(0, 10)
-		if err != nil {
-			t.Errorf("page < 1 应该使用默认值: %v", err)
-		}
-		if total < 1 {
-			t.Errorf("应该至少有一条记录")
-		}
-		if len(quotas) < 1 {
-			t.Errorf("应该返回至少一条记录")
-		}
-		t.Logf("page < 1 测试通过，返回 %d 条记录", len(quotas))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), total)
+		assert.Len(t, quotas, 1)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
-	// 测试 pageSize < 1（应该默认为10）
-	t.Run("List_PageSizeLessThanOne", func(t *testing.T) {
+	t.Run("PageSizeLessThanOne", func(t *testing.T) {
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "resource_quotas"`).
+			WillReturnRows(countRows)
+
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(1, 1, nil, "pro", 16, 32768, 4, 1000, 10, time.Now(), time.Now(), nil)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnRows(rows)
+
 		quotas, total, err := dao.List(1, 0)
-		if err != nil {
-			t.Errorf("pageSize < 1 应该使用默认值: %v", err)
-		}
-		if total < 1 {
-			t.Errorf("应该至少有一条记录")
-		}
-		t.Logf("pageSize < 1 测试通过，返回 %d 条记录", len(quotas))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), total)
+		assert.Len(t, quotas, 1)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
-	// 测试 pageSize > 100（应该限制为100）
-	t.Run("List_PageSizeGreaterThan100", func(t *testing.T) {
+	t.Run("PageSizeGreaterThan100", func(t *testing.T) {
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "resource_quotas"`).
+			WillReturnRows(countRows)
+
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(1, 1, nil, "pro", 16, 32768, 4, 1000, 10, time.Now(), time.Now(), nil)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnRows(rows)
+
 		quotas, total, err := dao.List(1, 200)
-		if err != nil {
-			t.Errorf("pageSize > 100 应该限制为100: %v", err)
-		}
-		if total < 1 {
-			t.Errorf("应该至少有一条记录")
-		}
-		// 验证返回的记录数不超过100
-		if len(quotas) > 100 {
-			t.Errorf("返回的记录数不应该超过100，实际: %d", len(quotas))
-		}
-		t.Logf("pageSize > 100 测试通过，返回 %d 条记录", len(quotas))
+		assert.NoError(t, err)
+		assert.Equal(t, int64(1), total)
+		assert.Len(t, quotas, 1)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
-	// 测试负数参数
-	t.Run("List_NegativeParameters", func(t *testing.T) {
-		quotas, total, err := dao.List(-1, -10)
-		if err != nil {
-			t.Errorf("负数参数应该使用默认值: %v", err)
-		}
-		if total < 1 {
-			t.Errorf("应该至少有一条记录")
-		}
-		t.Logf("负数参数测试通过，返回 %d 条记录", len(quotas))
+	t.Run("CountError", func(t *testing.T) {
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "resource_quotas"`).
+			WillReturnError(sql.ErrConnDone)
+
+		quotas, total, err := dao.List(1, 10)
+		assert.Error(t, err)
+		assert.Nil(t, quotas)
+		assert.Equal(t, int64(0), total)
+		assert.NoError(t, mock.ExpectationsWereMet())
 	})
 
-	t.Log("List边界情况测试通过")
+	t.Run("QueryError", func(t *testing.T) {
+		countRows := sqlmock.NewRows([]string{"count"}).AddRow(1)
+		mock.ExpectQuery(`SELECT count\(\*\) FROM "resource_quotas"`).
+			WillReturnRows(countRows)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnError(sql.ErrConnDone)
+
+		quotas, total, err := dao.List(1, 10)
+		assert.Error(t, err)
+		assert.Nil(t, quotas)
+		assert.Equal(t, int64(0), total)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
+// TestResourceQuotaDao_GetByQuotaLevel 测试根据配额级别获取资源配额列表
 func TestResourceQuotaDao_GetByQuotaLevel(t *testing.T) {
-	setupResourceQuotaTest(t)
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
 
-	dao := NewResourceQuotaDao()
-	customerDao := NewUserDao()
+	dao := &ResourceQuotaDao{db: gormDB}
 
-	// 创建测试客户
-	customer1 := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-level-user1-" + time.Now().Format("20060102150405"),
-		Email:        "level-test1-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test Level User 1",
-		Status:       "active",
-	}
-	err := customerDao.Create(customer1)
-	if err != nil {
-		t.Fatalf("创建测试客户1失败: %v", err)
-	}
-	defer customerDao.Delete(customer1.ID)
+	t.Run("Success", func(t *testing.T) {
+		now := time.Now()
+		level := "pro"
 
-	customer2 := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-level-user2-" + time.Now().Format("20060102150405"),
-		Email:        "level-test2-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test Level User 2",
-		Status:       "active",
-	}
-	err = customerDao.Create(customer2)
-	if err != nil {
-		t.Fatalf("创建测试客户2失败: %v", err)
-	}
-	defer customerDao.Delete(customer2.ID)
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).
+			AddRow(1, 1, nil, level, 16, 32768, 4, 1000, 10, now, now, nil).
+			AddRow(2, 2, nil, level, 16, 32768, 4, 1000, 10, now, now, nil)
 
-	// 创建不同级别的配额
-	quotaPro := &entity.ResourceQuota{
-		UserID:       customer1.ID,
-		WorkspaceID:      nil,
-		QuotaLevel:       "pro",
-		CPU:              16,
-		Memory:           32768,
-		GPU:              4,
-		Storage:          1000,
-		EnvironmentQuota: 10,
-	}
-	err = dao.Create(quotaPro)
-	if err != nil {
-		t.Fatalf("创建pro配额失败: %v", err)
-	}
-	defer dao.Delete(quotaPro.ID)
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnRows(rows)
 
-	quotaBasic := &entity.ResourceQuota{
-		UserID:       customer2.ID,
-		WorkspaceID:      nil,
-		QuotaLevel:       "basic",
-		CPU:              8,
-		Memory:           16384,
-		GPU:              2,
-		Storage:          500,
-		EnvironmentQuota: 5,
-	}
-	err = dao.Create(quotaBasic)
-	if err != nil {
-		t.Fatalf("创建basic配额失败: %v", err)
-	}
-	defer dao.Delete(quotaBasic.ID)
+		quotas, err := dao.GetByQuotaLevel(level)
+		assert.NoError(t, err)
+		assert.Len(t, quotas, 2)
+		assert.Equal(t, level, quotas[0].QuotaLevel)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 测试查询pro级别
-	proQuotas, err := dao.GetByQuotaLevel("pro")
-	if err != nil {
-		t.Fatalf("查询pro级别配额失败: %v", err)
-	}
-	if len(proQuotas) < 1 {
-		t.Fatalf("应该至少有1个pro级别配额")
-	}
-	t.Logf("查询到 %d 个pro级别配额", len(proQuotas))
+	t.Run("EmptyResult", func(t *testing.T) {
+		level := "enterprise"
 
-	// 测试查询basic级别
-	basicQuotas, err := dao.GetByQuotaLevel("basic")
-	if err != nil {
-		t.Fatalf("查询basic级别配额失败: %v", err)
-	}
-	if len(basicQuotas) < 1 {
-		t.Fatalf("应该至少有1个basic级别配额")
-	}
-	t.Logf("查询到 %d 个basic级别配额", len(basicQuotas))
+		rows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		})
 
-	t.Log("GetByQuotaLevel测试通过")
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnRows(rows)
+
+		quotas, err := dao.GetByQuotaLevel(level)
+		assert.NoError(t, err)
+		assert.Len(t, quotas, 0)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("DatabaseError", func(t *testing.T) {
+		level := "pro"
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WillReturnError(sql.ErrConnDone)
+
+		quotas, err := dao.GetByQuotaLevel(level)
+		assert.Error(t, err)
+		assert.Nil(t, quotas)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
-func TestResourceQuotaDao_CheckQuota(t *testing.T) {
-	setupResourceQuotaTest(t)
+// TestResourceQuotaDao_GetUsedResources 测试获取已使用的资源
+func TestResourceQuotaDao_GetUsedResources(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
 
-	dao := NewResourceQuotaDao()
-	customerDao := NewUserDao()
+	dao := &ResourceQuotaDao{db: gormDB}
 
-	// 自动迁移Host和Environment表
-	db := database.GetDB()
-	if err := db.AutoMigrate(&entity.Host{}, &entity.Environment{}); err != nil {
-		t.Fatalf("自动迁移表失败: %v", err)
-	}
+	t.Run("Success_WithResources", func(t *testing.T) {
+		userID := uint(1)
 
-	// 创建测试客户
-	customer := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-check-user-" + time.Now().Format("20060102150405"),
-		Email:        "check-test-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test Check User",
-		Status:       "active",
-	}
-	err := customerDao.Create(customer)
-	if err != nil {
-		t.Fatalf("创建测试客户失败: %v", err)
-	}
-	defer customerDao.Delete(customer.ID)
+		rows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
 
-	// 创建配额：CPU=16, Memory=32768, GPU=4, Storage=1000
-	quota := &entity.ResourceQuota{
-		UserID:       customer.ID,
-		WorkspaceID:      nil,
-		QuotaLevel:       "pro",
-		CPU:              16,
-		Memory:           32768,
-		GPU:              4,
-		Storage:          1000,
-		EnvironmentQuota: 10,
-	}
-	err = dao.Create(quota)
-	if err != nil {
-		t.Fatalf("创建配额失败: %v", err)
-	}
-	defer dao.Delete(quota.ID)
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(rows)
 
-	// 创建测试主机
-	host := &entity.Host{
-		ID:             "test-host-" + uuid.New().String(),
-		Name:           "Test Host",
-		IPAddress:      "192.168.1.100",
-		OSType:         "linux",
-		DeploymentMode: "docker",
-		TotalCPU:       32,
-		TotalMemory:    65536,
-		TotalGPU:       8,
-	}
-	err = db.Create(host).Error
-	if err != nil {
-		t.Fatalf("创建测试主机失败: %v", err)
-	}
-	defer db.Delete(host)
+		used, err := dao.GetUsedResources(userID)
+		assert.NoError(t, err)
+		assert.NotNil(t, used)
+		assert.Equal(t, 8, used.CPU)
+		assert.Equal(t, int64(16384), used.Memory)
+		assert.Equal(t, 2, used.GPU)
+		assert.Equal(t, int64(500), used.Storage)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 创建一个运行中的环境：CPU=8, Memory=16384, GPU=2, Storage=500
-	env := &entity.Environment{
-		ID:          "test-env-" + uuid.New().String(),
-		UserID:  customer.ID,
-		WorkspaceID: nil,
-		HostID:      host.ID,
-		Name:        "Test Environment",
-		Image:       "ubuntu:20.04",
-		Status:      "running",
-		CPU:         8,
-		Memory:      16384,
-		GPU:         2,
-		Storage:     func() *int64 { s := int64(500); return &s }(),
-	}
-	err = db.Create(env).Error
-	if err != nil {
-		t.Fatalf("创建测试环境失败: %v", err)
-	}
-	defer db.Delete(env)
+	t.Run("Success_NoResources", func(t *testing.T) {
+		userID := uint(2)
 
-	// 测试1：配额充足的情况（请求：CPU=4, Memory=8192, GPU=1, Storage=200）
-	// 已用：CPU=8, Memory=16384, GPU=2, Storage=500
-	// 总配额：CPU=16, Memory=32768, GPU=4, Storage=1000
-	// 已用+请求：CPU=12, Memory=24576, GPU=3, Storage=700 < 总配额
-	ok, err := dao.CheckQuota(customer.ID, 4, 8192, 1, 200)
-	if err != nil {
-		t.Fatalf("CheckQuota失败: %v", err)
-	}
-	if !ok {
-		t.Fatalf("配额应该充足，但返回false")
-	}
-	t.Log("配额充足测试通过")
+		rows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(0, 0, 0, 0)
 
-	// 测试2：CPU配额不足（请求：CPU=10, Memory=8192, GPU=1, Storage=200）
-	// 已用+请求：CPU=18 > 16（总配额）
-	ok, err = dao.CheckQuota(customer.ID, 10, 8192, 1, 200)
-	if err != nil {
-		t.Fatalf("CheckQuota失败: %v", err)
-	}
-	if ok {
-		t.Fatalf("CPU配额应该不足，但返回true")
-	}
-	t.Log("CPU配额不足测试通过")
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(rows)
 
-	// 测试3：内存配额不足（请求：CPU=4, Memory=20000, GPU=1, Storage=200）
-	// 已用+请求：Memory=36384 > 32768（总配额）
-	ok, err = dao.CheckQuota(customer.ID, 4, 20000, 1, 200)
-	if err != nil {
-		t.Fatalf("CheckQuota失败: %v", err)
-	}
-	if ok {
-		t.Fatalf("内存配额应该不足，但返回true")
-	}
-	t.Log("内存配额不足测试通过")
+		used, err := dao.GetUsedResources(userID)
+		assert.NoError(t, err)
+		assert.NotNil(t, used)
+		assert.Equal(t, 0, used.CPU)
+		assert.Equal(t, int64(0), used.Memory)
+		assert.Equal(t, 0, used.GPU)
+		assert.Equal(t, int64(0), used.Storage)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 测试4：GPU配额不足（请求：CPU=4, Memory=8192, GPU=3, Storage=200）
-	// 已用+请求：GPU=5 > 4（总配额）
-	ok, err = dao.CheckQuota(customer.ID, 4, 8192, 3, 200)
-	if err != nil {
-		t.Fatalf("CheckQuota失败: %v", err)
-	}
-	if ok {
-		t.Fatalf("GPU配额应该不足，但返回true")
-	}
-	t.Log("GPU配额不足测试通过")
+	t.Run("DatabaseError", func(t *testing.T) {
+		userID := uint(1)
 
-	// 测试5：存储配额不足（请求：CPU=4, Memory=8192, GPU=1, Storage=600）
-	// 已用+请求：Storage=1100 > 1000（总配额）
-	ok, err = dao.CheckQuota(customer.ID, 4, 8192, 1, 600)
-	if err != nil {
-		t.Fatalf("CheckQuota失败: %v", err)
-	}
-	if ok {
-		t.Fatalf("存储配额应该不足，但返回true")
-	}
-	t.Log("存储配额不足测试通过")
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnError(sql.ErrConnDone)
 
-	// 测试6：边界情况（请求刚好用完所有配额）
-	// 请求：CPU=8, Memory=16384, GPU=2, Storage=500
-	// 已用+请求：CPU=16, Memory=32768, GPU=4, Storage=1000（刚好等于总配额）
-	ok, err = dao.CheckQuota(customer.ID, 8, 16384, 2, 500)
-	if err != nil {
-		t.Fatalf("CheckQuota失败: %v", err)
-	}
-	if !ok {
-		t.Fatalf("边界情况应该允许，但返回false")
-	}
-	t.Log("边界情况测试通过")
-
-	t.Log("CheckQuota测试通过")
+		used, err := dao.GetUsedResources(userID)
+		assert.Error(t, err)
+		assert.Nil(t, used)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
 
+// TestResourceQuotaDao_GetAvailableQuota 测试获取可用配额
 func TestResourceQuotaDao_GetAvailableQuota(t *testing.T) {
-	setupResourceQuotaTest(t)
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
 
-	dao := NewResourceQuotaDao()
-	customerDao := NewUserDao()
+	dao := &ResourceQuotaDao{db: gormDB}
 
-	// 自动迁移Host和Environment表
-	db := database.GetDB()
-	if err := db.AutoMigrate(&entity.Host{}, &entity.Environment{}); err != nil {
-		t.Fatalf("自动迁移表失败: %v", err)
-	}
+	t.Run("Success", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
 
-	// 创建测试客户
-	customer := &entity.User{
-		UUID:         uuid.New(),
-		Username:     "test-available-user-" + time.Now().Format("20060102150405"),
-		Email:        "available-test-" + time.Now().Format("20060102150405") + "@example.com",
-		PasswordHash: "test-hash",
-		DisplayName:  "Test Available User",
-		Status:       "active",
-	}
-	err := customerDao.Create(customer)
-	if err != nil {
-		t.Fatalf("创建测试客户失败: %v", err)
-	}
-	defer customerDao.Delete(customer.ID)
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
 
-	// 创建配额：CPU=16, Memory=32768, GPU=4, Storage=1000
-	quota := &entity.ResourceQuota{
-		UserID:       customer.ID,
-		WorkspaceID:      nil,
-		QuotaLevel:       "pro",
-		CPU:              16,
-		Memory:           32768,
-		GPU:              4,
-		Storage:          1000,
-		EnvironmentQuota: 10,
-	}
-	err = dao.Create(quota)
-	if err != nil {
-		t.Fatalf("创建配额失败: %v", err)
-	}
-	defer dao.Delete(quota.ID)
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
 
-	// 创建测试主机
-	host := &entity.Host{
-		ID:             "test-host-" + uuid.New().String(),
-		Name:           "Test Host",
-		IPAddress:      "192.168.1.100",
-		OSType:         "linux",
-		DeploymentMode: "docker",
-		TotalCPU:       32,
-		TotalMemory:    65536,
-		TotalGPU:       8,
-	}
-	err = db.Create(host).Error
-	if err != nil {
-		t.Fatalf("创建测试主机失败: %v", err)
-	}
-	defer db.Delete(host)
+		// Mock GetUsedResources
+		usedRows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
 
-	// 创建一个运行中的环境：CPU=8, Memory=16384, GPU=2, Storage=500
-	env := &entity.Environment{
-		ID:          "test-env-" + uuid.New().String(),
-		UserID:  customer.ID,
-		WorkspaceID: nil,
-		HostID:      host.ID,
-		Name:        "Test Environment",
-		Image:       "ubuntu:20.04",
-		Status:      "running",
-		CPU:         8,
-		Memory:      16384,
-		GPU:         2,
-		Storage:     func() *int64 { s := int64(500); return &s }(),
-	}
-	err = db.Create(env).Error
-	if err != nil {
-		t.Fatalf("创建测试环境失败: %v", err)
-	}
-	defer db.Delete(env)
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(usedRows)
 
-	// 测试GetAvailableQuota
-	available, err := dao.GetAvailableQuota(customer.ID)
-	if err != nil {
-		t.Fatalf("GetAvailableQuota失败: %v", err)
-	}
+		available, err := dao.GetAvailableQuota(userID)
+		assert.NoError(t, err)
+		assert.NotNil(t, available)
+		assert.Equal(t, 8, available.CPU)
+		assert.Equal(t, int64(16384), available.Memory)
+		assert.Equal(t, 2, available.GPU)
+		assert.Equal(t, int64(500), available.Storage)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 
-	// 验证可用配额 = 总配额 - 已用配额
-	// 总配额：CPU=16, Memory=32768, GPU=4, Storage=1000
-	// 已用：CPU=8, Memory=16384, GPU=2, Storage=500
-	// 可用：CPU=8, Memory=16384, GPU=2, Storage=500
-	if available.CPU != 8 {
-		t.Errorf("可用CPU配额不正确: got %d, want 8", available.CPU)
-	}
-	if available.Memory != 16384 {
-		t.Errorf("可用内存配额不正确: got %d, want 16384", available.Memory)
-	}
-	if available.GPU != 2 {
-		t.Errorf("可用GPU配额不正确: got %d, want 2", available.GPU)
-	}
-	if available.Storage != 500 {
-		t.Errorf("可用存储配额不正确: got %d, want 500", available.Storage)
-	}
+	t.Run("QuotaNotFound", func(t *testing.T) {
+		userID := uint(999)
 
-	t.Log("GetAvailableQuota测试通过")
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		available, err := dao.GetAvailableQuota(userID)
+		assert.Error(t, err)
+		assert.Nil(t, available)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("GetUsedResourcesError", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources error
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnError(sql.ErrConnDone)
+
+		available, err := dao.GetAvailableQuota(userID)
+		assert.Error(t, err)
+		assert.Nil(t, available)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+}
+
+// TestResourceQuotaDao_CheckQuota 测试检查配额
+func TestResourceQuotaDao_CheckQuota(t *testing.T) {
+	gormDB, mock, sqlDB := setupResourceQuotaMockDB(t)
+	defer sqlDB.Close()
+
+	dao := &ResourceQuotaDao{db: gormDB}
+
+	t.Run("Success_QuotaSufficient", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources
+		usedRows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
+
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(usedRows)
+
+		// 请求: CPU=4, Memory=8192, GPU=1, Storage=200
+		// 已用: CPU=8, Memory=16384, GPU=2, Storage=500
+		// 总配额: CPU=16, Memory=32768, GPU=4, Storage=1000
+		// 已用+请求: CPU=12, Memory=24576, GPU=3, Storage=700 < 总配额
+		ok, err := dao.CheckQuota(userID, 4, 8192, 1, 200)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("CPUQuotaExceeded", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources
+		usedRows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
+
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(usedRows)
+
+		// 请求: CPU=10, Memory=8192, GPU=1, Storage=200
+		// 已用+请求: CPU=18 > 16 (总配额)
+		ok, err := dao.CheckQuota(userID, 10, 8192, 1, 200)
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("MemoryQuotaExceeded", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources
+		usedRows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
+
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(usedRows)
+
+		// 请求: CPU=4, Memory=20000, GPU=1, Storage=200
+		// 已用+请求: Memory=36384 > 32768 (总配额)
+		ok, err := dao.CheckQuota(userID, 4, 20000, 1, 200)
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("GPUQuotaExceeded", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources
+		usedRows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
+
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(usedRows)
+
+		// 请求: CPU=4, Memory=8192, GPU=3, Storage=200
+		// 已用+请求: GPU=5 > 4 (总配额)
+		ok, err := dao.CheckQuota(userID, 4, 8192, 3, 200)
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("StorageQuotaExceeded", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources
+		usedRows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
+
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(usedRows)
+
+		// 请求: CPU=4, Memory=8192, GPU=1, Storage=600
+		// 已用+请求: Storage=1100 > 1000 (总配额)
+		ok, err := dao.CheckQuota(userID, 4, 8192, 1, 600)
+		assert.NoError(t, err)
+		assert.False(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("ExactQuotaMatch", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources
+		usedRows := sqlmock.NewRows([]string{"cpu", "memory", "gpu", "storage"}).
+			AddRow(8, 16384, 2, 500)
+
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnRows(usedRows)
+
+		// 请求: CPU=8, Memory=16384, GPU=2, Storage=500
+		// 已用+请求: CPU=16, Memory=32768, GPU=4, Storage=1000 (刚好等于总配额)
+		ok, err := dao.CheckQuota(userID, 8, 16384, 2, 500)
+		assert.NoError(t, err)
+		assert.True(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("QuotaNotFound", func(t *testing.T) {
+		userID := uint(999)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnError(gorm.ErrRecordNotFound)
+
+		ok, err := dao.CheckQuota(userID, 4, 8192, 1, 200)
+		assert.Error(t, err)
+		assert.False(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
+
+	t.Run("GetUsedResourcesError", func(t *testing.T) {
+		userID := uint(1)
+		now := time.Now()
+
+		// Mock GetByUserID
+		quotaRows := sqlmock.NewRows([]string{
+			"id", "user_id", "workspace_id", "quota_level", "cpu", "memory",
+			"gpu", "storage", "environment_quota", "created_at", "updated_at", "deleted_at",
+		}).AddRow(
+			1, userID, nil, "pro", 16, 32768,
+			4, 1000, 10, now, now, nil,
+		)
+
+		mock.ExpectQuery(`SELECT \* FROM "resource_quotas"`).
+			WithArgs(userID, 1).
+			WillReturnRows(quotaRows)
+
+		// Mock GetUsedResources error
+		mock.ExpectQuery(`SELECT COALESCE\(SUM\(cpu\), 0\) as cpu`).
+			WillReturnError(sql.ErrConnDone)
+
+		ok, err := dao.CheckQuota(userID, 4, 8192, 1, 200)
+		assert.Error(t, err)
+		assert.False(t, ok)
+		assert.NoError(t, mock.ExpectationsWereMet())
+	})
 }
