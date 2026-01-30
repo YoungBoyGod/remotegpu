@@ -14,8 +14,8 @@ import (
 // WorkspaceService 工作空间服务
 type WorkspaceService struct {
 	db           *gorm.DB
-	workspaceDao *dao.WorkspaceDao
-	memberDao    *dao.WorkspaceMemberDao
+	workspaceDao dao.WorkspaceDaoInterface
+	memberDao    dao.WorkspaceMemberDaoInterface
 }
 
 // NewWorkspaceService 创建工作空间服务实例
@@ -232,7 +232,7 @@ func (s *WorkspaceService) CheckPermission(workspaceID, userID uint) (bool, erro
 	}
 
 	// 检查是否是成员
-	member, err := s.memberDao.GetByWorkspaceAndCustomer(workspaceID, userID)
+	member, err := s.memberDao.GetByWorkspaceAndUser(workspaceID, userID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return false, nil
