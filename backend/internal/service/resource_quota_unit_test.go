@@ -10,6 +10,58 @@ import (
 	"gorm.io/gorm"
 )
 
+// MockResourceQuotaDao 模拟 ResourceQuotaDao
+type MockResourceQuotaDao struct {
+	mock.Mock
+}
+
+func (m *MockResourceQuotaDao) Create(quota *entity.ResourceQuota) error {
+	args := m.Called(quota)
+	return args.Error(0)
+}
+
+func (m *MockResourceQuotaDao) GetByID(id uint) (*entity.ResourceQuota, error) {
+	args := m.Called(id)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.ResourceQuota), args.Error(1)
+}
+
+func (m *MockResourceQuotaDao) GetByUserID(userID uint) (*entity.ResourceQuota, error) {
+	args := m.Called(userID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.ResourceQuota), args.Error(1)
+}
+
+func (m *MockResourceQuotaDao) GetByWorkspaceID(workspaceID uint) (*entity.ResourceQuota, error) {
+	args := m.Called(workspaceID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.ResourceQuota), args.Error(1)
+}
+
+func (m *MockResourceQuotaDao) GetByUserAndWorkspace(userID, workspaceID uint) (*entity.ResourceQuota, error) {
+	args := m.Called(userID, workspaceID)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*entity.ResourceQuota), args.Error(1)
+}
+
+func (m *MockResourceQuotaDao) Update(quota *entity.ResourceQuota) error {
+	args := m.Called(quota)
+	return args.Error(0)
+}
+
+func (m *MockResourceQuotaDao) Delete(id uint) error {
+	args := m.Called(id)
+	return args.Error(0)
+}
+
 // TestResourceQuotaService_SetQuota_Unit 测试SetQuota方法（单元测试）
 func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 	t.Run("Create new user level quota", func(t *testing.T) {
