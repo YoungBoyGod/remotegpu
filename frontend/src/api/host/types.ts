@@ -1,38 +1,49 @@
 /**
- * Host Selection Module - Type Definitions
+ * Host Management Module - Type Definitions
  */
-import { Server } from '../cmdb/types'
 import { PaginationParams } from '../common/types'
 
-// Host availability status
-export type HostAvailabilityStatus = 'available' | 'limited' | 'unavailable'
-
-// Host information (extends Server with host-specific fields)
-export interface Host extends Server {
-  region: string
-  gpu_model: string
-  gpu_memory: number
-  cuda_version: string
-  price_per_hour: number
-  availability_status: HostAvailabilityStatus
-  available_gpu_count: number
+export interface Host {
+  id: string
+  name: string
+  hostname?: string
+  ip_address: string
+  public_ip?: string
+  os_type: string
+  os_version?: string
+  arch?: string
+  deployment_mode?: string
+  k8s_node_name?: string
+  status: string
+  health_status: string
+  total_cpu: number
+  total_memory: number
+  total_disk?: number
+  total_gpu: number
+  used_cpu: number
+  used_memory: number
+  used_disk?: number
+  used_gpu: number
+  ssh_port: number
+  winrm_port?: number | null
+  agent_port: number
+  labels?: Record<string, string>
+  tags?: string[]
+  last_heartbeat?: string | null
+  registered_at?: string
+  created_at: string
+  updated_at: string
 }
 
-// Host filter parameters
+export interface HostListResponse {
+  list: Host[]
+  total: number
+}
+
 export interface HostFilterParams {
-  region?: string
-  gpu_count?: number | string
-  gpu_model?: string
   keyword?: string
+  status?: string
+  os_type?: string
 }
 
-// Host pricing information
-export interface HostPricing {
-  base_price: number
-  gpu_price: number
-  total_price_per_hour: number
-  currency: string
-}
-
-// Host query parameters (combines filters with pagination)
 export interface HostQueryParams extends PaginationParams, HostFilterParams {}

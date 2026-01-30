@@ -51,7 +51,7 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
         ElMessage.success('登录成功')
         navigateTo('/dashboard')
       } catch (error: any) {
-        ElMessage.error(error.response?.data?.message || '登录失败，请检查用户名和密码')
+        ElMessage.error(error?.msg || error.response?.data?.msg || '登录失败，请检查用户名和密码')
       } finally {
         loading.value = false
       }

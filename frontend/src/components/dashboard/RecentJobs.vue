@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import StatusTag from '@/components/common/StatusTag.vue'
 
-const router = useRouter()
 const { navigateTo } = useRoleNavigation()
 
 interface TrainingJob {
@@ -60,7 +58,7 @@ const loadRecentJobs = async () => {
 
 // 查看任务详情
 const viewJob = (id: string) => {
-  router.push(`/training/${id}`)
+  navigateTo(`/training/${id}`)
 }
 
 onMounted(() => {

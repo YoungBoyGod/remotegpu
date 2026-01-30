@@ -18,28 +18,26 @@ const emit = defineEmits<{
   select: [host: Host]
 }>()
 
-// 格式化价格
-const formattedPrice = computed(() => {
-  return `¥${props.host.price_per_hour.toFixed(2)}/时`
-})
-
-// 价格颜色
-const priceColor = computed(() => {
-  const price = props.host.price_per_hour
-  if (price < 2) return '#67C23A'
-  if (price < 5) return '#409EFF'
-  return '#E6A23C'
-})
-
-// 可用性状态映射
-const availabilityStatusMap = {
-  available: { text: '可用', type: 'success' },
-  limited: { text: '库存紧张', type: 'warning' },
-  unavailable: { text: '已售罄', type: 'danger' }
+const formatMemory = (value?: number | null) => {
+  if (!value && value !== 0) return '-'
+  const gb = value / 1024
+  if (gb >= 1) {
+    return `${gb.toFixed(1)} GB`
+  }
+  return `${value} MB`
 }
 
-const availabilityStatus = computed(() => {
-  return availabilityStatusMap[props.host.availability_status]
+const formatStorage = (value?: number | null) => {
+  if (!value && value !== 0) return '-'
+  const gb = value / 1024
+  if (gb >= 1) {
+    return `${gb.toFixed(1)} GB`
+  }
+  return `${value} MB`
+}
+
+const hostTitle = computed(() => {
+  return props.host.name || props.host.hostname || props.host.id
 })
 
 // 处理选择
@@ -56,44 +54,41 @@ const handleSelect = () => {
     @click="handleSelect"
   >
     <div class="card-header">
-      <div class="gpu-info">
-        <span class="gpu-model">{{ host.gpu_model }} / {{ host.gpu_memory }}GB</span>
+      <div class="host-title">
+        <span class="host-name">{{ hostTitle }}</span>
+        <span class="host-ip">{{ host.ip_address }}</span>
       </div>
       <div class="header-right">
-        <StatusTag :type="availabilityStatus.type" :text="availabilityStatus.text" />
-        <span class="price" :style="{ color: priceColor }">{{ formattedPrice }}</span>
+        <StatusTag :status="host.status" />
       </div>
     </div>
 
     <div class="card-body">
       <div class="spec-item">
-        <el-icon><Location /></el-icon>
-        <span>{{ host.region }}</span>
+        <span class="spec-label">系统</span>
+        <span>{{ host.os_type }} {{ host.os_version || '' }}</span>
       </div>
       <div class="spec-item">
-        <el-icon><Cpu /></el-icon>
-        <span>{{ host.cpu_cores }}核</span>
+        <span class="spec-label">CPU</span>
+        <span>{{ host.used_cpu }} / {{ host.total_cpu }} 核</span>
       </div>
       <div class="spec-item">
-        <el-icon><Memo /></el-icon>
-        <span>{{ host.memory_total }}GB</span>
+        <span class="spec-label">内存</span>
+        <span>{{ formatMemory(host.used_memory) }} / {{ formatMemory(host.total_memory) }}</span>
       </div>
       <div class="spec-item">
-        <el-icon><Coin /></el-icon>
-        <span>{{ host.disk_total }}GB</span>
+        <span class="spec-label">GPU</span>
+        <span>{{ host.used_gpu }} / {{ host.total_gpu }} 张</span>
+      </div>
+      <div class="spec-item">
+        <span class="spec-label">磁盘</span>
+        <span>{{ formatStorage(host.used_disk) }} / {{ formatStorage(host.total_disk) }}</span>
       </div>
     </div>
 
     <div class="card-footer">
-      <div class="cuda-version">
-        <el-icon><Tools /></el-icon>
-        <span>CUDA {{ host.cuda_version }}</span>
-      </div>
-      <el-button
-        type="primary"
-        size="small"
-        :disabled="host.availability_status === 'unavailable'"
-      >
+      <div class="health-status">健康状态：{{ host.health_status }}</div>
+      <el-button type="primary" size="small" :disabled="host.status !== 'active'">
         选择此主机
       </el-button>
     </div>
@@ -126,25 +121,27 @@ const handleSelect = () => {
   border-bottom: 1px solid #EBEEF5;
 }
 
-.gpu-info {
-  flex: 1;
+
+.host-title {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.gpu-model {
+.host-name {
   font-size: 18px;
   font-weight: 600;
   color: #303133;
 }
 
+.host-ip {
+  font-size: 13px;
+  color: #909399;
+}
+
 .header-right {
   display: flex;
   align-items: center;
-  gap: 12px;
-}
-
-.price {
-  font-size: 20px;
-  font-weight: 600;
 }
 
 .card-body {
@@ -156,13 +153,13 @@ const handleSelect = () => {
 
 .spec-item {
   display: flex;
-  align-items: center;
-  gap: 6px;
+  justify-content: space-between;
+  gap: 12px;
   font-size: 14px;
   color: #606266;
 }
 
-.spec-item .el-icon {
+.spec-label {
   color: #909399;
 }
 
@@ -174,10 +171,7 @@ const handleSelect = () => {
   border-top: 1px solid #EBEEF5;
 }
 
-.cuda-version {
-  display: flex;
-  align-items: center;
-  gap: 6px;
+.health-status {
   font-size: 13px;
   color: #909399;
 }

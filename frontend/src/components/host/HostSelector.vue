@@ -26,12 +26,11 @@ const hostStore = useHostStore()
 const hosts = ref<Host[]>([])
 const loading = ref(false)
 const filters = ref<HostFilterParams>({
-  region: '',
-  gpu_count: '',
-  gpu_model: '',
+  status: '',
+  os_type: '',
   keyword: ''
 })
-const selectedHostId = ref<number | null>(null)
+const selectedHostId = ref<string | null>(null)
 
 // 分页
 const pagination = ref({
@@ -51,7 +50,7 @@ const loadHosts = async () => {
     }
 
     const response = await getAvailableHosts(params)
-    hosts.value = response.data.items
+    hosts.value = response.data.list
     pagination.value.total = response.data.total
   } catch (error) {
     ElMessage.error('加载主机列表失败')
@@ -76,9 +75,8 @@ const handleRefresh = () => {
 // 清除筛选
 const handleClearFilters = () => {
   filters.value = {
-    region: '',
-    gpu_count: '',
-    gpu_model: '',
+    status: '',
+    os_type: '',
     keyword: ''
   }
 }

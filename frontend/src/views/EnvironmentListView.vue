@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh } from '@element-plus/icons-vue'
 import { useRoleNavigation } from '@/composables/useRoleNavigation'
@@ -9,32 +8,75 @@ import FilterBar from '@/components/common/FilterBar.vue'
 import StatusTag from '@/components/common/StatusTag.vue'
 import ConfigurableTable from '@/components/common/ConfigurableTable.vue'
 import { environmentColumns } from '@/config/tableColumns'
+import type { Environment } from '@/api/environment/types'
+import {
+  getEnvironmentList,
+  startEnvironment as startEnv,
+  stopEnvironment as stopEnv,
+  deleteEnvironment as deleteEnv,
+} from '@/api/environment'
 
-const router = useRouter()
 const { navigateTo } = useRoleNavigation()
-
-interface Environment {
-  id: string
-  name: string
-  status: string
-  image: string
-  gpu: string
-  cpu: number
-  memory: number
-  runningTime: string
-  createdAt: string
-}
 
 const environments = ref<Environment[]>([])
 const loading = ref(false)
 const searchText = ref('')
 const statusFilter = ref('')
 
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+const formatMemoryToGB = (value: number) => {
+  if (!value) return 0
+  const gb = value / 1024
+  return gb < 1 ? 1 : Math.round(gb)
+}
+
+const formatDuration = (startAt?: string | null) => {
+  if (!startAt) return '-'
+  const start = new Date(startAt)
+  if (Number.isNaN(start.getTime())) return '-'
+  const diffMs = Date.now() - start.getTime()
+  if (diffMs < 0) return '-'
+  const diffMinutes = Math.floor(diffMs / 60000)
+  const hours = Math.floor(diffMinutes / 60)
+  const minutes = diffMinutes % 60
+  if (hours > 0) {
+    return `${hours}小时${minutes}分`
+  }
+  return `${minutes}分`
+}
+
+const displayEnvironments = computed(() => {
+  return environments.value.map(env => ({
+    id: env.id,
+    name: env.name,
+    status: env.status,
+    image: env.image,
+    gpu: env.gpu,
+    cpu: env.cpu,
+    memory: formatMemoryToGB(env.memory),
+    runningTime: env.status === 'running' ? formatDuration(env.started_at) : '-',
+    createdAt: formatDateTime(env.created_at),
+  }))
+})
+
+const statusTextMap: Record<string, string> = {
+  running: '运行中',
+  stopped: '已停止',
+  creating: '创建中',
+  deleting: '删除中',
+  error: '错误',
+}
+
 // 过滤后的环境列表
 const filteredEnvironments = computed(() => {
-  let result = environments.value
+  let result = displayEnvironments.value
 
-  // 搜索过滤
   if (searchText.value) {
     const search = searchText.value.toLowerCase()
     result = result.filter(env =>
@@ -43,7 +85,6 @@ const filteredEnvironments = computed(() => {
     )
   }
 
-  // 状态过滤
   if (statusFilter.value) {
     result = result.filter(env => env.status === statusFilter.value)
   }
@@ -55,31 +96,8 @@ const filteredEnvironments = computed(() => {
 const loadEnvironments = async () => {
   loading.value = true
   try {
-    // 模拟数据
-    environments.value = [
-      {
-        id: 'env-001',
-        name: 'PyTorch 训练环境',
-        status: 'running',
-        image: 'pytorch/pytorch:2.0-cuda11.8',
-        gpu: 'Tesla V100 x2',
-        cpu: 8,
-        memory: 32,
-        runningTime: '2小时30分',
-        createdAt: '2026-01-26 10:30',
-      },
-      {
-        id: 'env-002',
-        name: 'TensorFlow 开发',
-        status: 'stopped',
-        image: 'tensorflow/tensorflow:2.13-gpu',
-        gpu: 'RTX 4090 x1',
-        cpu: 4,
-        memory: 16,
-        runningTime: '-',
-        createdAt: '2026-01-25 15:20',
-      },
-    ]
+    const response = await getEnvironmentList()
+    environments.value = response.data
   } catch (error) {
     ElMessage.error('加载环境列表失败')
   } finally {
@@ -90,6 +108,7 @@ const loadEnvironments = async () => {
 // 启动环境
 const startEnvironment = async (id: string) => {
   try {
+    await startEnv(id)
     ElMessage.success('环境启动中...')
     await loadEnvironments()
   } catch (error) {
@@ -100,6 +119,7 @@ const startEnvironment = async (id: string) => {
 // 停止环境
 const stopEnvironment = async (id: string) => {
   try {
+    await stopEnv(id)
     ElMessage.success('环境已停止')
     await loadEnvironments()
   } catch (error) {
@@ -115,6 +135,7 @@ const deleteEnvironment = async (id: string) => {
       cancelButtonText: '取消',
       type: 'warning',
     })
+    await deleteEnv(id)
     ElMessage.success('环境已删除')
     await loadEnvironments()
   } catch (error) {
@@ -160,14 +181,14 @@ onMounted(() => {
     >
       <!-- 环境名称列 -->
       <template #name="{ row }">
-        <el-link type="primary" @click="router.push(`/environments/${row.id}`)">
+        <el-link type="primary" @click="navigateTo(`/environments/${row.id}`)">
           {{ row.name }}
         </el-link>
       </template>
 
       <!-- 状态列 -->
       <template #status="{ row }">
-        <StatusTag :status="row.status === 'running' ? '运行中' : row.status === 'stopped' ? '已停止' : '错误'" />
+        <StatusTag :status="statusTextMap[row.status] || row.status" />
       </template>
 
       <!-- CPU/内存列 -->

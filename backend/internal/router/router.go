@@ -14,6 +14,7 @@ func InitRouter(r *gin.Engine) {
 	hostController := v1.NewHostController()
 	gpuController := v1.NewGPUController()
 	environmentController := v1.NewEnvironmentController()
+	quotaController := v1.NewResourceQuotaController()
 
 	// API v1 路由组
 	apiV1 := r.Group("/api/v1")
@@ -75,6 +76,16 @@ func InitRouter(r *gin.Engine) {
 			admin.DELETE("/environments/:id", environmentController.Delete)
 			admin.POST("/environments/:id/start", environmentController.Start)
 			admin.POST("/environments/:id/stop", environmentController.Stop)
+			admin.POST("/environments/:id/restart", environmentController.Restart)
+			admin.GET("/environments/:id/access", environmentController.GetAccessInfo)
+			admin.GET("/environments/:id/logs", environmentController.GetLogs)
+
+			// 资源配额管理
+			admin.POST("/quotas", quotaController.SetQuota)
+			admin.GET("/quotas/:id", quotaController.GetQuota)
+			admin.PUT("/quotas/:id", quotaController.UpdateQuota)
+			admin.DELETE("/quotas/:id", quotaController.DeleteQuota)
+			admin.GET("/quotas/usage", quotaController.GetUsage)
 		}
 	}
 }

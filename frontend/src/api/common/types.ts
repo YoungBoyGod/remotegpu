@@ -22,7 +22,7 @@ export interface PaginationResponse<T> {
 // 通用响应结构
 export interface ApiResponse<T = any> {
   code: number
-  message: string
+  msg: string
   data: T
 }
 
@@ -39,7 +39,7 @@ export interface IdResponse {
 
 // 通用状态响应
 export interface StatusResponse {
-  status: string
+  status?: string
   message?: string
 }
 

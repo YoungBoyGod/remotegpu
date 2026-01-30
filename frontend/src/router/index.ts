@@ -11,10 +11,19 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/register',
+      name: 'register',
+      component: () => import('@/views/RegisterView.vue'),
+      meta: { requiresAuth: false },
+    },
+    {
       path: '/',
       redirect: (to) => {
         // 根据用户角色重定向到不同的首页
         const authStore = useAuthStore()
+        if (!authStore.isAuthenticated) {
+          return '/login'
+        }
         if (authStore.user?.role === 'admin') {
           return '/admin/dashboard'
         }
@@ -339,7 +348,7 @@ const router = createRouter({
 })
 
 // 路由守卫
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth !== false
   const requiresRole = to.meta.requiresRole as 'admin' | 'customer' | undefined
@@ -348,6 +357,16 @@ router.beforeEach((to, from, next) => {
   if (requiresAuth && !authStore.isAuthenticated) {
     next('/login')
     return
+  }
+
+  if (requiresAuth && authStore.isAuthenticated && !authStore.user) {
+    try {
+      await authStore.fetchProfile()
+    } catch (error) {
+      await authStore.logout()
+      next('/login')
+      return
+    }
   }
 
   // 已登录用户访问登录页，根据角色重定向到对应的首页

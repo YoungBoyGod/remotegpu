@@ -91,6 +91,11 @@ func (s *ResourceQuotaService) GetQuota(customerID uint, workspaceID *uint) (*en
 	return s.quotaDao.GetByCustomerID(customerID)
 }
 
+// GetQuotaByID 根据ID获取资源配额
+func (s *ResourceQuotaService) GetQuotaByID(id uint) (*entity.ResourceQuota, error) {
+	return s.quotaDao.GetByID(id)
+}
+
 // GetQuotaInTx 在事务中获取资源配额（使用悲观锁 FOR UPDATE）
 // 用于需要并发安全的场景，如环境创建时的配额检查
 func (s *ResourceQuotaService) GetQuotaInTx(tx *gorm.DB, customerID uint, workspaceID *uint) (*entity.ResourceQuota, error) {

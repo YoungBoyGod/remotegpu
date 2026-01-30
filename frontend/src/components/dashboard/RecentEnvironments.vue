@@ -1,11 +1,9 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import StatusTag from '@/components/common/StatusTag.vue'
 
-const router = useRouter()
 const { navigateTo } = useRoleNavigation()
 
 interface Environment {
@@ -60,7 +58,7 @@ const loadRecentEnvironments = async () => {
 
 // 查看环境详情
 const viewEnvironment = (id: string) => {
-  router.push(`/environments/${id}`)
+  navigateTo(`/environments/${id}`)
 }
 
 onMounted(() => {

@@ -13,12 +13,14 @@ import { mockMatcher } from '@/mock'
 
 // 请求配置
 const config: AxiosRequestConfig = {
-  baseURL: import.meta.env.VITE_API_BASE_URL || '/api',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json'
   }
 }
+
+const enableDebugLog = import.meta.env.VITE_DEBUG_LOG === 'true'
 
 // 创建 axios 实例
 const service: AxiosInstance = axios.create(config)
@@ -26,6 +28,18 @@ const service: AxiosInstance = axios.create(config)
 // 请求拦截器
 service.interceptors.request.use(
   (config) => {
+    if (enableDebugLog) {
+      const metadata = (config as any).metadata || {}
+      metadata.startTime = Date.now()
+      ;(config as any).metadata = metadata
+      console.debug('[API Request]', {
+        method: config.method,
+        url: config.url,
+        params: config.params,
+        data: config.data,
+      })
+    }
+
     // Mock 数据拦截
     const useMock = import.meta.env.VITE_USE_MOCK === 'true'
     if (useMock) {
@@ -69,10 +83,31 @@ service.interceptors.response.use(
   (response: AxiosResponse) => {
     const res = response.data
 
-    // 如果返回的状态码不是 200，则认为是错误
-    if (response.status !== 200) {
-      ElMessage.error(res.message || '请求失败')
-      return Promise.reject(new Error(res.message || '请求失败'))
+    if (enableDebugLog) {
+      const metadata = (response.config as any)?.metadata
+      const duration = metadata?.startTime ? Date.now() - metadata.startTime : undefined
+      console.debug('[API Response]', {
+        url: response.config.url,
+        code: res?.code,
+        duration,
+        data: res?.data,
+      })
+    }
+
+    if (res && typeof res.code !== 'undefined' && res.code !== 0) {
+      const message = res.msg || res.message || '请求失败'
+
+      if (res.code === 401) {
+        ElMessage.error('未授权，请重新登录')
+        localStorage.removeItem('token')
+        window.location.href = '/login'
+      } else if (res.code === 403) {
+        ElMessage.error('拒绝访问')
+      } else {
+        ElMessage.error(message)
+      }
+
+      return Promise.reject(res)
     }
 
     return res
@@ -84,7 +119,7 @@ service.interceptors.response.use(
 
       // Mock 数据错误处理（如登录失败）
       if (mockResponse.code !== 200) {
-        ElMessage.error(mockResponse.message || '请求失败')
+        ElMessage.error(mockResponse.msg || mockResponse.message || '请求失败')
         return Promise.reject(mockResponse)
       }
 
@@ -93,6 +128,13 @@ service.interceptors.response.use(
     }
 
     console.error('响应错误:', error)
+    if (enableDebugLog) {
+      console.debug('[API Error]', {
+        url: error.config?.url,
+        message: error.message,
+        response: error.response?.data,
+      })
+    }
 
     if (error.response) {
       const status = error.response.status
@@ -117,7 +159,7 @@ service.interceptors.response.use(
           ElMessage.error('服务器内部错误')
           break
         default:
-          ElMessage.error((error.response.data as any)?.message || '请求失败')
+          ElMessage.error((error.response.data as any)?.msg || (error.response.data as any)?.message || '请求失败')
       }
     } else if (error.request) {
       ElMessage.error('网络错误，请检查网络连接')

@@ -96,3 +96,45 @@ func (ctrl *EnvironmentController) Stop(c *gin.Context) {
 	}
 	response.Success(c, gin.H{"message": "停止成功"})
 }
+
+// Restart 重启环境
+func (ctrl *EnvironmentController) Restart(c *gin.Context) {
+	id := c.Param("id")
+	if err := ctrl.envService.RestartEnvironment(id); err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"message": "重启成功"})
+}
+
+// GetAccessInfo 获取环境访问信息
+func (ctrl *EnvironmentController) GetAccessInfo(c *gin.Context) {
+	id := c.Param("id")
+	accessInfo, err := ctrl.envService.GetAccessInfo(id)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, accessInfo)
+}
+
+// GetLogs 获取环境日志
+func (ctrl *EnvironmentController) GetLogs(c *gin.Context) {
+	id := c.Param("id")
+
+	// 获取查询参数
+	var tailLines int64 = 100 // 默认100行
+	if tail := c.Query("tail"); tail != "" {
+		if _, err := fmt.Sscanf(tail, "%d", &tailLines); err != nil {
+			response.Error(c, http.StatusBadRequest, "tail 参数格式错误")
+			return
+		}
+	}
+
+	logs, err := ctrl.envService.GetLogs(id, tailLines)
+	if err != nil {
+		response.Error(c, http.StatusInternalServerError, err.Error())
+		return
+	}
+	response.Success(c, gin.H{"logs": logs})
+}

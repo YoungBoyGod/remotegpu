@@ -1,54 +1,84 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
-import { ElMessage } from 'element-plus'
+import { ref, computed, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import { useRoleNavigation } from '@/composables/useRoleNavigation'
+import type { Environment } from '@/api/environment/types'
+import {
+  getEnvironmentDetail,
+  startEnvironment as startEnv,
+  stopEnvironment as stopEnv,
+  deleteEnvironment as deleteEnv,
+} from '@/api/environment'
 
 const route = useRoute()
-const router = useRouter()
 const { navigateTo } = useRoleNavigation()
 const activeTab = ref('overview')
+const environment = ref<Environment | null>(null)
 
-const environment = ref({
-  id: '',
-  name: '',
-  status: 'running',
-  image: '',
-  cpu: 0,
-  memory: 0,
-  gpu: '',
-  storage: 0,
-  sshCommand: '',
-  jupyterUrl: '',
-  createdAt: '',
-  runningTime: '',
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+const formatMemoryToGB = (value?: number | null) => {
+  if (!value) return '-'
+  const gb = value / 1024
+  return `${gb < 1 ? 1 : Math.round(gb)} GB`
+}
+
+const formatStorage = (value?: number | null) => {
+  if (!value) return '-'
+  const gb = value / 1024
+  return `${gb < 1 ? 1 : Math.round(gb)} GB`
+}
+
+const statusLabel = computed(() => {
+  if (!environment.value) return ''
+  return environment.value.status === 'running' ? '运行中' :
+    environment.value.status === 'stopped' ? '已停止' : environment.value.status
 })
 
 const loadEnvironment = async () => {
-  const id = route.params.id
-  // 模拟数据
-  environment.value = {
-    id: id as string,
-    name: 'PyTorch 训练环境',
-    status: 'running',
-    image: 'pytorch/pytorch:2.0-cuda11.8',
-    cpu: 8,
-    memory: 32,
-    gpu: 'Tesla V100 x2',
-    storage: 100,
-    sshCommand: 'ssh -p 30001 root@gpu.example.com',
-    jupyterUrl: 'http://gpu.example.com:38001',
-    createdAt: '2026-01-26 10:30',
-    runningTime: '2小时30分',
+  const id = route.params.id as string
+  try {
+    const response = await getEnvironmentDetail(id)
+    environment.value = response.data
+  } catch (error) {
+    ElMessage.error('加载环境详情失败')
   }
 }
 
 const startEnvironment = async () => {
+  if (!environment.value) return
+  await startEnv(environment.value.id)
   ElMessage.success('环境启动中...')
+  await loadEnvironment()
 }
 
 const stopEnvironment = async () => {
+  if (!environment.value) return
+  await stopEnv(environment.value.id)
   ElMessage.success('环境已停止')
+  await loadEnvironment()
+}
+
+const deleteEnvironment = async () => {
+  if (!environment.value) return
+  try {
+    await ElMessageBox.confirm('确定要删除这个环境吗？', '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning',
+    })
+    await deleteEnv(environment.value.id)
+    ElMessage.success('环境已删除')
+    navigateTo('/environments')
+  } catch (error) {
+    // 用户取消
+  }
 }
 
 onMounted(() => {
@@ -57,12 +87,12 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="environment-detail">
+  <div v-if="environment" class="environment-detail">
     <div class="page-header">
       <div>
         <h1>{{ environment.name }}</h1>
-        <el-tag v-if="environment.status === 'running'" type="success">运行中</el-tag>
-        <el-tag v-else type="info">已停止</el-tag>
+        <el-tag v-if="environment.status === 'running'" type="success">{{ statusLabel }}</el-tag>
+        <el-tag v-else type="info">{{ statusLabel }}</el-tag>
       </div>
       <div class="actions">
         <el-button v-if="environment.status === 'stopped'" type="success" @click="startEnvironment">
@@ -71,6 +101,7 @@ onMounted(() => {
         <el-button v-if="environment.status === 'running'" type="warning" @click="stopEnvironment">
           停止
         </el-button>
+        <el-button type="danger" @click="deleteEnvironment">删除</el-button>
         <el-button @click="navigateTo('/environments')">返回列表</el-button>
       </div>
     </div>
@@ -82,8 +113,8 @@ onMounted(() => {
             <template #header>基本信息</template>
             <el-descriptions :column="2" border>
               <el-descriptions-item label="环境ID">{{ environment.id }}</el-descriptions-item>
-              <el-descriptions-item label="创建时间">{{ environment.createdAt }}</el-descriptions-item>
-              <el-descriptions-item label="运行时长">{{ environment.runningTime }}</el-descriptions-item>
+              <el-descriptions-item label="创建时间">{{ formatDateTime(environment.created_at) }}</el-descriptions-item>
+              <el-descriptions-item label="主机ID">{{ environment.host_id }}</el-descriptions-item>
               <el-descriptions-item label="镜像">{{ environment.image }}</el-descriptions-item>
             </el-descriptions>
           </el-card>
@@ -92,66 +123,16 @@ onMounted(() => {
             <template #header>资源配置</template>
             <el-descriptions :column="2" border>
               <el-descriptions-item label="CPU">{{ environment.cpu }} 核</el-descriptions-item>
-              <el-descriptions-item label="内存">{{ environment.memory }} GB</el-descriptions-item>
-              <el-descriptions-item label="GPU">{{ environment.gpu }}</el-descriptions-item>
-              <el-descriptions-item label="存储">{{ environment.storage }} GB</el-descriptions-item>
+              <el-descriptions-item label="内存">{{ formatMemoryToGB(environment.memory) }}</el-descriptions-item>
+              <el-descriptions-item label="GPU">{{ environment.gpu }} 张</el-descriptions-item>
+              <el-descriptions-item label="存储">{{ formatStorage(environment.storage) }}</el-descriptions-item>
             </el-descriptions>
           </el-card>
-
-          <el-card class="info-card">
-            <template #header>访问信息</template>
-            <div class="access-info">
-              <div class="access-item">
-                <label>SSH 连接：</label>
-                <el-input v-model="environment.sshCommand" readonly>
-                  <template #append>
-                    <el-button>复制</el-button>
-                  </template>
-                </el-input>
-              </div>
-              <div class="access-item">
-                <label>JupyterLab：</label>
-                <el-link :href="environment.jupyterUrl" target="_blank" type="primary">
-                  {{ environment.jupyterUrl }}
-                </el-link>
-              </div>
-            </div>
-          </el-card>
-        </div>
-      </el-tab-pane>
-
-      <el-tab-pane label="监控" name="monitoring">
-        <div class="monitoring-content">
-          <el-empty description="监控数据加载中..." />
-        </div>
-      </el-tab-pane>
-
-      <el-tab-pane label="日志" name="logs">
-        <div class="logs-content">
-          <el-input
-            type="textarea"
-            :rows="20"
-            readonly
-            placeholder="日志内容..."
-          />
-        </div>
-      </el-tab-pane>
-
-      <el-tab-pane label="设置" name="settings">
-        <div class="settings-content">
-          <el-form label-width="120px">
-            <el-form-item label="环境名称">
-              <el-input v-model="environment.name" />
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary">保存</el-button>
-              <el-button type="danger">删除环境</el-button>
-            </el-form-item>
-          </el-form>
         </div>
       </el-tab-pane>
     </el-tabs>
   </div>
+  <el-empty v-else description="正在加载环境信息..." />
 </template>
 
 <style scoped>
@@ -188,24 +169,4 @@ onMounted(() => {
   margin-bottom: 0;
 }
 
-.access-info {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.access-item label {
-  display: block;
-  margin-bottom: 8px;
-  font-weight: 600;
-  color: #606266;
-}
-
-.monitoring-content,
-.logs-content,
-.settings-content {
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-}
 </style>

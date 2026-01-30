@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	corev1 "k8s.io/api/core/v1"
+	"gorm.io/gorm"
 )
 
 // MockHostDao 模拟 HostDao
@@ -118,6 +119,17 @@ func (m *MockResourceQuotaService) CheckQuota(customerID uint, workspaceID *uint
 	args := m.Called(customerID, workspaceID, req)
 	return args.Bool(0), args.Error(1)
 }
+
+// MockDB 模拟数据库
+type MockDB struct {
+	mock.Mock
+}
+
+func (m *MockDB) Transaction(fc func(tx *gorm.DB) error) error {
+	args := m.Called(fc)
+	return args.Error(0)
+}
+
 
 // TestSelectHost_Success 测试主机选择成功
 func TestSelectHost_Success(t *testing.T) {
@@ -440,6 +452,69 @@ func TestGetStatus_WithoutK8s(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, "stopped", status)
 	mockEnvDao.AssertExpectations(t)
+}
+
+// TestCreateEnvironment_QuotaCheckFailed 测试配额检查失败
+func TestCreateEnvironment_QuotaCheckFailed(t *testing.T) {
+	mockHostDao := new(MockHostDao)
+	mockQuotaService := new(MockResourceQuotaService)
+
+	req := &CreateEnvironmentRequest{
+		CustomerID: 1,
+		Name:       "test-env",
+		Image:      "ubuntu:20.04",
+		CPU:        4,
+		Memory:     8000,
+		GPU:        1,
+	}
+
+	// Mock 配额检查失败
+	mockQuotaService.On("CheckQuota", uint(1), (*uint)(nil), mock.AnythingOfType("*service.ResourceRequest")).Return(false, nil)
+
+	service := &EnvironmentService{
+		hostDao:      mockHostDao,
+		quotaService: mockQuotaService,
+	}
+
+	env, err := service.CreateEnvironment(req)
+
+	assert.Error(t, err)
+	assert.Nil(t, env)
+	assert.Contains(t, err.Error(), "资源配额不足")
+	mockQuotaService.AssertExpectations(t)
+}
+
+// TestCreateEnvironment_HostSelectionFailed 测试主机选择失败
+func TestCreateEnvironment_HostSelectionFailed(t *testing.T) {
+	mockHostDao := new(MockHostDao)
+	mockQuotaService := new(MockResourceQuotaService)
+
+	req := &CreateEnvironmentRequest{
+		CustomerID: 1,
+		Name:       "test-env",
+		Image:      "ubuntu:20.04",
+		CPU:        4,
+		Memory:     8000,
+		GPU:        1,
+	}
+
+	// Mock 配额检查通过
+	mockQuotaService.On("CheckQuota", uint(1), (*uint)(nil), mock.AnythingOfType("*service.ResourceRequest")).Return(true, nil)
+	// Mock 主机选择失败
+	mockHostDao.On("ListByStatus", "active").Return([]*entity.Host{}, nil)
+
+	service := &EnvironmentService{
+		hostDao:      mockHostDao,
+		quotaService: mockQuotaService,
+	}
+
+	env, err := service.CreateEnvironment(req)
+
+	assert.Error(t, err)
+	assert.Nil(t, env)
+	assert.Contains(t, err.Error(), "选择主机失败")
+	mockQuotaService.AssertExpectations(t)
+	mockHostDao.AssertExpectations(t)
 }
 
 // TestValidateCreateRequest_Success 测试验证成功

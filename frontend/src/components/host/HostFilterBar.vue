@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
+import { Search, Delete, Refresh } from '@element-plus/icons-vue'
 import type { HostFilterParams } from '@/api/host/types'
-import { GPU_MODELS, GPU_COUNTS, REGIONS } from '@/config/hostConfig'
 
 interface Props {
   modelValue: HostFilterParams
@@ -14,6 +14,16 @@ const emit = defineEmits<{
   refresh: []
 }>()
 
+const STATUS_OPTIONS = [
+  { label: '在线', value: 'active' },
+  { label: '离线', value: 'offline' },
+]
+
+const OS_OPTIONS = [
+  { label: 'Linux', value: 'linux' },
+  { label: 'Windows', value: 'windows' },
+]
+
 // 本地过滤器状态
 const localFilters = ref<HostFilterParams>({ ...props.modelValue })
 
@@ -25,9 +35,8 @@ watch(localFilters, (newValue) => {
 // 清除所有过滤器
 const handleClearFilters = () => {
   localFilters.value = {
-    region: '',
-    gpu_count: '',
-    gpu_model: '',
+    status: '',
+    os_type: '',
     keyword: ''
   }
 }
@@ -53,44 +62,30 @@ const handleRefresh = () => {
       </el-input>
 
       <el-select
-        v-model="localFilters.region"
-        placeholder="选择地区"
+        v-model="localFilters.status"
+        placeholder="主机状态"
         clearable
         class="filter-select"
       >
         <el-option
-          v-for="region in REGIONS"
-          :key="region.value"
-          :label="region.label"
-          :value="region.value"
+          v-for="status in STATUS_OPTIONS"
+          :key="status.value"
+          :label="status.label"
+          :value="status.value"
         />
       </el-select>
 
       <el-select
-        v-model="localFilters.gpu_count"
-        placeholder="GPU数量"
+        v-model="localFilters.os_type"
+        placeholder="操作系统"
         clearable
         class="filter-select"
       >
         <el-option
-          v-for="count in GPU_COUNTS"
-          :key="count.value"
-          :label="count.label"
-          :value="count.value"
-        />
-      </el-select>
-
-      <el-select
-        v-model="localFilters.gpu_model"
-        placeholder="GPU型号"
-        clearable
-        class="filter-select"
-      >
-        <el-option
-          v-for="model in GPU_MODELS"
-          :key="model.value"
-          :label="model.label"
-          :value="model.value"
+          v-for="os in OS_OPTIONS"
+          :key="os.value"
+          :label="os.label"
+          :value="os.value"
         />
       </el-select>
 
