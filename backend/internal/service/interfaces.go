@@ -70,6 +70,11 @@ type DBInterface interface {
 	Transaction(fc func(tx *gorm.DB) error) error
 }
 
+// AccessInfoServiceInterface 访问信息服务接口
+type AccessInfoServiceInterface interface {
+	GenerateAccessInfo(env *entity.Environment, host *entity.Host) (*AccessInfo, error)
+}
+
 // GormDBWrapper 包装 gorm.DB 实现 DBInterface
 type GormDBWrapper struct {
 	db *gorm.DB

@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -8,9 +10,18 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/YoungBoyGod/remotegpu/pkg/k8s"
+	pkgredis "github.com/YoungBoyGod/remotegpu/pkg/redis"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
+)
+
+// Redis Key 前缀和过期时间
+const (
+	// AccessInfoKeyPrefix 访问信息 Redis Key 前缀
+	AccessInfoKeyPrefix = "env:access_info:"
+	// AccessInfoExpiration 访问信息过期时间(24小时)
+	AccessInfoExpiration = 24 * time.Hour
 )
 
 // EnvironmentService 环境服务
@@ -20,6 +31,7 @@ type EnvironmentService struct {
 	hostDao         HostDaoInterface
 	gpuDao          *dao.GPUDao
 	quotaService    ResourceQuotaServiceInterface
+	accessInfoService AccessInfoServiceInterface
 	k8sClient       K8sClientInterface
 	db              DBInterface
 }
@@ -28,12 +40,13 @@ type EnvironmentService struct {
 func NewEnvironmentService() *EnvironmentService {
 	k8sClient, _ := k8s.GetClient()
 	return &EnvironmentService{
-		envDao:         dao.NewEnvironmentDao(),
-		portMappingDao: dao.NewPortMappingDao(),
-		hostDao:        dao.NewHostDao(),
-		gpuDao:         dao.NewGPUDao(),
-		quotaService:   NewResourceQuotaService(),
-		k8sClient:      k8sClient,
+		envDao:            dao.NewEnvironmentDao(),
+		portMappingDao:    dao.NewPortMappingDao(),
+		hostDao:           dao.NewHostDao(),
+		gpuDao:            dao.NewGPUDao(),
+		quotaService:      NewResourceQuotaService(),
+		accessInfoService: NewAccessInfoService(),
+		k8sClient:         k8sClient,
 	}
 }
 
@@ -267,6 +280,12 @@ func (s *EnvironmentService) CreateEnvironment(req *CreateEnvironmentRequest) (*
 		return nil, fmt.Errorf("更新环境状态失败: %w", err)
 	}
 
+	// 生成并保存连接信息
+	if err := s.GenerateAndSaveAccessInfo(env.ID); err != nil {
+		// 记录错误但不影响创建流程
+		fmt.Printf("生成连接信息失败: %v\n", err)
+	}
+
 	return env, nil
 }
 
@@ -344,7 +363,7 @@ func (s *EnvironmentService) DeleteEnvironment(id string) error {
 	}
 
 	// 2. 在事务中删除环境
-	return database.GetDB().Transaction(func(tx *gorm.DB) error {
+	err = database.GetDB().Transaction(func(tx *gorm.DB) error {
 		// 删除 K8s 资源
 		if env.PodName != "" {
 			if err := s.k8sClient.DeletePod("default", env.PodName); err != nil {
@@ -374,6 +393,18 @@ func (s *EnvironmentService) DeleteEnvironment(id string) error {
 
 		return nil
 	})
+
+	if err != nil {
+		return err
+	}
+
+	// 3. 删除 Redis 缓存
+	if err := s.DeleteAccessInfoCache(id); err != nil {
+		// Redis 删除失败不影响主流程,只记录日志
+		fmt.Printf("删除环境 %s 的 Redis 缓存失败: %v\n", id, err)
+	}
+
+	return nil
 }
 
 // StartEnvironment 启动环境
@@ -399,6 +430,12 @@ func (s *EnvironmentService) StartEnvironment(id string) error {
 
 	if err := s.envDao.Update(env); err != nil {
 		return fmt.Errorf("更新环境状态失败: %w", err)
+	}
+
+	// 5. 生成并保存连接信息
+	if err := s.GenerateAndSaveAccessInfo(id); err != nil {
+		// 记录错误但不影响启动流程
+		fmt.Printf("生成连接信息失败: %v\n", err)
 	}
 
 	return nil
@@ -449,6 +486,53 @@ func (s *EnvironmentService) RestartEnvironment(id string) error {
 // GetEnvironment 获取环境信息
 func (s *EnvironmentService) GetEnvironment(id string) (*entity.Environment, error) {
 	return s.envDao.GetByID(id)
+}
+
+
+// GenerateAndSaveAccessInfo 生成并保存连接信息
+func (s *EnvironmentService) GenerateAndSaveAccessInfo(envID string) error {
+	// 获取环境信息
+	env, err := s.envDao.GetByID(envID)
+	if err != nil {
+		return fmt.Errorf("获取环境失败: %w", err)
+	}
+
+	// 获取主机信息
+	host, err := s.hostDao.GetByID(env.HostID)
+	if err != nil {
+		return fmt.Errorf("获取主机失败: %w", err)
+	}
+
+	// 生成连接信息
+	accessInfo, err := s.accessInfoService.GenerateAccessInfo(env, host)
+	if err != nil {
+		return fmt.Errorf("生成连接信息失败: %w", err)
+	}
+
+	// 将连接信息序列化为JSON
+	accessInfoJSON, err := json.Marshal(accessInfo)
+	if err != nil {
+		return fmt.Errorf("序列化连接信息失败: %w", err)
+	}
+
+	// 保存到数据库
+	db := database.GetDB()
+	if err := db.Model(&entity.Environment{}).Where("id = ?", envID).Update("access_info", accessInfoJSON).Error; err != nil {
+		return fmt.Errorf("保存连接信息失败: %w", err)
+	}
+
+	// 保存到 Redis 缓存
+	redisClient := pkgredis.GetRedis()
+	if redisClient != nil {
+		ctx := context.Background()
+		redisKey := AccessInfoKeyPrefix + envID
+		if err := redisClient.Set(ctx, redisKey, accessInfoJSON, AccessInfoExpiration).Err(); err != nil {
+			// Redis 保存失败不影响主流程,只记录日志
+			fmt.Printf("保存连接信息到 Redis 失败: %v\n", err)
+		}
+	}
+
+	return nil
 }
 
 // ListEnvironments 列出环境
@@ -502,24 +586,109 @@ func (s *EnvironmentService) GetLogs(id string, tailLines int64) (string, error)
 
 // GetAccessInfo 获取环境访问信息
 func (s *EnvironmentService) GetAccessInfo(id string) (map[string]interface{}, error) {
+	var accessInfoJSON []byte
+	var accessInfo map[string]interface{}
+
+	// 1. 先从 Redis 获取
+	redisClient := pkgredis.GetRedis()
+	if redisClient != nil {
+		ctx := context.Background()
+		redisKey := AccessInfoKeyPrefix + id
+		val, err := redisClient.Get(ctx, redisKey).Result()
+		if err == nil && val != "" {
+			// Redis 命中,直接返回
+			accessInfoJSON = []byte(val)
+			if err := json.Unmarshal(accessInfoJSON, &accessInfo); err != nil {
+				return nil, fmt.Errorf("解析 Redis 连接信息失败: %w", err)
+			}
+
+			// 获取环境基本信息
+			env, err := s.envDao.GetByID(id)
+			if err != nil {
+				return nil, fmt.Errorf("获取环境失败: %w", err)
+			}
+
+			return map[string]interface{}{
+				"environment_id": env.ID,
+				"status":         env.Status,
+				"pod_name":       env.PodName,
+				"access_info":    accessInfo,
+			}, nil
+		}
+	}
+
+	// 2. Redis 未命中,从数据库获取
 	env, err := s.envDao.GetByID(id)
 	if err != nil {
 		return nil, fmt.Errorf("获取环境失败: %w", err)
 	}
 
-	// 获取端口映射
-	portMappings, err := s.portMappingDao.GetByEnvironmentID(id)
-	if err != nil {
-		return nil, fmt.Errorf("获取端口映射失败: %w", err)
+	// 3. 如果数据库中 access_info 为空,生成连接信息
+	if env.AccessInfo == nil || len(env.AccessInfo) == 0 {
+		if err := s.GenerateAndSaveAccessInfo(id); err != nil {
+			return nil, fmt.Errorf("生成连接信息失败: %w", err)
+		}
+		// 重新获取环境信息
+		env, err = s.envDao.GetByID(id)
+		if err != nil {
+			return nil, fmt.Errorf("获取环境失败: %w", err)
+		}
 	}
 
-	// 构建访问信息
-	accessInfo := map[string]interface{}{
+	// 4. 解析 access_info JSON
+	if env.AccessInfo != nil {
+		accessInfoJSON = env.AccessInfo
+		if err := json.Unmarshal(accessInfoJSON, &accessInfo); err != nil {
+			return nil, fmt.Errorf("解析连接信息失败: %w", err)
+		}
+
+		// 5. 缓存到 Redis
+		if redisClient != nil {
+			ctx := context.Background()
+			redisKey := AccessInfoKeyPrefix + id
+			if err := redisClient.Set(ctx, redisKey, accessInfoJSON, AccessInfoExpiration).Err(); err != nil {
+				// Redis 保存失败不影响主流程,只记录日志
+				fmt.Printf("缓存连接信息到 Redis 失败: %v\n", err)
+			}
+		}
+	}
+
+	// 6. 返回结果
+	result := map[string]interface{}{
 		"environment_id": env.ID,
 		"status":         env.Status,
 		"pod_name":       env.PodName,
-		"ports":          portMappings,
+		"access_info":    accessInfo,
 	}
 
-	return accessInfo, nil
+	return result, nil
+}
+
+// UpdateAccessInfo 更新环境访问信息(当连接信息发生变动时调用)
+func (s *EnvironmentService) UpdateAccessInfo(envID string) error {
+	// 先删除 Redis 缓存
+	redisClient := pkgredis.GetRedis()
+	if redisClient != nil {
+		ctx := context.Background()
+		redisKey := AccessInfoKeyPrefix + envID
+		if err := redisClient.Del(ctx, redisKey).Err(); err != nil {
+			fmt.Printf("删除 Redis 缓存失败: %v\n", err)
+		}
+	}
+
+	// 重新生成并保存连接信息
+	return s.GenerateAndSaveAccessInfo(envID)
+}
+
+// DeleteAccessInfoCache 删除环境访问信息缓存
+func (s *EnvironmentService) DeleteAccessInfoCache(envID string) error {
+	redisClient := pkgredis.GetRedis()
+	if redisClient != nil {
+		ctx := context.Background()
+		redisKey := AccessInfoKeyPrefix + envID
+		if err := redisClient.Del(ctx, redisKey).Err(); err != nil {
+			return fmt.Errorf("删除 Redis 缓存失败: %w", err)
+		}
+	}
+	return nil
 }
