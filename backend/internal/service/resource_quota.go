@@ -25,12 +25,14 @@ type ResourceQuotaDaoInterface interface {
 // ResourceQuotaService 资源配额服务
 type ResourceQuotaService struct {
 	quotaDao ResourceQuotaDaoInterface
+	db       *gorm.DB
 }
 
 // NewResourceQuotaService 创建资源配额服务实例
 func NewResourceQuotaService() *ResourceQuotaService {
 	return &ResourceQuotaService{
 		quotaDao: dao.NewResourceQuotaDao(),
+		db:       database.GetDB(),
 	}
 }
 
@@ -38,6 +40,15 @@ func NewResourceQuotaService() *ResourceQuotaService {
 func NewResourceQuotaServiceWithDao(quotaDao ResourceQuotaDaoInterface) *ResourceQuotaService {
 	return &ResourceQuotaService{
 		quotaDao: quotaDao,
+		db:       database.GetDB(),
+	}
+}
+
+// NewResourceQuotaServiceWithDeps 创建资源配额服务实例（用于测试注入所有依赖）
+func NewResourceQuotaServiceWithDeps(quotaDao ResourceQuotaDaoInterface, db *gorm.DB) *ResourceQuotaService {
+	return &ResourceQuotaService{
+		quotaDao: quotaDao,
+		db:       db,
 	}
 }
 
@@ -295,7 +306,7 @@ func (s *ResourceQuotaService) checkQuota(tx *gorm.DB, customerID uint, workspac
 //
 // 注意：用户级别配额会统计该用户在所有工作空间中的资源使用，确保用户总资源不超限。
 func (s *ResourceQuotaService) GetUsedResources(customerID uint, workspaceID *uint) (*UsedResources, error) {
-	db := database.GetDB()
+	db := s.db
 
 	// 查询所有运行中和创建中的环境（创建中的环境也占用资源）
 	var environments []*entity.Environment

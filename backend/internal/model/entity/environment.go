@@ -2,6 +2,8 @@ package entity
 
 import (
 	"time"
+
+	"gorm.io/gorm"
 )
 
 // PortMapping 端口映射实体
@@ -28,6 +30,7 @@ func (PortMapping) TableName() string {
 type Environment struct {
 	ID           string     `gorm:"primaryKey;size:64" json:"id"`
 	UserID       uint       `gorm:"column:user_id;not null;index:idx_environments_user" json:"user_id"`
+	CustomerID   uint       `gorm:"column:customer_id;not null" json:"-"` // 临时字段,保持向后兼容
 	WorkspaceID  *uint      `gorm:"column:workspace_id;index:idx_environments_workspace" json:"workspace_id"`
 	HostID       string     `gorm:"column:host_id;size:64;not null;index:idx_environments_host" json:"host_id"`
 	Name         string     `gorm:"size:128;not null" json:"name"`
@@ -58,4 +61,16 @@ type Environment struct {
 // TableName 指定表名
 func (Environment) TableName() string {
 	return "environments"
+}
+
+// BeforeCreate GORM钩子,创建前同步UserID到CustomerID
+func (e *Environment) BeforeCreate(tx *gorm.DB) error {
+	e.CustomerID = e.UserID
+	return nil
+}
+
+// BeforeUpdate GORM钩子,更新前同步UserID到CustomerID
+func (e *Environment) BeforeUpdate(tx *gorm.DB) error {
+	e.CustomerID = e.UserID
+	return nil
 }
