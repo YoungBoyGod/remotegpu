@@ -92,10 +92,12 @@ func cleanupTestData(t *testing.T) {
 	db := database.GetDB()
 
 	// 删除测试数据（按依赖关系倒序删除）
+	db.Exec("DELETE FROM environments WHERE id LIKE 'test-%' OR host_id LIKE 'test-%'")
 	db.Exec("DELETE FROM gpus WHERE host_id LIKE 'test-%'")
 	db.Exec("DELETE FROM hosts WHERE id LIKE 'test-%'")
-	db.Exec("DELETE FROM resource_quotas WHERE customer_id IN (SELECT id FROM customers WHERE username LIKE 'test_%')")
-	db.Exec("DELETE FROM customers WHERE username LIKE 'test_%'")
+	db.Exec("DELETE FROM resource_quotas WHERE user_id IN (SELECT id FROM users WHERE username LIKE 'test_%')")
+	db.Exec("DELETE FROM workspaces WHERE owner_id IN (SELECT id FROM users WHERE username LIKE 'test_%')")
+	db.Exec("DELETE FROM users WHERE username LIKE 'test_%'")
 
 	t.Log("✅ 测试数据清理完成")
 }
