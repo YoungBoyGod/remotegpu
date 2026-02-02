@@ -14,6 +14,7 @@ const formRef = ref<FormInstance>()
 const formData = reactive({
   name: '',
   description: '',
+  deployment_mode: 'k8s_pod' as 'k8s_pod' | 'docker_local' | 'vm',
   image: '',
   cpu: 4,
   memory: 16,
@@ -85,6 +86,7 @@ const submitForm = async () => {
       name: formData.name,
       description: formData.description || undefined,
       image: formData.image,
+      deployment_mode: formData.deployment_mode,
       cpu: formData.cpu,
       memory: formData.memory * 1024,
       gpu: formData.gpu,
@@ -135,6 +137,20 @@ onMounted(() => {
               placeholder="请输入环境描述（可选）"
             />
           </el-form-item>
+          <el-form-item label="部署类型">
+            <el-radio-group v-model="formData.deployment_mode">
+              <el-radio label="k8s_pod">K8S 容器</el-radio>
+              <el-radio label="docker_local">裸金属 Docker</el-radio>
+            </el-radio-group>
+            <div class="deployment-hint">
+              <span v-if="formData.deployment_mode === 'k8s_pod'" class="hint-text">
+                使用 Kubernetes 容器部署，资源隔离性好，启动快速
+              </span>
+              <span v-else class="hint-text">
+                使用裸金属机器 Docker 部署，性能更高，适合高性能计算场景
+              </span>
+            </div>
+          </el-form-item>
         </div>
 
         <!-- 步骤2: 镜像配置 -->
@@ -182,6 +198,9 @@ onMounted(() => {
         <div v-show="currentStep === 3" class="step-content">
           <el-descriptions title="配置摘要" :column="2" border>
             <el-descriptions-item label="环境名称">{{ formData.name }}</el-descriptions-item>
+            <el-descriptions-item label="部署类型">
+              {{ formData.deployment_mode === 'k8s_pod' ? 'K8S 容器' : '裸金属 Docker' }}
+            </el-descriptions-item>
             <el-descriptions-item label="镜像">{{ formData.image || '-' }}</el-descriptions-item>
             <el-descriptions-item label="CPU">{{ formData.cpu }} 核</el-descriptions-item>
             <el-descriptions-item label="内存">{{ formData.memory }} GB</el-descriptions-item>
@@ -240,5 +259,15 @@ onMounted(() => {
   justify-content: center;
   gap: 12px;
   margin-top: 32px;
+}
+
+.deployment-hint {
+  margin-top: 8px;
+}
+
+.hint-text {
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.5;
 }
 </style>

@@ -45,3 +45,23 @@ func GetLogger() *zap.Logger {
 	}
 	return Logger
 }
+
+// Info 记录信息日志
+func Info(msg string, fields ...interface{}) {
+	GetLogger().Sugar().Infow(msg, fields...)
+}
+
+// Error 记录错误日志
+func Error(msg string, fields ...interface{}) {
+	GetLogger().Sugar().Errorw(msg, fields...)
+}
+
+// Warn 记录警告日志
+func Warn(msg string, fields ...interface{}) {
+	GetLogger().Sugar().Warnw(msg, fields...)
+}
+
+// Debug 记录调试日志
+func Debug(msg string, fields ...interface{}) {
+	GetLogger().Sugar().Debugw(msg, fields...)
+}

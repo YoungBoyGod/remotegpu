@@ -55,16 +55,6 @@ func (d *EnvironmentDao) GetByUserID(userID uint) ([]*entity.Environment, error)
 	return envs, nil
 }
 
-// GetByWorkspaceID 根据工作空间ID获取环境列表
-func (d *EnvironmentDao) GetByWorkspaceID(workspaceID uint) ([]*entity.Environment, error) {
-	var envs []*entity.Environment
-	err := d.db.Where("workspace_id = ?", workspaceID).Find(&envs).Error
-	if err != nil {
-		return nil, err
-	}
-	return envs, nil
-}
-
 // GetByHostID 根据主机ID获取环境列表
 func (d *EnvironmentDao) GetByHostID(hostID string) ([]*entity.Environment, error) {
 	var envs []*entity.Environment

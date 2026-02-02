@@ -47,9 +47,10 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
         await authStore.login({
           username: loginForm.username,
           password: loginForm.password,
+          remember_me: loginForm.remember,
         })
         ElMessage.success('登录成功')
-        navigateTo('/dashboard')
+        router.push('/')
       } catch (error: any) {
         ElMessage.error(error?.msg || error.response?.data?.msg || '登录失败，请检查用户名和密码')
       } finally {
@@ -59,9 +60,16 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
   })
 }
 
-// OAuth 登录
-const handleOAuthLogin = (provider: string) => {
-  ElMessage.info(`${provider} 登录功能开发中`)
+// 一键填写管理员账号
+const fillAdminAccount = () => {
+  loginForm.username = 'admin'
+  loginForm.password = 'admin123'
+}
+
+// 一键填写普通用户账号
+const fillUserAccount = () => {
+  loginForm.username = 'user'
+  loginForm.password = 'user123'
 }
 </script>
 
@@ -105,7 +113,7 @@ const handleOAuthLogin = (provider: string) => {
         <el-form-item>
           <div class="login-options">
             <el-checkbox v-model="loginForm.remember">记住我</el-checkbox>
-            <el-link type="primary" :underline="false">忘记密码？</el-link>
+            <el-link type="primary" underline="never">忘记密码？</el-link>
           </div>
         </el-form-item>
 
@@ -121,25 +129,26 @@ const handleOAuthLogin = (provider: string) => {
         </el-form-item>
       </el-form>
 
-      <!-- 分隔线 -->
-      <el-divider>或</el-divider>
-
-      <!-- OAuth 登录 -->
-      <div class="oauth-login">
-        <el-button class="oauth-button" @click="handleOAuthLogin('GitHub')">
-          <span class="oauth-icon">🐙</span>
-          GitHub 登录
+      <!-- 快速登录按钮 -->
+      <div class="quick-login">
+        <el-button
+          class="quick-login-btn"
+          @click="fillAdminAccount"
+        >
+          管理员账号
         </el-button>
-        <el-button class="oauth-button" @click="handleOAuthLogin('Google')">
-          <span class="oauth-icon">🔍</span>
-          Google 登录
+        <el-button
+          class="quick-login-btn"
+          @click="fillUserAccount"
+        >
+          普通用户账号
         </el-button>
       </div>
 
       <!-- 注册链接 -->
       <div class="login-footer">
         <span>还没有账号？</span>
-        <el-link type="primary" :underline="false" @click="router.push('/register')">
+        <el-link type="primary" underline="never" @click="router.push('/register')">
           立即注册
         </el-link>
       </div>
@@ -199,22 +208,16 @@ const handleOAuthLogin = (provider: string) => {
   font-size: 16px;
 }
 
-.oauth-login {
+.quick-login {
   display: flex;
   gap: 12px;
-  margin-top: 16px;
+  margin-top: 20px;
+  margin-bottom: 20px;
 }
 
-.oauth-button {
+.quick-login-btn {
   flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-}
-
-.oauth-icon {
-  font-size: 18px;
+  height: 36px;
 }
 
 .login-footer {

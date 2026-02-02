@@ -1,137 +1,428 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import PageHeader from '@/components/common/PageHeader.vue'
 
-interface Device {
+interface Machine {
   id: number
   name: string
   region: string
   gpuModel: string
   gpuMemory: number
-  gpuCount: number
-  availableGpu: number
-  totalGpu: number
   cpu: string
   memory: number
   disk: number
-  systemDisk: number
   cudaVersion: string
   gpuDriver: string
-  pricePerHour: number
-  expiryDate: string
+  status: 'available' | 'allocated'
+  loginInfo: {
+    ip: string
+    port: number
+    username: string
+    password: string
+  }
+  allocatedTo?: {
+    customerId: number
+    customerName: string
+    allocatedAt: string
+    duration: number // 月数
+  }
+}
+
+interface Customer {
+  id: number
+  name: string
+  company: string
+}
+
+interface GpuCategory {
+  model: string
+  memory: number
+  available: Machine[]
+  allocated: Machine[]
 }
 
 const loading = ref(false)
-const devices = ref<Device[]>([])
+const machines = ref<Machine[]>([])
+const customers = ref<Customer[]>([])
 
-// 筛选条件
-const billingMethod = ref('按需计费')
-const selectedRegion = ref('北京B区')
-const selectedGpuModels = ref<string[]>([])
-const selectedGpuCount = ref(1)
-
-// 地区选项
-const regions = [
-  { label: '北京B区', value: '北京B区', hot: true },
-  { label: '西北B区', value: '西北B区' },
-  { label: '重庆A区', value: '重庆A区' },
-  { label: '内蒙B区', value: '内蒙B区' },
-  { label: '北京A区', value: '北京A区' },
-  { label: '佛山区', value: '佛山区' }
-]
-
-// GPU型号选项
-const gpuModels = [
-  { label: '全部', value: 'all' },
-  { label: 'RTX 5090', value: 'RTX 5090', count: 1114 },
-  { label: 'RTX PRO 6000', value: 'RTX PRO 6000', count: 0 },
-  { label: 'vGPU-48GB', value: 'vGPU-48GB', count: 31 },
-  { label: 'vGPU-48GB-425W', value: 'vGPU-48GB-425W', count: 89 },
-  { label: 'RTX 5090 D', value: 'RTX 5090 D', count: 1 },
-  { label: 'RTX 4090D', value: 'RTX 4090D', count: 1 },
-  { label: 'RTX 4090', value: 'RTX 4090', count: 87 },
-  { label: 'CPU', value: 'CPU', count: 0 }
-]
-
-// 过滤后的设备列表
-const filteredDevices = computed(() => {
-  let result = devices.value
-
-  if (selectedRegion.value) {
-    result = result.filter(d => d.region === selectedRegion.value)
-  }
-
-  if (selectedGpuModels.value.length > 0 && !selectedGpuModels.value.includes('all')) {
-    result = result.filter(d => selectedGpuModels.value.includes(d.gpuModel))
-  }
-
-  if (selectedGpuCount.value > 0) {
-    result = result.filter(d => d.gpuCount >= selectedGpuCount.value)
-  }
-
-  return result
+// 分配对话框
+const allocationDialogVisible = ref(false)
+const currentMachine = ref<Machine | null>(null)
+const allocationForm = ref({
+  customerId: null as number | null,
+  duration: 1, // 默认1个月
+  notes: ''
 })
 
-// 加载设备列表
-const loadDevices = async () => {
+// 筛选条件
+const selectedGpuModel = ref<string>('all')
+const selectedRegion = ref<string>('all')
+const selectedStatus = ref<string>('all')
+
+// 获取所有GPU型号
+const gpuModels = computed(() => {
+  const models = new Set<string>()
+  machines.value.forEach(m => models.add(m.gpuModel))
+  return ['all', ...Array.from(models)]
+})
+
+// 获取所有地区
+const regions = computed(() => {
+  const regionSet = new Set<string>()
+  machines.value.forEach(m => regionSet.add(m.region))
+  return ['all', ...Array.from(regionSet)]
+})
+
+// 按GPU型号分组（带筛选）
+const gpuCategories = computed<GpuCategory[]>(() => {
+  // 先筛选机器
+  let filteredMachines = machines.value
+
+  if (selectedGpuModel.value !== 'all') {
+    filteredMachines = filteredMachines.filter(m => m.gpuModel === selectedGpuModel.value)
+  }
+
+  if (selectedRegion.value !== 'all') {
+    filteredMachines = filteredMachines.filter(m => m.region === selectedRegion.value)
+  }
+
+  if (selectedStatus.value !== 'all') {
+    filteredMachines = filteredMachines.filter(m => m.status === selectedStatus.value)
+  }
+
+  // 再按GPU型号分组
+  const categoryMap = new Map<string, GpuCategory>()
+
+  filteredMachines.forEach(machine => {
+    const key = `${machine.gpuModel}-${machine.gpuMemory}`
+
+    if (!categoryMap.has(key)) {
+      categoryMap.set(key, {
+        model: machine.gpuModel,
+        memory: machine.gpuMemory,
+        available: [],
+        allocated: []
+      })
+    }
+
+    const category = categoryMap.get(key)!
+    if (machine.status === 'available') {
+      category.available.push(machine)
+    } else {
+      category.allocated.push(machine)
+    }
+  })
+
+  return Array.from(categoryMap.values())
+})
+
+// 加载机器列表
+const loadMachines = async () => {
   loading.value = true
   try {
     // TODO: 调用API获取数据
     await new Promise(resolve => setTimeout(resolve, 500))
-    devices.value = [
+    machines.value = [
+      // RTX 5090 - 未分配
       {
         id: 1,
-        name: '北京B区 / 598机',
+        name: '北京B区-598机',
         region: '北京B区',
         gpuModel: 'RTX 5090',
         gpuMemory: 32,
-        gpuCount: 8,
-        availableGpu: 1,
-        totalGpu: 8,
-        cpu: '16核, Xeon(R) Gold 6459C',
+        cpu: '16核',
         memory: 90,
-        disk: 50,
-        systemDisk: 5881,
+        disk: 5881,
         cudaVersion: '≤ 13.0',
         gpuDriver: '580.76.05',
-        pricePerHour: 3.03,
-        expiryDate: '2027-01-01'
+        status: 'available',
+        loginInfo: {
+          ip: '192.168.1.101',
+          port: 22,
+          username: 'root',
+          password: 'Abc123456'
+        }
       },
       {
         id: 2,
-        name: '北京B区 / 353机',
+        name: '北京B区-353机',
         region: '北京B区',
         gpuModel: 'RTX 5090',
         gpuMemory: 32,
-        gpuCount: 8,
-        availableGpu: 1,
-        totalGpu: 8,
-        cpu: '25核, Xeon(R) Platinum 8470Q',
+        cpu: '25核',
         memory: 90,
-        disk: 50,
-        systemDisk: 3810,
+        disk: 3810,
         cudaVersion: '≤ 13.0',
         gpuDriver: '580.76.05',
-        pricePerHour: 3.03,
-        expiryDate: '2027-01-01'
+        status: 'available',
+        loginInfo: {
+          ip: '192.168.1.102',
+          port: 22,
+          username: 'root',
+          password: 'Abc123456'
+        }
+      },
+      // RTX 5090 - 已分配
+      {
+        id: 3,
+        name: '北京A区-201机',
+        region: '北京A区',
+        gpuModel: 'RTX 5090',
+        gpuMemory: 32,
+        cpu: '32核',
+        memory: 128,
+        disk: 7200,
+        cudaVersion: '≤ 13.0',
+        gpuDriver: '580.76.05',
+        status: 'allocated',
+        loginInfo: {
+          ip: '192.168.2.201',
+          port: 22,
+          username: 'root',
+          password: 'Abc123456'
+        },
+        allocatedTo: {
+          customerId: 1,
+          customerName: '张三',
+          allocatedAt: '2026-01-15',
+          duration: 3
+        }
+      },
+      // RTX 4090 - 未分配
+      {
+        id: 4,
+        name: '西北B区-102机',
+        region: '西北B区',
+        gpuModel: 'RTX 4090',
+        gpuMemory: 24,
+        cpu: '16核',
+        memory: 64,
+        disk: 4000,
+        cudaVersion: '≤ 12.0',
+        gpuDriver: '535.54.03',
+        status: 'available',
+        loginInfo: {
+          ip: '192.168.3.102',
+          port: 22,
+          username: 'root',
+          password: 'Abc123456'
+        }
+      },
+      {
+        id: 5,
+        name: '重庆A区-301机',
+        region: '重庆A区',
+        gpuModel: 'RTX 4090',
+        gpuMemory: 24,
+        cpu: '16核',
+        memory: 64,
+        disk: 4000,
+        cudaVersion: '≤ 12.0',
+        gpuDriver: '535.54.03',
+        status: 'available',
+        loginInfo: {
+          ip: '192.168.4.301',
+          port: 22,
+          username: 'root',
+          password: 'Abc123456'
+        }
+      },
+      // RTX 4090 - 已分配
+      {
+        id: 6,
+        name: '重庆A区-302机',
+        region: '重庆A区',
+        gpuModel: 'RTX 4090',
+        gpuMemory: 24,
+        cpu: '16核',
+        memory: 64,
+        disk: 4000,
+        cudaVersion: '≤ 12.0',
+        gpuDriver: '535.54.03',
+        status: 'allocated',
+        loginInfo: {
+          ip: '192.168.4.302',
+          port: 22,
+          username: 'root',
+          password: 'Abc123456'
+        },
+        allocatedTo: {
+          customerId: 2,
+          customerName: '李四',
+          allocatedAt: '2026-01-20',
+          duration: 1
+        }
+      },
+      // vGPU-48GB - 未分配
+      {
+        id: 7,
+        name: '内蒙B区-401机',
+        region: '内蒙B区',
+        gpuModel: 'vGPU-48GB',
+        gpuMemory: 48,
+        cpu: '24核',
+        memory: 96,
+        disk: 6000,
+        cudaVersion: '≤ 12.0',
+        gpuDriver: '535.54.03',
+        status: 'available',
+        loginInfo: {
+          ip: '192.168.5.401',
+          port: 22,
+          username: 'root',
+          password: 'Abc123456'
+        }
       }
     ]
   } catch (error) {
-    ElMessage.error('加载设备列表失败')
+    ElMessage.error('加载机器列表失败')
   } finally {
     loading.value = false
   }
 }
 
-// 租用设备
-const handleRent = (device: Device) => {
-  ElMessage.success(`正在租用设备: ${device.name}`)
-  // TODO: 实现租用逻辑
+// 加载客户列表
+const loadCustomers = async () => {
+  try {
+    // TODO: 调用API获取数据
+    await new Promise(resolve => setTimeout(resolve, 300))
+    customers.value = [
+      { id: 1, name: '张三', company: '科技有限公司' },
+      { id: 2, name: '李四', company: '数据科技公司' },
+      { id: 3, name: '王五', company: '智能科技公司' },
+      { id: 4, name: '赵六', company: '云计算公司' }
+    ]
+  } catch (error) {
+    ElMessage.error('加载客户列表失败')
+  }
+}
+
+// 打开分配对话框
+const handleAllocate = (machine: Machine) => {
+  currentMachine.value = machine
+  allocationForm.value = {
+    customerId: null,
+    duration: 1,
+    notes: ''
+  }
+  allocationDialogVisible.value = true
+}
+
+// 提交分配
+const handleSubmitAllocation = async () => {
+  if (!allocationForm.value.customerId) {
+    ElMessage.warning('请选择客户')
+    return
+  }
+
+  try {
+    // TODO: 调用API提交分配
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    const customer = customers.value.find(c => c.id === allocationForm.value.customerId)
+
+    // 更新机器状态
+    if (currentMachine.value) {
+      currentMachine.value.status = 'allocated'
+      currentMachine.value.allocatedTo = {
+        customerId: allocationForm.value.customerId!,
+        customerName: customer?.name || '',
+        allocatedAt: new Date().toLocaleDateString('zh-CN'),
+        duration: allocationForm.value.duration
+      }
+    }
+
+    ElMessage.success(`已成功将 ${currentMachine.value?.name} 分配给 ${customer?.name}，时长 ${allocationForm.value.duration} 个月`)
+    allocationDialogVisible.value = false
+  } catch (error) {
+    ElMessage.error('分配失败')
+  }
+}
+
+// 回收机器
+const handleReclaim = async (machine: Machine) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认回收机器 ${machine.name}？该机器当前分配给 ${machine.allocatedTo?.customerName}`,
+      '回收确认',
+      {
+        confirmButtonText: '确认回收',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+
+    // TODO: 调用API回收机器
+    await new Promise(resolve => setTimeout(resolve, 500))
+
+    // 更新机器状态
+    machine.status = 'available'
+    delete machine.allocatedTo
+
+    ElMessage.success(`已成功回收机器 ${machine.name}`)
+  } catch {
+    // 用户取消
+  }
+}
+
+// 一键登录
+const handleQuickLogin = async (machine: Machine) => {
+  // 构造WebSSH URL (假设WebSSH服务部署在 /webssh 路径)
+  // 格式: /webssh?hostname=ip&port=port&username=username&password=password
+  const websshUrl = `/webssh?hostname=${machine.loginInfo.ip}&port=${machine.loginInfo.port}&username=${machine.loginInfo.username}&password=${encodeURIComponent(machine.loginInfo.password)}`
+
+  // 构造Jumpserver URL (假设Jumpserver部署在配置的地址)
+  // 格式: http://jumpserver/terminal/connect/?asset_id=xxx
+  const jumpserverUrl = `http://192.168.10.249:8080/terminal/connect/?hostname=${machine.loginInfo.ip}&port=${machine.loginInfo.port}&username=${machine.loginInfo.username}`
+
+  // SSH命令(作为备选方案)
+  const sshCommand = `ssh ${machine.loginInfo.username}@${machine.loginInfo.ip} -p ${machine.loginInfo.port}`
+
+  // 弹出选择对话框
+  try {
+    await ElMessageBox.confirm(
+      '请选择登录方式',
+      '一键登录',
+      {
+        distinguishCancelAndClose: true,
+        confirmButtonText: 'WebSSH (浏览器)',
+        cancelButtonText: 'Jumpserver',
+        type: 'info'
+      }
+    )
+    // 用户选择WebSSH
+    window.open(websshUrl, '_blank')
+  } catch (action) {
+    if (action === 'cancel') {
+      // 用户选择Jumpserver
+      window.open(jumpserverUrl, '_blank')
+    } else {
+      // 用户关闭对话框,复制SSH命令作为备选
+      try {
+        await navigator.clipboard.writeText(sshCommand)
+        ElMessage.info({
+          message: `SSH命令已复制到剪贴板\n密码: ${machine.loginInfo.password}`,
+          duration: 5000,
+          showClose: true
+        })
+      } catch (error) {
+        ElMessageBox.alert(
+          `SSH命令: ${sshCommand}\n密码: ${machine.loginInfo.password}`,
+          '登录信息',
+          {
+            confirmButtonText: '确定',
+            type: 'info'
+          }
+        )
+      }
+    }
+  }
 }
 
 onMounted(() => {
-  loadDevices()
+  loadMachines()
+  loadCustomers()
 })
 </script>
 
@@ -139,154 +430,282 @@ onMounted(() => {
   <div class="computing-market">
     <PageHeader title="算力市场" />
 
-    <div class="market-container">
-      <!-- 筛选区域 -->
+    <div class="market-container" v-loading="loading">
+      <!-- 筛选标签区域 -->
       <div class="filter-section">
-        <!-- 计费方式 -->
-        <div class="filter-row">
-          <span class="filter-label">计费方式</span>
-          <el-radio-group v-model="billingMethod">
-            <el-radio-button label="按需计费" />
-            <el-radio-button label="包日" />
-            <el-radio-button label="包周" />
-            <el-radio-button label="包月" />
-          </el-radio-group>
-        </div>
-
-        <!-- 选择地区 -->
-        <div class="filter-row">
-          <span class="filter-label">选择地区</span>
-          <div class="region-buttons">
-            <el-button
-              v-for="region in regions"
-              :key="region.value"
-              :type="selectedRegion === region.value ? 'primary' : 'default'"
-              size="small"
-              @click="selectedRegion = region.value"
-            >
-              {{ region.label }}
-              <el-tag v-if="region.hot" type="danger" size="small" style="margin-left: 4px">
-                PRO9000
-              </el-tag>
-            </el-button>
-          </div>
-        </div>
-
-        <!-- GPU型号 -->
-        <div class="filter-row">
-          <span class="filter-label">GPU型号</span>
-          <el-checkbox-group v-model="selectedGpuModels">
-            <el-checkbox
+        <!-- GPU型号筛选 -->
+        <div class="filter-group">
+          <span class="filter-label">显卡分类：</span>
+          <div class="filter-tags">
+            <el-tag
               v-for="model in gpuModels"
-              :key="model.value"
-              :label="model.value"
+              :key="model"
+              :type="selectedGpuModel === model ? 'primary' : 'info'"
+              :effect="selectedGpuModel === model ? 'dark' : 'plain'"
+              class="filter-tag"
+              @click="selectedGpuModel = model"
             >
-              {{ model.label }}
-              <span v-if="model.count !== undefined" class="model-count">
-                ({{ model.count }}/{{ model.count }})
-              </span>
-            </el-checkbox>
-          </el-checkbox-group>
+              {{ model === 'all' ? '全部' : model }}
+            </el-tag>
+          </div>
         </div>
 
-        <!-- GPU数量 -->
-        <div class="filter-row">
-          <span class="filter-label">GPU数量</span>
-          <el-radio-group v-model="selectedGpuCount">
-            <el-radio-button :label="1">1</el-radio-button>
-            <el-radio-button :label="2">2</el-radio-button>
-            <el-radio-button :label="3">3</el-radio-button>
-            <el-radio-button :label="4">4</el-radio-button>
-            <el-radio-button :label="5">5</el-radio-button>
-            <el-radio-button :label="6">6</el-radio-button>
-            <el-radio-button :label="7">7</el-radio-button>
-            <el-radio-button :label="8">8</el-radio-button>
-            <el-radio-button :label="10">10</el-radio-button>
-            <el-radio-button :label="12">12</el-radio-button>
-          </el-radio-group>
+        <!-- 地区筛选 -->
+        <div class="filter-group">
+          <span class="filter-label">地区分类：</span>
+          <div class="filter-tags">
+            <el-tag
+              v-for="region in regions"
+              :key="region"
+              :type="selectedRegion === region ? 'success' : 'info'"
+              :effect="selectedRegion === region ? 'dark' : 'plain'"
+              class="filter-tag"
+              @click="selectedRegion = region"
+            >
+              {{ region === 'all' ? '全部' : region }}
+            </el-tag>
+          </div>
+        </div>
+
+        <!-- 状态筛选 -->
+        <div class="filter-group">
+          <span class="filter-label">状态分类：</span>
+          <div class="filter-tags">
+            <el-tag
+              :type="selectedStatus === 'all' ? 'warning' : 'info'"
+              :effect="selectedStatus === 'all' ? 'dark' : 'plain'"
+              class="filter-tag"
+              @click="selectedStatus = 'all'"
+            >
+              全部
+            </el-tag>
+            <el-tag
+              :type="selectedStatus === 'available' ? 'warning' : 'info'"
+              :effect="selectedStatus === 'available' ? 'dark' : 'plain'"
+              class="filter-tag"
+              @click="selectedStatus = 'available'"
+            >
+              未分配
+            </el-tag>
+            <el-tag
+              :type="selectedStatus === 'allocated' ? 'warning' : 'info'"
+              :effect="selectedStatus === 'allocated' ? 'dark' : 'plain'"
+              class="filter-tag"
+              @click="selectedStatus = 'allocated'"
+            >
+              已分配
+            </el-tag>
+          </div>
         </div>
       </div>
 
-      <!-- 设备列表 -->
-      <div v-loading="loading" class="device-list">
-        <div
-          v-for="device in filteredDevices"
-          :key="device.id"
-          class="device-card"
-        >
-          <div class="device-header">
-            <div class="device-title">
-              <span class="device-region">{{ device.region }}</span>
-              <span class="device-name">/ {{ device.name }}</span>
-              <span class="device-expiry">可用期限：{{ device.expiryDate }}</span>
-            </div>
-            <div class="device-availability">
-              <span class="availability-label">空闲/总量</span>
-              <span class="availability-value">{{ device.availableGpu }}/{{ device.totalGpu }}</span>
-            </div>
-          </div>
-
-          <div class="device-title-main">
-            {{ device.gpuModel }} / {{ device.gpuMemory }} GB
-          </div>
-
-          <div class="device-specs">
-            <div class="spec-column">
-              <div class="spec-title">每GPU分配</div>
-              <div class="spec-item">
-                <span class="spec-label">CPU:</span>
-                <span class="spec-value">{{ device.cpu }}</span>
-              </div>
-              <div class="spec-item">
-                <span class="spec-label">内存:</span>
-                <span class="spec-value">{{ device.memory }} GB</span>
-              </div>
-            </div>
-
-            <div class="spec-column">
-              <div class="spec-title">硬盘</div>
-              <div class="spec-item">
-                <span class="spec-label">系统盘:</span>
-                <span class="spec-value">{{ device.disk }} GB</span>
-              </div>
-              <div class="spec-item">
-                <span class="spec-label">数据盘:</span>
-                <span class="spec-value">{{ device.systemDisk }} GB</span>
-              </div>
-            </div>
-
-            <div class="spec-column">
-              <div class="spec-title">其它</div>
-              <div class="spec-item">
-                <span class="spec-label">GPU驱动:</span>
-                <span class="spec-value">{{ device.gpuDriver }}</span>
-              </div>
-              <div class="spec-item">
-                <span class="spec-label">CUDA版本:</span>
-                <span class="spec-value">{{ device.cudaVersion }}</span>
-              </div>
-            </div>
-
-            <div class="spec-column price-column">
-              <div class="price">
-                <span class="price-symbol">¥</span>
-                <span class="price-value">{{ device.pricePerHour.toFixed(2) }}</span>
-                <span class="price-unit">/时</span>
-              </div>
-              <div class="price-tip">会员低至7.9折 ¥2.39/时</div>
-              <el-button type="primary" size="large" @click="handleRent(device)">
-                1卡即租
-              </el-button>
-            </div>
+      <!-- GPU型号分类列表 -->
+      <div v-for="category in gpuCategories" :key="`${category.model}-${category.memory}`" class="gpu-category">
+        <div class="category-header">
+          <h3>{{ category.model }} / {{ category.memory }}GB</h3>
+          <div class="category-stats">
+            <el-tag type="success">未分配: {{ category.available.length }}</el-tag>
+            <el-tag type="warning" style="margin-left: 8px">已分配: {{ category.allocated.length }}</el-tag>
           </div>
         </div>
 
-        <el-empty
-          v-if="!loading && filteredDevices.length === 0"
-          description="暂无符合条件的设备"
-        />
+        <div class="category-content">
+          <!-- 左栏：未分配 -->
+          <div class="machines-column">
+            <div class="column-header">
+              <h4>未分配机器</h4>
+            </div>
+            <div class="machines-list">
+              <div
+                v-for="machine in category.available"
+                :key="machine.id"
+                class="machine-card"
+              >
+                <div class="machine-info">
+                  <div class="machine-name">{{ machine.name }}</div>
+                  <div class="machine-specs">
+                    <span>{{ machine.region }}</span>
+                    <span>CPU: {{ machine.cpu }}</span>
+                    <span>内存: {{ machine.memory }}GB</span>
+                    <span>硬盘: {{ machine.disk }}GB</span>
+                  </div>
+                  <div class="machine-driver">
+                    <span>CUDA: {{ machine.cudaVersion }}</span>
+                    <span>驱动: {{ machine.gpuDriver }}</span>
+                  </div>
+                  <div class="login-info">
+                    <div class="login-item">
+                      <span class="login-label">IP地址：</span>
+                      <span class="login-value">{{ machine.loginInfo.ip }}:{{ machine.loginInfo.port }}</span>
+                    </div>
+                    <div class="login-item">
+                      <span class="login-label">用户名：</span>
+                      <span class="login-value">{{ machine.loginInfo.username }}</span>
+                    </div>
+                    <div class="login-item">
+                      <span class="login-label">密码：</span>
+                      <span class="login-value">{{ machine.loginInfo.password }}</span>
+                    </div>
+                  </div>
+                </div>
+                <div class="machine-actions">
+                  <el-button type="primary" @click="handleAllocate(machine)">
+                    立即分配
+                  </el-button>
+                  <el-button type="success" @click="handleQuickLogin(machine)">
+                    一键登录
+                  </el-button>
+                </div>
+              </div>
+              <el-empty
+                v-if="category.available.length === 0"
+                description="暂无未分配机器"
+                :image-size="80"
+              />
+            </div>
+          </div>
+
+          <!-- 右栏：已分配 -->
+          <div class="machines-column">
+            <div class="column-header">
+              <h4>已分配机器</h4>
+            </div>
+            <div class="machines-list">
+              <div
+                v-for="machine in category.allocated"
+                :key="machine.id"
+                class="machine-card allocated"
+              >
+                <div class="machine-info">
+                  <div class="machine-name">{{ machine.name }}</div>
+                  <div class="machine-specs">
+                    <span>{{ machine.region }}</span>
+                    <span>CPU: {{ machine.cpu }}</span>
+                    <span>内存: {{ machine.memory }}GB</span>
+                    <span>硬盘: {{ machine.disk }}GB</span>
+                  </div>
+                  <div class="machine-driver">
+                    <span>CUDA: {{ machine.cudaVersion }}</span>
+                    <span>驱动: {{ machine.gpuDriver }}</span>
+                  </div>
+                  <div class="login-info">
+                    <div class="login-item">
+                      <span class="login-label">IP地址：</span>
+                      <span class="login-value">{{ machine.loginInfo.ip }}:{{ machine.loginInfo.port }}</span>
+                    </div>
+                    <div class="login-item">
+                      <span class="login-label">用户名：</span>
+                      <span class="login-value">{{ machine.loginInfo.username }}</span>
+                    </div>
+                    <div class="login-item">
+                      <span class="login-label">密码：</span>
+                      <span class="login-value">{{ machine.loginInfo.password }}</span>
+                    </div>
+                  </div>
+                  <div class="allocation-info">
+                    <el-tag type="info" size="small">
+                      客户: {{ machine.allocatedTo?.customerName }}
+                    </el-tag>
+                    <el-tag type="warning" size="small" style="margin-left: 4px">
+                      时长: {{ machine.allocatedTo?.duration }}个月
+                    </el-tag>
+                    <span class="allocation-date">
+                      分配时间: {{ machine.allocatedTo?.allocatedAt }}
+                    </span>
+                  </div>
+                </div>
+                <div class="machine-actions">
+                  <el-button type="danger" @click="handleReclaim(machine)">
+                    立即回收
+                  </el-button>
+                  <el-button type="success" @click="handleQuickLogin(machine)">
+                    一键登录
+                  </el-button>
+                </div>
+              </div>
+              <el-empty
+                v-if="category.allocated.length === 0"
+                description="暂无已分配机器"
+                :image-size="80"
+              />
+            </div>
+          </div>
+        </div>
       </div>
+
+      <el-empty
+        v-if="gpuCategories.length === 0"
+        description="暂无机器数据"
+      />
     </div>
+
+    <!-- 分配对话框 -->
+    <el-dialog
+      v-model="allocationDialogVisible"
+      title="分配主机资源"
+      width="600px"
+    >
+      <div v-if="currentMachine" class="allocation-dialog">
+        <!-- 机器信息 -->
+        <div class="device-info-section">
+          <h4>机器信息</h4>
+          <div class="info-row">
+            <span class="info-label">机器名称：</span>
+            <span class="info-value">{{ currentMachine.name }}</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">GPU型号：</span>
+            <span class="info-value">{{ currentMachine.gpuModel }} / {{ currentMachine.gpuMemory }}GB</span>
+          </div>
+          <div class="info-row">
+            <span class="info-label">配置：</span>
+            <span class="info-value">{{ currentMachine.cpu }} / {{ currentMachine.memory }}GB内存</span>
+          </div>
+        </div>
+
+        <!-- 分配表单 -->
+        <el-form :model="allocationForm" label-width="100px" style="margin-top: 20px">
+          <el-form-item label="选择客户" required>
+            <el-select
+              v-model="allocationForm.customerId"
+              placeholder="请选择客户"
+              style="width: 100%"
+            >
+              <el-option
+                v-for="customer in customers"
+                :key="customer.id"
+                :label="`${customer.name} (${customer.company})`"
+                :value="customer.id"
+              />
+            </el-select>
+          </el-form-item>
+
+          <el-form-item label="分配时长" required>
+            <el-input-number
+              v-model="allocationForm.duration"
+              :min="1"
+              :max="12"
+              style="width: 100%"
+            />
+            <span style="margin-left: 8px; color: #909399">个月</span>
+          </el-form-item>
+
+          <el-form-item label="备注">
+            <el-input
+              v-model="allocationForm.notes"
+              type="textarea"
+              :rows="3"
+              placeholder="请输入备注信息"
+            />
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <el-button @click="allocationDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="handleSubmitAllocation">确认分配</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -299,169 +718,278 @@ onMounted(() => {
   background: white;
   border-radius: 8px;
   padding: 24px;
+  min-height: 400px;
 }
 
+/* 筛选区域 */
 .filter-section {
   margin-bottom: 24px;
+  padding: 20px;
+  background: #f5f7fa;
+  border-radius: 8px;
 }
 
-.filter-row {
+.filter-group {
   display: flex;
   align-items: flex-start;
-  margin-bottom: 20px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid #f0f0f0;
+  margin-bottom: 16px;
 }
 
-.filter-row:last-child {
-  border-bottom: none;
+.filter-group:last-child {
+  margin-bottom: 0;
 }
 
 .filter-label {
   min-width: 100px;
+  font-size: 14px;
   font-weight: 500;
-  color: #303133;
-  padding-top: 8px;
+  color: #606266;
+  padding-top: 6px;
+  flex-shrink: 0;
 }
 
-.region-buttons {
+.filter-tags {
   display: flex;
-  gap: 8px;
   flex-wrap: wrap;
+  gap: 8px;
+  flex: 1;
 }
 
-.model-count {
-  color: #909399;
-  font-size: 12px;
+.filter-tag {
+  cursor: pointer;
+  transition: all 0.3s;
+  user-select: none;
 }
 
-.device-list {
-  min-height: 400px;
+.filter-tag:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
 }
 
-.device-card {
-  background: #f8f9fa;
+/* GPU分类 */
+.gpu-category {
+  margin-bottom: 32px;
+  border: 1px solid #e4e7ed;
   border-radius: 8px;
-  padding: 20px;
-  margin-bottom: 16px;
+  overflow: hidden;
 }
 
-.device-header {
+.category-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 12px;
+  padding: 16px 24px;
+  background: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
 }
 
-.device-title {
+.category-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.category-stats {
   display: flex;
-  align-items: center;
   gap: 8px;
-  font-size: 13px;
+}
+
+/* 左右两栏布局 */
+.category-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  background: #e4e7ed;
+}
+
+.machines-column {
+  background: white;
+  min-height: 300px;
+}
+
+.column-header {
+  padding: 12px 16px;
+  background: #fafafa;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.column-header h4 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
   color: #606266;
 }
 
-.device-region {
-  color: #409EFF;
+.machines-list {
+  padding: 16px;
 }
 
-.device-expiry {
+/* 机器卡片 */
+.machine-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  margin-bottom: 12px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s;
+}
+
+.machine-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.machine-card:last-child {
+  margin-bottom: 0;
+}
+
+.machine-card.allocated {
+  background: #fff9e6;
+  border-color: #ffd666;
+}
+
+.machine-info {
+  flex: 1;
+}
+
+.machine-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.machine-specs {
+  display: flex;
+  gap: 12px;
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 6px;
+}
+
+.machine-specs span {
+  display: inline-block;
+}
+
+.machine-driver {
+  display: flex;
+  gap: 12px;
+  font-size: 12px;
   color: #909399;
 }
 
-.device-availability {
+.login-info {
+  margin-top: 8px;
+  padding: 8px;
+  background: #f0f9ff;
+  border-radius: 4px;
+  border: 1px solid #d1e7ff;
+}
+
+.login-item {
+  display: flex;
+  align-items: center;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+
+.login-item:last-child {
+  margin-bottom: 0;
+}
+
+.login-label {
+  color: #606266;
+  min-width: 60px;
+  font-weight: 500;
+}
+
+.login-value {
+  color: #303133;
+  font-family: 'Courier New', monospace;
+  font-weight: 600;
+}
+
+.allocation-info {
   display: flex;
   align-items: center;
   gap: 8px;
+  margin-top: 8px;
 }
 
-.availability-label {
-  font-size: 13px;
+.allocation-date {
+  font-size: 12px;
   color: #909399;
+  margin-left: 8px;
 }
 
-.availability-value {
-  font-size: 18px;
-  font-weight: 600;
-  color: #409EFF;
+.machine-actions {
+  margin-left: 16px;
 }
 
-.device-title-main {
-  font-size: 20px;
-  font-weight: 600;
-  color: #303133;
+/* 分配对话框 */
+.allocation-dialog {
+  padding: 10px 0;
+}
+
+.device-info-section {
+  background: #f5f7fa;
+  padding: 16px;
+  border-radius: 8px;
   margin-bottom: 16px;
 }
 
-.device-specs {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
-}
-
-.spec-column {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.spec-title {
-  font-size: 13px;
-  color: #909399;
-  margin-bottom: 4px;
-}
-
-.spec-item {
-  display: flex;
-  gap: 8px;
-  font-size: 13px;
-}
-
-.spec-label {
-  color: #606266;
-}
-
-.spec-value {
+.device-info-section h4 {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 600;
   color: #303133;
 }
 
-.price-column {
-  align-items: flex-end;
-  text-align: right;
-}
-
-.price {
+.info-row {
   display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  margin-bottom: 4px;
-}
-
-.price-symbol {
-  font-size: 16px;
-  color: #F56C6C;
-}
-
-.price-value {
-  font-size: 28px;
-  font-weight: 600;
-  color: #F56C6C;
-}
-
-.price-unit {
+  margin-bottom: 8px;
   font-size: 14px;
-  color: #F56C6C;
 }
 
-.price-tip {
-  font-size: 12px;
-  color: #909399;
-  margin-bottom: 12px;
+.info-row:last-child {
+  margin-bottom: 0;
 }
 
+.info-label {
+  color: #606266;
+  min-width: 100px;
+}
+
+.info-value {
+  color: #303133;
+  font-weight: 500;
+}
+
+/* 响应式 */
 @media (max-width: 1200px) {
-  .device-specs {
-    grid-template-columns: repeat(2, 1fr);
+  .category-content {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 768px) {
+  .machine-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .machine-actions {
+    margin-left: 0;
+    margin-top: 12px;
+    width: 100%;
+  }
+
+  .machine-actions .el-button {
+    width: 100%;
   }
 }
 </style>

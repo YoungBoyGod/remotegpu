@@ -127,57 +127,6 @@ export const datasetFormFields: FormFieldConfig[] = [
 ]
 
 /**
- * 训练任务创建表单配置
- */
-export const trainingFormFields: FormFieldConfig[] = [
-  {
-    prop: 'name',
-    label: '任务名称',
-    type: 'input',
-    required: true,
-    placeholder: '请输入任务名称',
-    span: 24,
-  },
-  {
-    prop: 'environment',
-    label: '运行环境',
-    type: 'select',
-    required: true,
-    placeholder: '请选择运行环境',
-    options: [],
-    span: 24,
-  },
-  {
-    prop: 'dataset',
-    label: '数据集',
-    type: 'select',
-    required: true,
-    placeholder: '请选择数据集',
-    options: [],
-    span: 24,
-  },
-  {
-    prop: 'script',
-    label: '训练脚本',
-    type: 'textarea',
-    required: true,
-    placeholder: '请输入训练脚本路径或命令',
-    span: 24,
-  },
-  {
-    prop: 'gpuCount',
-    label: 'GPU 数量',
-    type: 'slider',
-    required: true,
-    min: 1,
-    max: 8,
-    step: 1,
-    unit: '个',
-    span: 24,
-  },
-]
-
-/**
  * 用户设置表单配置
  */
 export const userSettingsFormFields: FormFieldConfig[] = [

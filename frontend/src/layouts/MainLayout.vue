@@ -32,40 +32,80 @@ const collapsed = ref(false)
 // 管理员菜单项
 const adminMenuItems = [
   { path: '/dashboard', icon: Monitor, label: '概览' },
-  { path: '/resource-center', icon: Grid, label: '资源中心' },
-  { path: '/resource-platform', icon: DataBoard, label: '资源平台' },
-  { path: '/resource-list', icon: Management, label: '资源管理' },
-  { path: '/monitoring-center', icon: DataAnalysis, label: '监控中心' },
-  { path: '/alert-center', icon: Bell, label: '告警中心' },
-  { path: '/customer-center', icon: User, label: '客户中心' },
-  { path: '/computing-market', icon: Shop, label: '算力市场' },
-  { path: '/release-version', icon: Upload, label: '发布版本' },
-  { path: '/document-center', icon: Document, label: '文档中心' },
-  { path: '/download-center', icon: Download, label: '下载中心' },
+  {
+    label: '资源',
+    icon: Grid,
+    children: [
+      { path: '/resource-center', icon: Grid, label: '资源中心' },
+      { path: '/resource-platform', icon: DataBoard, label: '资源平台' },
+      { path: '/resource-list', icon: Management, label: '主机信息' },
+      { path: '/computing-market', icon: Shop, label: '算力市场' },
+    ]
+  },
+  {
+    label: '监控',
+    icon: DataAnalysis,
+    children: [
+      { path: '/monitoring-center', icon: DataAnalysis, label: '监控中心' },
+      { path: '/alert-center', icon: Bell, label: '告警中心' },
+    ]
+  },
+  {
+    label: '客户',
+    icon: User,
+    children: [
+      { path: '/customer-center', icon: User, label: '客户中心' },
+      { path: '/quotas', icon: TrendCharts, label: '配额管理' },
+    ]
+  },
+  {
+    label: '发布',
+    icon: Upload,
+    children: [
+      { path: '/release-version', icon: Upload, label: '发布版本' },
+      { path: '/document-center', icon: Document, label: '文档中心' },
+      { path: '/download-center', icon: Download, label: '下载中心' },
+    ]
+  },
+  { path: '/settings', icon: Setting, label: '设置' },
 ]
 
 // 客户菜单项
 const customerMenuItems = [
-  { path: '/dashboard', icon: Monitor, label: '概览' },
-  { path: '/environments', icon: IconMenu, label: '环境部署' },
+  { path: '/environments', icon: Grid, label: '环境列表' },
   { path: '/datasets', icon: FolderOpened, label: '数据集' },
   { path: '/images', icon: Picture, label: '镜像' },
   { path: '/model-repository', icon: Box, label: '模型仓库' },
-  { path: '/training', icon: TrendCharts, label: '训练任务' },
   { path: '/computing-market', icon: Shop, label: '算力市场' },
-  { path: '/release-version', icon: Upload, label: '发布版本' },
   { path: '/document-center', icon: Document, label: '文档中心' },
-  { path: '/download-center', icon: Download, label: '下载中心' },
-  { path: '/settings', icon: Setting, label: '平台设置' },
+  { path: '/settings', icon: Setting, label: '设置' },
 ]
 
 // 根据用户角色返回对应的菜单项
 const menuItems = computed(() => {
   const items = authStore.user?.role === 'admin' ? adminMenuItems : customerMenuItems
-  return items.map(item => ({
-    ...item,
-    path: getRolePath(item.path)
-  }))
+
+  // 递归处理菜单项，为路径添加角色前缀
+  const processItems = (items: any[]) => {
+    return items.map(item => {
+      if (item.children) {
+        // 如果有子菜单，递归处理
+        return {
+          ...item,
+          children: processItems(item.children)
+        }
+      } else if (item.path) {
+        // 如果有路径，添加角色前缀
+        return {
+          ...item,
+          path: getRolePath(item.path)
+        }
+      }
+      return item
+    })
+  }
+
+  return processItems(items)
 })
 
 const handleLogout = async () => {
@@ -86,14 +126,29 @@ const handleLogout = async () => {
         :collapse="collapsed"
         router
       >
-        <el-menu-item
-          v-for="item in menuItems"
-          :key="item.path"
-          :index="item.path"
-        >
-          <el-icon><component :is="item.icon" /></el-icon>
-          <template #title>{{ item.label }}</template>
-        </el-menu-item>
+        <template v-for="(item, index) in menuItems" :key="item.path || item.label">
+          <!-- 分组菜单 -->
+          <el-sub-menu v-if="item.children" :index="String(index)">
+            <template #title>
+              <el-icon><component :is="item.icon" /></el-icon>
+              <span>{{ item.label }}</span>
+            </template>
+            <el-menu-item
+              v-for="child in item.children"
+              :key="child.path"
+              :index="child.path"
+            >
+              <el-icon><component :is="child.icon" /></el-icon>
+              <template #title>{{ child.label }}</template>
+            </el-menu-item>
+          </el-sub-menu>
+
+          <!-- 普通菜单项 -->
+          <el-menu-item v-else :index="item.path">
+            <el-icon><component :is="item.icon" /></el-icon>
+            <template #title>{{ item.label }}</template>
+          </el-menu-item>
+        </template>
       </el-menu>
     </el-aside>
 

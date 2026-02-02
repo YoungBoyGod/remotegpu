@@ -73,7 +73,6 @@ func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 
 		quota := &entity.ResourceQuota{
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -95,7 +94,6 @@ func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 		existingQuota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         8,
 			Memory:      16384,
 			GPU:         2,
@@ -104,7 +102,6 @@ func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 
 		newQuota := &entity.ResourceQuota{
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -127,7 +124,6 @@ func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 		workspaceID := uint(10)
 		quota := &entity.ResourceQuota{
 			UserID:      1,
-			WorkspaceID: &workspaceID,
 			CPU:         8,
 			Memory:      16384,
 			GPU:         2,
@@ -148,7 +144,6 @@ func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 
 		quota := &entity.ResourceQuota{
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         -1,
 			Memory:      16384,
 			GPU:         2,
@@ -166,7 +161,6 @@ func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 
 		quota := &entity.ResourceQuota{
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      -1,
 			GPU:         2,
@@ -184,7 +178,6 @@ func TestResourceQuotaService_SetQuota_Unit(t *testing.T) {
 
 		quota := &entity.ResourceQuota{
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -208,7 +201,6 @@ func TestResourceQuotaService_GetQuota_Unit(t *testing.T) {
 		expectedQuota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -231,7 +223,6 @@ func TestResourceQuotaService_GetQuota_Unit(t *testing.T) {
 		expectedQuota := &entity.ResourceQuota{
 			ID:          2,
 			UserID:      1,
-			WorkspaceID: &workspaceID,
 			CPU:         8,
 			Memory:      16384,
 			GPU:         2,
@@ -563,7 +554,6 @@ func TestResourceQuotaService_CheckQuota_Success(t *testing.T) {
 		quota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -572,10 +562,10 @@ func TestResourceQuotaService_CheckQuota_Success(t *testing.T) {
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
 		// Mock GetUsedResources query
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 4, 8192, 1, 200, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 4, 8192, 1, 200, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
@@ -617,10 +607,10 @@ func TestResourceQuotaService_CheckQuota_Success(t *testing.T) {
 		}
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 8, 16384, 2, 500, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 8, 16384, 2, 500, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
@@ -694,10 +684,10 @@ func TestResourceQuotaService_CheckQuota_Errors(t *testing.T) {
 		}
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 12, 8192, 1, 200, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 12, 8192, 1, 200, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
@@ -748,10 +738,10 @@ func TestResourceQuotaService_CheckQuota_MemoryGPUStorageExceeded(t *testing.T) 
 		}
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 4, 24576, 1, 200, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 4, 24576, 1, 200, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
@@ -797,10 +787,10 @@ func TestResourceQuotaService_CheckQuota_MemoryGPUStorageExceeded(t *testing.T) 
 		}
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 4, 8192, 3, 200, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 4, 8192, 3, 200, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
@@ -846,10 +836,10 @@ func TestResourceQuotaService_CheckQuota_MemoryGPUStorageExceeded(t *testing.T) 
 		}
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 4, 8192, 1, 700, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 4, 8192, 1, 700, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
@@ -890,15 +880,15 @@ func TestResourceQuotaService_GetUsedResources_Success(t *testing.T) {
 
 		storage1 := int64(200)
 		storage2 := int64(300)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 4, 8192, 1, storage1, "running").
-			AddRow(2, 1, 1, 8, 16384, 2, storage2, "creating")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 4, 8192, 1, storage1, "running").
+			AddRow(2, 1, 8, 16384, 2, storage2, "creating")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
-		used, err := service.GetUsedResources(1, nil)
+		used, err := service.GetUsedResources(1)
 		assert.NoError(t, err)
 		assert.NotNil(t, used)
 		assert.Equal(t, 12, used.CPU)
@@ -924,11 +914,11 @@ func TestResourceQuotaService_GetUsedResources_Success(t *testing.T) {
 
 		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"})
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
-		used, err := service.GetUsedResources(1, nil)
+		used, err := service.GetUsedResources(1)
 		assert.NoError(t, err)
 		assert.NotNil(t, used)
 		assert.Equal(t, 0, used.CPU)
@@ -954,7 +944,7 @@ func TestResourceQuotaService_GetUsedResources_Success(t *testing.T) {
 
 		workspaceID := uint(10)
 		storage := int64(200)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
 			AddRow(1, 1, 10, 4, 8192, 1, storage, "running")
 
 		mock.ExpectQuery("SELECT \\* FROM `environments` WHERE.*customer_id.*status.*workspace_id").
@@ -988,11 +978,11 @@ func TestResourceQuotaService_GetUsedResources_Errors(t *testing.T) {
 		mockDao := new(MockResourceQuotaDao)
 		service := NewResourceQuotaServiceWithDeps(mockDao, gormDB)
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnError(errors.New("database error"))
 
-		used, err := service.GetUsedResources(1, nil)
+		used, err := service.GetUsedResources(1)
 		assert.Error(t, err)
 		assert.Nil(t, used)
 		assert.NoError(t, mock.ExpectationsWereMet())
@@ -1026,14 +1016,14 @@ func TestResourceQuotaService_GetAvailableQuota_Success(t *testing.T) {
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
 		storage := int64(200)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 4, 8192, 1, storage, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 4, 8192, 1, storage, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
-		available, err := service.GetAvailableQuota(1, nil)
+		available, err := service.GetAvailableQuota(1)
 		assert.NoError(t, err)
 		assert.NotNil(t, available)
 		assert.Equal(t, 12, available.CPU)
@@ -1070,11 +1060,11 @@ func TestResourceQuotaService_GetAvailableQuota_Success(t *testing.T) {
 
 		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"})
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
-		available, err := service.GetAvailableQuota(1, nil)
+		available, err := service.GetAvailableQuota(1)
 		assert.NoError(t, err)
 		assert.NotNil(t, available)
 		assert.Equal(t, 16, available.CPU)
@@ -1110,14 +1100,14 @@ func TestResourceQuotaService_GetAvailableQuota_Success(t *testing.T) {
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
 		storage := int64(1200)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 20, 40960, 5, storage, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 20, 40960, 5, storage, "running")
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnRows(rows)
 
-		available, err := service.GetAvailableQuota(1, nil)
+		available, err := service.GetAvailableQuota(1)
 		assert.NoError(t, err)
 		assert.NotNil(t, available)
 		assert.Equal(t, 0, available.CPU)
@@ -1177,11 +1167,11 @@ func TestResourceQuotaService_GetAvailableQuota_Errors(t *testing.T) {
 		}
 		mockDao.On("GetByUserID", uint(1)).Return(quota, nil)
 
-		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
+		mock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE user_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
 			WillReturnError(errors.New("database error"))
 
-		available, err := service.GetAvailableQuota(1, nil)
+		available, err := service.GetAvailableQuota(1)
 		assert.Error(t, err)
 		assert.Nil(t, available)
 		mockDao.AssertExpectations(t)
@@ -1209,13 +1199,13 @@ func TestResourceQuotaService_GetQuotaInTx_Success(t *testing.T) {
 		tx := gormDB.Begin()
 
 		rows := sqlmock.NewRows([]string{"id", "user_id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage"}).
-			AddRow(1, 1, 1, nil, 16, 32768, 4, 1000)
+			AddRow(1, 1, nil, 16, 32768, 4, 1000)
 
 		mock.ExpectQuery("SELECT \\* FROM `resource_quotas` WHERE customer_id = \\? AND workspace_id IS NULL.*FOR UPDATE").
 			WithArgs(1, 1).
 			WillReturnRows(rows)
 
-		quota, err := service.GetQuotaInTx(tx, 1, nil)
+		quota, err := service.GetQuotaInTx(tx, 1)
 		assert.NoError(t, err)
 		assert.NotNil(t, quota)
 		assert.Equal(t, uint(1), quota.ID)
@@ -1243,13 +1233,13 @@ func TestResourceQuotaService_GetQuotaInTx_Success(t *testing.T) {
 
 		workspaceID := uint(10)
 		rows := sqlmock.NewRows([]string{"id", "user_id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage"}).
-			AddRow(2, 1, 1, 10, 8, 16384, 2, 500)
+			AddRow(2, 1, 10, 8, 16384, 2, 500)
 
 		mock.ExpectQuery("SELECT \\* FROM `resource_quotas` WHERE customer_id = \\? AND workspace_id = \\?.*FOR UPDATE").
 			WithArgs(1, 10, 1).
 			WillReturnRows(rows)
 
-		quota, err := service.GetQuotaInTx(tx, 1, &workspaceID)
+		quota, err := service.GetQuotaInTx(tx, 1)
 		assert.NoError(t, err)
 		assert.NotNil(t, quota)
 		assert.Equal(t, uint(2), quota.ID)
@@ -1308,7 +1298,6 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		existingQuota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         8,
 			Memory:      16384,
 			GPU:         2,
@@ -1327,8 +1316,8 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 
 		// Mock GetUsedResources query
 		storage := int64(200)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 4, 8192, 1, storage, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 4, 8192, 1, storage, "running")
 
 		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
@@ -1361,7 +1350,6 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		existingQuota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -1379,8 +1367,8 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		mockDao.On("GetByID", uint(1)).Return(existingQuota, nil)
 
 		storage := int64(200)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 8, 16384, 2, storage, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 8, 16384, 2, storage, "running")
 
 		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
@@ -1410,7 +1398,6 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		existingQuota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -1428,8 +1415,8 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		mockDao.On("GetByID", uint(1)).Return(existingQuota, nil)
 
 		storage := int64(200)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 8, 16384, 2, storage, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 8, 16384, 2, storage, "running")
 
 		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
@@ -1459,7 +1446,6 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		existingQuota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -1477,8 +1463,8 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		mockDao.On("GetByID", uint(1)).Return(existingQuota, nil)
 
 		storage := int64(200)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 8, 16384, 2, storage, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 8, 16384, 2, storage, "running")
 
 		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").
@@ -1508,7 +1494,6 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		existingQuota := &entity.ResourceQuota{
 			ID:          1,
 			UserID:      1,
-			WorkspaceID: nil,
 			CPU:         16,
 			Memory:      32768,
 			GPU:         4,
@@ -1526,8 +1511,8 @@ func TestResourceQuotaService_UpdateQuota_WithUsedResources(t *testing.T) {
 		mockDao.On("GetByID", uint(1)).Return(existingQuota, nil)
 
 		storage := int64(500)
-		rows := sqlmock.NewRows([]string{"id", "customer_id", "workspace_id", "cpu", "memory", "gpu", "storage", "status"}).
-			AddRow(1, 1, 1, 8, 16384, 2, storage, "running")
+		rows := sqlmock.NewRows([]string{"id", "user_id", "cpu", "memory", "gpu", "storage", "status"}).
+			AddRow(1, 1, 8, 16384, 2, storage, "running")
 
 		sqlMock.ExpectQuery(regexp.QuoteMeta("SELECT * FROM `environments` WHERE customer_id = ? AND status IN (?,?)")).
 			WithArgs(1, "running", "creating").

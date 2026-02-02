@@ -50,16 +50,8 @@ func (ctrl *EnvironmentController) GetByID(c *gin.Context) {
 
 // List 列出环境
 func (ctrl *EnvironmentController) List(c *gin.Context) {
-	customerID := c.GetUint("customer_id")
-	var workspaceID *uint
-	if wsID := c.Query("workspace_id"); wsID != "" {
-		var id uint
-		if _, err := fmt.Sscanf(wsID, "%d", &id); err == nil {
-			workspaceID = &id
-		}
-	}
-
-	envs, err := ctrl.envService.ListEnvironments(customerID, workspaceID)
+	userID := c.GetUint("user_id")
+	envs, err := ctrl.envService.ListEnvironments(userID)
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, err.Error())
 		return

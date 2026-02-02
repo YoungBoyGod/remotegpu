@@ -10,6 +10,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/internal/router"
+	"github.com/YoungBoyGod/remotegpu/pkg/auth"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/YoungBoyGod/remotegpu/pkg/graceful"
 	"github.com/YoungBoyGod/remotegpu/pkg/hotreload"
@@ -89,6 +90,12 @@ func runServer(restartChan chan struct{}) error {
 
 // initInfrastructure 初始化基础设施（数据库、Redis等）
 func initInfrastructure() error {
+	// 初始化 JWT
+	if err := auth.InitJWT(config.GlobalConfig.JWT.Secret, config.GlobalConfig.JWT.ExpireTime); err != nil {
+		return fmt.Errorf("初始化 JWT 失败: %w", err)
+	}
+	logger.GetLogger().Info("JWT 初始化完成")
+
 	// 初始化数据库
 	dbConfig := database.Config{
 		Host:     config.GlobalConfig.Database.Host,

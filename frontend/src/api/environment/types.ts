@@ -4,6 +4,8 @@
 
 export type EnvironmentStatus = 'creating' | 'running' | 'stopped' | 'error' | 'deleting'
 
+export type DeploymentMode = 'k8s_pod' | 'docker_local' | 'vm'
+
 export interface Environment {
   id: string
   customer_id: number
@@ -34,6 +36,7 @@ export interface CreateEnvironmentRequest {
   name: string
   description?: string
   image: string
+  deployment_mode?: DeploymentMode
   cpu: number
   memory: number
   gpu: number

@@ -27,7 +27,7 @@ const router = createRouter({
         if (authStore.user?.role === 'admin') {
           return '/admin/dashboard'
         }
-        return '/portal/dashboard'
+        return '/portal/environments'
       },
     },
     // 管理员路由
@@ -100,6 +100,21 @@ const router = createRouter({
           name: 'admin-download-center',
           component: () => import('@/views/DownloadCenterView.vue'),
         },
+        {
+          path: 'quotas',
+          name: 'admin-quotas',
+          component: () => import('@/views/QuotaManagementView.vue'),
+        },
+        {
+          path: 'quotas/create',
+          name: 'admin-quota-create',
+          component: () => import('@/views/QuotaFormView.vue'),
+        },
+        {
+          path: 'quotas/:id/edit',
+          name: 'admin-quota-edit',
+          component: () => import('@/views/QuotaFormView.vue'),
+        },
       ],
     },
     // 客户门户路由
@@ -110,23 +125,23 @@ const router = createRouter({
       children: [
         {
           path: '',
-          redirect: '/portal/dashboard',
+          redirect: '/portal/environments',
         },
-        {
-          path: 'dashboard',
-          name: 'portal-dashboard',
-          component: () => import('@/views/DashboardView.vue'),
-        },
+        // {
+        //   path: 'dashboard',
+        //   name: 'portal-dashboard',
+        //   component: () => import('@/views/DashboardView.vue'),
+        // },
         {
           path: 'environments',
           name: 'portal-environments',
           component: () => import('@/views/EnvironmentListView.vue'),
         },
-        {
-          path: 'environments/create',
-          name: 'portal-environment-create',
-          component: () => import('@/views/EnvironmentCreateView.vue'),
-        },
+        // {
+        //   path: 'environments/create',
+        //   name: 'portal-environment-create',
+        //   component: () => import('@/views/EnvironmentCreateView.vue'),
+        // },
         {
           path: 'environments/:id',
           name: 'portal-environment-detail',
@@ -162,21 +177,21 @@ const router = createRouter({
           name: 'portal-image-build',
           component: () => import('@/views/ImageBuildView.vue'),
         },
-        {
-          path: 'training',
-          name: 'portal-training',
-          component: () => import('@/views/TrainingListView.vue'),
-        },
-        {
-          path: 'training/create',
-          name: 'portal-training-create',
-          component: () => import('@/views/TrainingCreateView.vue'),
-        },
-        {
-          path: 'training/:id',
-          name: 'portal-training-detail',
-          component: () => import('@/views/TrainingDetailView.vue'),
-        },
+        // {
+        //   path: 'training',
+        //   name: 'portal-training',
+        //   component: () => import('@/views/TrainingListView.vue'),
+        // },
+        // {
+        //   path: 'training/create',
+        //   name: 'portal-training-create',
+        //   component: () => import('@/views/TrainingCreateView.vue'),
+        // },
+        // {
+        //   path: 'training/:id',
+        //   name: 'portal-training-detail',
+        //   component: () => import('@/views/TrainingDetailView.vue'),
+        // },
         {
           path: 'model-repository',
           name: 'portal-model-repository',
@@ -192,6 +207,31 @@ const router = createRouter({
           name: 'portal-workspace',
           component: () => import('@/views/WorkspaceSettingsView.vue'),
         },
+        {
+          path: 'workspaces',
+          name: 'portal-workspaces',
+          component: () => import('@/views/WorkspaceListView.vue'),
+        },
+        {
+          path: 'workspaces/create',
+          name: 'portal-workspace-create',
+          component: () => import('@/views/WorkspaceFormView.vue'),
+        },
+        {
+          path: 'workspaces/:id',
+          name: 'portal-workspace-detail',
+          component: () => import('@/views/WorkspaceDetailView.vue'),
+        },
+        {
+          path: 'workspaces/:id/edit',
+          name: 'portal-workspace-edit',
+          component: () => import('@/views/WorkspaceFormView.vue'),
+        },
+        // {
+        //   path: 'quota-usage',
+        //   name: 'portal-quota-usage',
+        //   component: () => import('@/views/QuotaUsageView.vue'),
+        // },
         {
           path: 'computing-market',
           name: 'portal-computing-market',
@@ -277,11 +317,11 @@ const router = createRouter({
           name: 'environments',
           component: () => import('@/views/EnvironmentListView.vue'),
         },
-        {
-          path: 'environments/create',
-          name: 'environment-create',
-          component: () => import('@/views/EnvironmentCreateView.vue'),
-        },
+        // {
+        //   path: 'environments/create',
+        //   name: 'environment-create',
+        //   component: () => import('@/views/EnvironmentCreateView.vue'),
+        // },
         {
           path: 'environments/:id',
           name: 'environment-detail',
@@ -317,21 +357,21 @@ const router = createRouter({
           name: 'image-build',
           component: () => import('@/views/ImageBuildView.vue'),
         },
-        {
-          path: 'training',
-          name: 'training',
-          component: () => import('@/views/TrainingListView.vue'),
-        },
-        {
-          path: 'training/create',
-          name: 'training-create',
-          component: () => import('@/views/TrainingCreateView.vue'),
-        },
-        {
-          path: 'training/:id',
-          name: 'training-detail',
-          component: () => import('@/views/TrainingDetailView.vue'),
-        },
+        // {
+        //   path: 'training',
+        //   name: 'training',
+        //   component: () => import('@/views/TrainingListView.vue'),
+        // },
+        // {
+        //   path: 'training/create',
+        //   name: 'training-create',
+        //   component: () => import('@/views/TrainingCreateView.vue'),
+        // },
+        // {
+        //   path: 'training/:id',
+        //   name: 'training-detail',
+        //   component: () => import('@/views/TrainingDetailView.vue'),
+        // },
         {
           path: 'settings',
           name: 'settings',
@@ -374,7 +414,7 @@ router.beforeEach(async (to, from, next) => {
     if (authStore.user?.role === 'admin') {
       next('/admin/dashboard')
     } else {
-      next('/portal/dashboard')
+      next('/portal/environments')
     }
     return
   }
@@ -385,7 +425,7 @@ router.beforeEach(async (to, from, next) => {
     if (authStore.user?.role === 'admin') {
       next('/admin/dashboard')
     } else {
-      next('/portal/dashboard')
+      next('/portal/environments')
     }
     return
   }

@@ -34,7 +34,6 @@ func (ctrl *ResourceQuotaController) SetQuota(c *gin.Context) {
 
 	quota := &entity.ResourceQuota{
 		UserID:       req.UserID,
-		WorkspaceID:      req.WorkspaceID,
 		CPU:              req.MaxCPU,
 		Memory:           req.MaxMemory,
 		GPU:              req.MaxGPU,
@@ -145,36 +144,25 @@ func (ctrl *ResourceQuotaController) DeleteQuota(c *gin.Context) {
 
 // GetUsage 获取资源使用情况
 func (ctrl *ResourceQuotaController) GetUsage(c *gin.Context) {
-	customerID, err := strconv.ParseUint(c.Query("customer_id"), 10, 32)
+	userID, err := strconv.ParseUint(c.Query("user_id"), 10, 32)
 	if err != nil {
-		response.Error(c, http.StatusBadRequest, "无效的客户ID")
+		response.Error(c, http.StatusBadRequest, "无效的用户ID")
 		return
 	}
 
-	var workspaceID *uint
-	if wsID := c.Query("workspace_id"); wsID != "" {
-		id, err := strconv.ParseUint(wsID, 10, 32)
-		if err != nil {
-			response.Error(c, http.StatusBadRequest, "无效的工作空间ID")
-			return
-		}
-		wsIDUint := uint(id)
-		workspaceID = &wsIDUint
-	}
-
-	quota, err := ctrl.quotaService.GetQuota(uint(customerID), workspaceID)
+	quota, err := ctrl.quotaService.GetQuota(uint(userID))
 	if err != nil {
 		response.Error(c, http.StatusNotFound, "配额不存在")
 		return
 	}
 
-	used, err := ctrl.quotaService.GetUsedResources(uint(customerID), workspaceID)
+	used, err := ctrl.quotaService.GetUsedResources(uint(userID))
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "获取资源使用情况失败: "+err.Error())
 		return
 	}
 
-	available, err := ctrl.quotaService.GetAvailableQuota(uint(customerID), workspaceID)
+	available, err := ctrl.quotaService.GetAvailableQuota(uint(userID))
 	if err != nil {
 		response.Error(c, http.StatusInternalServerError, "获取可用配额失败: "+err.Error())
 		return
@@ -219,7 +207,6 @@ func (ctrl *ResourceQuotaController) entityToQuotaInfo(quota *entity.ResourceQuo
 	return &v1.QuotaInfo{
 		ID:              quota.ID,
 		UserID:      quota.UserID,
-		WorkspaceID:     quota.WorkspaceID,
 		QuotaLevel:      quota.QuotaLevel,
 		MaxGPU:          quota.GPU,
 		MaxCPU:          quota.CPU,

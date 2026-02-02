@@ -41,6 +41,20 @@ func InitRouter(r *gin.Engine) {
 			// 用户相关（需要认证）
 			auth.GET("/user/info", userController.GetUserInfo)
 			auth.PUT("/user/info", userController.UpdateUser)
+
+			// 资源配额查询（需要认证）
+			auth.GET("/quotas/usage", quotaController.GetUsage)
+
+			// 环境管理（需要认证，普通用户只能操作自己的环境）
+			auth.POST("/environments", environmentController.Create)
+			auth.GET("/environments", environmentController.List)
+			auth.GET("/environments/:id", environmentController.GetByID)
+			auth.DELETE("/environments/:id", environmentController.Delete)
+			auth.POST("/environments/:id/start", environmentController.Start)
+			auth.POST("/environments/:id/stop", environmentController.Stop)
+			auth.POST("/environments/:id/restart", environmentController.Restart)
+			auth.GET("/environments/:id/access", environmentController.GetAccessInfo)
+			auth.GET("/environments/:id/logs", environmentController.GetLogs)
 		}
 
 		// 管理员路由（需要管理员权限）
@@ -67,7 +81,7 @@ func InitRouter(r *gin.Engine) {
 			admin.DELETE("/gpus/:id", gpuController.Delete)
 			admin.POST("/gpus/:id/allocate", gpuController.Allocate)
 			admin.POST("/gpus/:id/release", gpuController.Release)
-			admin.GET("/hosts/:host_id/gpus", gpuController.GetByHostID)
+			admin.GET("/hosts/:id/gpus", gpuController.GetByHostID)
 
 			// 环境管理
 			admin.POST("/environments", environmentController.Create)
@@ -82,10 +96,10 @@ func InitRouter(r *gin.Engine) {
 
 			// 资源配额管理
 			admin.POST("/quotas", quotaController.SetQuota)
+			admin.GET("/quotas", quotaController.List)
 			admin.GET("/quotas/:id", quotaController.GetQuota)
 			admin.PUT("/quotas/:id", quotaController.UpdateQuota)
 			admin.DELETE("/quotas/:id", quotaController.DeleteQuota)
-			admin.GET("/quotas/usage", quotaController.GetUsage)
 		}
 	}
 }

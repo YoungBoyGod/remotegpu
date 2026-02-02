@@ -7,6 +7,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/auth"
+	apperrors "github.com/YoungBoyGod/remotegpu/pkg/errors"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -25,18 +26,18 @@ func NewUserService() *UserService {
 func (s *UserService) Register(req *v1.RegisterRequest) error {
 	// 检查用户名是否存在
 	if _, err := s.customerDao.GetByUsername(req.Username); err == nil {
-		return errors.New("用户名已存在")
+		return apperrors.New(apperrors.ErrorUserExists, "用户名已存在")
 	}
 
 	// 检查邮箱是否存在
 	if _, err := s.customerDao.GetByEmail(req.Email); err == nil {
-		return errors.New("邮箱已存在")
+		return apperrors.New(apperrors.ErrorUserExists, "邮箱已存在")
 	}
 
 	// 加密密码
 	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return err
+		return apperrors.Wrap(apperrors.ErrorServerError, err)
 	}
 
 	// 创建用户
@@ -50,7 +51,10 @@ func (s *UserService) Register(req *v1.RegisterRequest) error {
 		Status:       "active",
 	}
 
-	return s.customerDao.Create(user)
+	if err := s.customerDao.Create(user); err != nil {
+		return apperrors.HandleDatabaseError(err, "创建用户")
+	}
+	return nil
 }
 
 // Login 用户登录
@@ -59,25 +63,25 @@ func (s *UserService) Login(req *v1.LoginRequest) (*v1.LoginResponse, error) {
 	user, err := s.customerDao.GetByUsername(req.Username)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, errors.New("用户名或密码错误")
+			return nil, apperrors.New(apperrors.ErrorPasswordIncorrect, "用户名或密码错误")
 		}
-		return nil, err
+		return nil, apperrors.HandleDatabaseError(err, "查询用户")
 	}
 
 	// 验证密码
 	if err := bcrypt.CompareHashAndPassword([]byte(user.PasswordHash), []byte(req.Password)); err != nil {
-		return nil, errors.New("用户名或密码错误")
+		return nil, apperrors.New(apperrors.ErrorPasswordIncorrect, "用户名或密码错误")
 	}
 
 	// 检查用户状态
 	if user.Status != "active" {
-		return nil, errors.New("用户已被禁用")
+		return nil, apperrors.New(apperrors.ErrorForbidden, "用户已被禁用")
 	}
 
 	// 生成 token
 	token, err := auth.GenerateToken(user.ID, user.Username, user.UserType)
 	if err != nil {
-		return nil, err
+		return nil, apperrors.Wrap(apperrors.ErrorServerError, err)
 	}
 
 	return &v1.LoginResponse{

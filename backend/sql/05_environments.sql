@@ -9,8 +9,7 @@
 -- 开发环境表
 CREATE TABLE IF NOT EXISTS environments (
     id VARCHAR(64) PRIMARY KEY,
-    customer_id BIGINT NOT NULL,
-    workspace_id BIGINT,
+    user_id BIGINT NOT NULL,
     host_id VARCHAR(64) NOT NULL,
     name VARCHAR(128) NOT NULL,
     description TEXT,
@@ -32,8 +31,7 @@ CREATE TABLE IF NOT EXISTS environments (
 );
 
 -- 创建索引
-CREATE INDEX idx_environments_customer ON environments(customer_id);
-CREATE INDEX idx_environments_workspace ON environments(workspace_id);
+CREATE INDEX idx_environments_user ON environments(user_id);
 CREATE INDEX idx_environments_host ON environments(host_id);
 CREATE INDEX idx_environments_status ON environments(status);
 CREATE INDEX idx_environments_created_at ON environments(created_at DESC);

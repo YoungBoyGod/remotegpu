@@ -7,6 +7,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
+	apperrors "github.com/YoungBoyGod/remotegpu/pkg/errors"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -16,8 +17,6 @@ type ResourceQuotaDaoInterface interface {
 	Create(quota *entity.ResourceQuota) error
 	GetByID(id uint) (*entity.ResourceQuota, error)
 	GetByUserID(userID uint) (*entity.ResourceQuota, error)
-	GetByWorkspaceID(workspaceID uint) (*entity.ResourceQuota, error)
-	GetByUserAndWorkspace(userID, workspaceID uint) (*entity.ResourceQuota, error)
 	Update(quota *entity.ResourceQuota) error
 	Delete(id uint) error
 }
@@ -86,60 +85,69 @@ func (e *QuotaExceededError) Error() string {
 func (s *ResourceQuotaService) SetQuota(quota *entity.ResourceQuota) error {
 	// 验证配额值
 	if quota.CPU < 0 || quota.Memory < 0 || quota.GPU < 0 || quota.Storage < 0 {
-		return fmt.Errorf("配额值不能为负数")
+		return apperrors.New(apperrors.ErrorQuotaInvalid, "配额值不能为负数")
 	}
 
 	// 检查是否已存在配额
 	var existing *entity.ResourceQuota
 	var err error
 
-	if quota.WorkspaceID != nil {
-		existing, err = s.quotaDao.GetByUserAndWorkspace(quota.UserID, *quota.WorkspaceID)
-	} else {
-		existing, err = s.quotaDao.GetByUserID(quota.UserID)
-	}
+	existing, err = s.quotaDao.GetByUserID(quota.UserID)
 
 	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
-		return err
+		return apperrors.HandleDatabaseError(err, "查询配额")
 	}
 
 	// 如果已存在，更新；否则创建
 	if existing != nil {
 		quota.ID = existing.ID
-		return s.quotaDao.Update(quota)
+		if err := s.quotaDao.Update(quota); err != nil {
+			return apperrors.HandleDatabaseError(err, "更新配额")
+		}
+		return nil
 	}
 
-	return s.quotaDao.Create(quota)
+	if err := s.quotaDao.Create(quota); err != nil {
+		return apperrors.HandleDatabaseError(err, "创建配额")
+	}
+	return nil
 }
 
 // GetQuota 获取资源配额
-func (s *ResourceQuotaService) GetQuota(userID uint, workspaceID *uint) (*entity.ResourceQuota, error) {
-	if workspaceID != nil {
-		return s.quotaDao.GetByUserAndWorkspace(userID, *workspaceID)
+func (s *ResourceQuotaService) GetQuota(userID uint) (*entity.ResourceQuota, error) {
+	quota, err := s.quotaDao.GetByUserID(userID)
+
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(apperrors.ErrorQuotaNotFound, "配额不存在")
+		}
+		return nil, apperrors.HandleDatabaseError(err, "查询配额")
 	}
-	return s.quotaDao.GetByUserID(userID)
+
+	return quota, nil
 }
 
 // GetQuotaByID 根据ID获取资源配额
 func (s *ResourceQuotaService) GetQuotaByID(id uint) (*entity.ResourceQuota, error) {
-	return s.quotaDao.GetByID(id)
+	quota, err := s.quotaDao.GetByID(id)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, apperrors.New(apperrors.ErrorQuotaNotFound, "配额不存在")
+		}
+		return nil, apperrors.HandleDatabaseError(err, "查询配额")
+	}
+	return quota, nil
 }
 
 // GetQuotaInTx 在事务中获取资源配额（使用悲观锁 FOR UPDATE）
 // 用于需要并发安全的场景，如环境创建时的配额检查
-func (s *ResourceQuotaService) GetQuotaInTx(tx *gorm.DB, customerID uint, workspaceID *uint) (*entity.ResourceQuota, error) {
+func (s *ResourceQuotaService) GetQuotaInTx(tx *gorm.DB, userID uint) (*entity.ResourceQuota, error) {
 	if tx == nil {
 		return nil, fmt.Errorf("事务不能为空")
 	}
 
 	var quota entity.ResourceQuota
-	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("customer_id = ?", customerID)
-
-	if workspaceID != nil {
-		query = query.Where("workspace_id = ?", *workspaceID)
-	} else {
-		query = query.Where("workspace_id IS NULL")
-	}
+	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("user_id = ?", userID)
 
 	if err := query.First(&quota).Error; err != nil {
 		return nil, err
@@ -152,36 +160,40 @@ func (s *ResourceQuotaService) GetQuotaInTx(tx *gorm.DB, customerID uint, worksp
 func (s *ResourceQuotaService) UpdateQuota(quota *entity.ResourceQuota) error {
 	// 验证配额值
 	if quota.CPU < 0 || quota.Memory < 0 || quota.GPU < 0 || quota.Storage < 0 {
-		return fmt.Errorf("配额值不能为负数")
+		return apperrors.New(apperrors.ErrorQuotaInvalid, "配额值不能为负数")
 	}
 
 	// 检查配额是否存在
 	existing, err := s.quotaDao.GetByID(quota.ID)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("配额不存在")
+			return apperrors.New(apperrors.ErrorQuotaNotFound, "配额不存在")
 		}
-		return err
+		return apperrors.HandleDatabaseError(err, "查询配额")
 	}
 
 	// 获取已使用资源
-	used, err := s.GetUsedResources(existing.UserID, existing.WorkspaceID)
+	used, err := s.GetUsedResources(existing.UserID)
 	if err != nil {
-		return fmt.Errorf("获取已使用资源失败: %w", err)
+		return apperrors.WrapWithMessage(apperrors.ErrorServerError, "获取已使用资源失败", err)
 	}
 
 	// 验证新配额是否小于已使用资源
 	if quota.CPU < used.CPU {
-		return fmt.Errorf("CPU配额不能小于已使用量: 已使用%d，新配额%d", used.CPU, quota.CPU)
+		return apperrors.New(apperrors.ErrorQuotaInvalid,
+			fmt.Sprintf("CPU配额不能小于已使用量: 已使用%d，新配额%d", used.CPU, quota.CPU))
 	}
 	if quota.Memory < used.Memory {
-		return fmt.Errorf("内存配额不能小于已使用量: 已使用%dMB，新配额%dMB", used.Memory, quota.Memory)
+		return apperrors.New(apperrors.ErrorQuotaInvalid,
+			fmt.Sprintf("内存配额不能小于已使用量: 已使用%dMB，新配额%dMB", used.Memory, quota.Memory))
 	}
 	if quota.GPU < used.GPU {
-		return fmt.Errorf("GPU配额不能小于已使用量: 已使用%d，新配额%d", used.GPU, quota.GPU)
+		return apperrors.New(apperrors.ErrorQuotaInvalid,
+			fmt.Sprintf("GPU配额不能小于已使用量: 已使用%d，新配额%d", used.GPU, quota.GPU))
 	}
 	if quota.Storage < used.Storage {
-		return fmt.Errorf("存储配额不能小于已使用量: 已使用%dGB，新配额%dGB", used.Storage, quota.Storage)
+		return apperrors.New(apperrors.ErrorQuotaInvalid,
+			fmt.Sprintf("存储配额不能小于已使用量: 已使用%dGB，新配额%dGB", used.Storage, quota.Storage))
 	}
 
 	// 更新字段
@@ -190,7 +202,10 @@ func (s *ResourceQuotaService) UpdateQuota(quota *entity.ResourceQuota) error {
 	existing.GPU = quota.GPU
 	existing.Storage = quota.Storage
 
-	return s.quotaDao.Update(existing)
+	if err := s.quotaDao.Update(existing); err != nil {
+		return apperrors.HandleDatabaseError(err, "更新配额")
+	}
+	return nil
 }
 
 // DeleteQuota 删除资源配额
@@ -199,51 +214,54 @@ func (s *ResourceQuotaService) DeleteQuota(id uint) error {
 	_, err := s.quotaDao.GetByID(id)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("配额不存在")
+			return apperrors.New(apperrors.ErrorQuotaNotFound, "配额不存在")
 		}
-		return err
+		return apperrors.HandleDatabaseError(err, "查询配额")
 	}
 
-	return s.quotaDao.Delete(id)
+	if err := s.quotaDao.Delete(id); err != nil {
+		return apperrors.HandleDatabaseError(err, "删除配额")
+	}
+	return nil
 }
 
 // CheckQuota 检查资源配额是否足够
 // 注意：此方法不保证并发安全。如需在环境创建等场景中使用，请使用 CheckQuotaInTx
-func (s *ResourceQuotaService) CheckQuota(customerID uint, workspaceID *uint, request *ResourceRequest) (bool, error) {
-	return s.checkQuota(nil, customerID, workspaceID, request)
+func (s *ResourceQuotaService) CheckQuota(userID uint, request *ResourceRequest) (bool, error) {
+	return s.checkQuota(nil, userID, request)
 }
 
 // CheckQuotaInTx 在事务中检查资源配额是否足够（使用悲观锁，保证并发安全）
 // 用于环境创建等需要原子性操作的场景
 // 使用方式：
 //   tx := db.Begin()
-//   ok, err := service.CheckQuotaInTx(tx, customerID, workspaceID, request)
+//   ok, err := service.CheckQuotaInTx(tx, userID, request)
 //   if ok {
 //       // 创建环境...
 //       tx.Commit()
 //   } else {
 //       tx.Rollback()
 //   }
-func (s *ResourceQuotaService) CheckQuotaInTx(tx *gorm.DB, customerID uint, workspaceID *uint, request *ResourceRequest) (bool, error) {
+func (s *ResourceQuotaService) CheckQuotaInTx(tx *gorm.DB, userID uint, request *ResourceRequest) (bool, error) {
 	if tx == nil {
 		return false, fmt.Errorf("事务不能为空")
 	}
-	return s.checkQuota(tx, customerID, workspaceID, request)
+	return s.checkQuota(tx, userID, request)
 }
 
 // checkQuota 内部实现：检查资源配额是否足够
 // tx 为 nil 时使用普通查询，不为 nil 时在事务中执行并使用悲观锁
-func (s *ResourceQuotaService) checkQuota(tx *gorm.DB, customerID uint, workspaceID *uint, request *ResourceRequest) (bool, error) {
+func (s *ResourceQuotaService) checkQuota(tx *gorm.DB, userID uint, request *ResourceRequest) (bool, error) {
 	// 1. 获取配额
 	var quota *entity.ResourceQuota
 	var err error
 
 	if tx != nil {
 		// 在事务中使用悲观锁获取配额
-		quota, err = s.GetQuotaInTx(tx, customerID, workspaceID)
+		quota, err = s.GetQuotaInTx(tx, userID)
 	} else {
 		// 普通查询
-		quota, err = s.GetQuota(customerID, workspaceID)
+		quota, err = s.GetQuota(userID)
 	}
 
 	if err != nil {
@@ -254,7 +272,7 @@ func (s *ResourceQuotaService) checkQuota(tx *gorm.DB, customerID uint, workspac
 	}
 
 	// 2. 获取已使用资源
-	used, err := s.GetUsedResources(customerID, workspaceID)
+	used, err := s.GetUsedResources(userID)
 	if err != nil {
 		return false, err
 	}
@@ -299,25 +317,13 @@ func (s *ResourceQuotaService) checkQuota(tx *gorm.DB, customerID uint, workspac
 }
 
 // GetUsedResources 获取已使用的资源
-//
-// 资源统计范围说明：
-// - workspaceID != nil: 统计指定工作空间内的所有运行中和创建中环境的资源使用
-// - workspaceID == nil: 统计用户在所有工作空间的所有运行中和创建中环境的资源使用总和
-//
-// 注意：用户级别配额会统计该用户在所有工作空间中的资源使用，确保用户总资源不超限。
-func (s *ResourceQuotaService) GetUsedResources(customerID uint, workspaceID *uint) (*UsedResources, error) {
+// 统计用户所有运行中和创建中环境的资源使用
+func (s *ResourceQuotaService) GetUsedResources(userID uint) (*UsedResources, error) {
 	db := s.db
 
 	// 查询所有运行中和创建中的环境（创建中的环境也占用资源）
 	var environments []*entity.Environment
-	query := db.Where("customer_id = ? AND status IN ?", customerID, []string{"running", "creating"})
-
-	// 根据 workspaceID 过滤环境范围
-	if workspaceID != nil {
-		// 工作空间级别：只统计该工作空间的环境
-		query = query.Where("workspace_id = ?", *workspaceID)
-	}
-	// 用户级别（workspaceID == nil）：统计该用户所有环境，不添加workspace_id过滤条件
+	query := db.Where("user_id = ? AND status IN ?", userID, []string{"running", "creating"})
 
 	if err := query.Find(&environments).Error; err != nil {
 		return nil, err
@@ -344,15 +350,15 @@ func (s *ResourceQuotaService) GetUsedResources(customerID uint, workspaceID *ui
 }
 
 // GetAvailableQuota 获取可用配额
-func (s *ResourceQuotaService) GetAvailableQuota(customerID uint, workspaceID *uint) (*entity.ResourceQuota, error) {
+func (s *ResourceQuotaService) GetAvailableQuota(userID uint) (*entity.ResourceQuota, error) {
 	// 1. 获取总配额
-	quota, err := s.GetQuota(customerID, workspaceID)
+	quota, err := s.GetQuota(userID)
 	if err != nil {
 		return nil, err
 	}
 
 	// 2. 获取已使用资源
-	used, err := s.GetUsedResources(customerID, workspaceID)
+	used, err := s.GetUsedResources(userID)
 	if err != nil {
 		return nil, err
 	}
@@ -376,8 +382,7 @@ func (s *ResourceQuotaService) GetAvailableQuota(customerID uint, workspaceID *u
 	}
 
 	available := &entity.ResourceQuota{
-		UserID:  customerID,
-		WorkspaceID: workspaceID,
+		UserID:  userID,
 		CPU:         availableCPU,
 		Memory:      availableMemory,
 		GPU:         availableGPU,

@@ -59,26 +59,6 @@ func (d *ResourceQuotaDao) GetByUserID(userID uint) (*entity.ResourceQuota, erro
 	return &quota, nil
 }
 
-// GetByWorkspaceID 根据工作空间ID获取资源配额
-func (d *ResourceQuotaDao) GetByWorkspaceID(workspaceID uint) (*entity.ResourceQuota, error) {
-	var quota entity.ResourceQuota
-	err := d.db.Where("workspace_id = ?", workspaceID).First(&quota).Error
-	if err != nil {
-		return nil, err
-	}
-	return &quota, nil
-}
-
-// GetByUserAndWorkspace 根据用户ID和工作空间ID获取资源配额
-func (d *ResourceQuotaDao) GetByUserAndWorkspace(userID, workspaceID uint) (*entity.ResourceQuota, error) {
-	var quota entity.ResourceQuota
-	err := d.db.Where("user_id = ? AND workspace_id = ?", userID, workspaceID).First(&quota).Error
-	if err != nil {
-		return nil, err
-	}
-	return &quota, nil
-}
-
 // Update 更新资源配额
 func (d *ResourceQuotaDao) Update(quota *entity.ResourceQuota) error {
 	return d.db.Save(quota).Error

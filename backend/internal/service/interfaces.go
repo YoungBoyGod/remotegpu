@@ -40,7 +40,6 @@ type EnvironmentDaoInterface interface {
 	Update(env *entity.Environment) error
 	GetByID(id string) (*entity.Environment, error)
 	GetByUserID(userID uint) ([]*entity.Environment, error)
-	GetByWorkspaceID(workspaceID uint) ([]*entity.Environment, error)
 }
 
 // PortMappingDaoInterface 端口映射DAO接口
@@ -51,7 +50,7 @@ type PortMappingDaoInterface interface {
 
 // ResourceQuotaServiceInterface 配额服务接口
 type ResourceQuotaServiceInterface interface {
-	CheckQuota(customerID uint, workspaceID *uint, req *ResourceRequest) (bool, error)
+	CheckQuota(userID uint, req *ResourceRequest) (bool, error)
 }
 
 // K8sClientInterface K8s客户端接口

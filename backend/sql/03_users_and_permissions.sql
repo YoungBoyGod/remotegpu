@@ -103,8 +103,7 @@ COMMENT ON COLUMN workspace_members.status IS '状态: active-活跃, invited-�
 -- 资源配额表
 CREATE TABLE IF NOT EXISTS resource_quotas (
     id BIGSERIAL PRIMARY KEY,
-    customer_id BIGINT NOT NULL,
-    workspace_id BIGINT,
+    user_id BIGINT NOT NULL,
     quota_level VARCHAR(32) DEFAULT 'free',
     cpu_quota INT DEFAULT 4,
     memory_quota INT DEFAULT 8192,
@@ -116,8 +115,7 @@ CREATE TABLE IF NOT EXISTS resource_quotas (
 );
 
 -- 创建索引
-CREATE INDEX idx_resource_quotas_customer ON resource_quotas(customer_id);
-CREATE INDEX idx_resource_quotas_workspace ON resource_quotas(workspace_id);
+CREATE INDEX idx_resource_quotas_user ON resource_quotas(user_id);
 
 -- 创建更新时间触发器
 CREATE TRIGGER update_resource_quotas_updated_at

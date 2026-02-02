@@ -70,7 +70,7 @@ onMounted(() => {
   <div class="recent-environments">
     <div class="section-header">
       <h3>最近使用的环境</h3>
-      <el-link type="primary" :underline="false" @click="navigateTo('/environments')">
+      <el-link type="primary" underline="never" @click="navigateTo('/environments')">
         查看全部
       </el-link>
     </div>

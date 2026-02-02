@@ -48,6 +48,8 @@ type RedisConfig struct {
 	Port     int    `yaml:"port"`
 	Password string `yaml:"password"`
 	DB       int    `yaml:"db"`
+	PoolSize int    `yaml:"pool_size"` // 连接池大小
+	Timeout  int    `yaml:"timeout"`   // 超时时间(秒)
 }
 
 // JWTConfig JWT 配置

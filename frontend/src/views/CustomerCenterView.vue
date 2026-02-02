@@ -33,6 +33,17 @@ interface Customer {
     gpuUsed: number
     storageUsed: number
   }
+  hosts: {
+    total: number
+    running: number
+    stopped: number
+    hostList: Array<{
+      name: string
+      status: 'running' | 'stopped'
+      gpu: string
+      cpu: string
+    }>
+  }
   issueCount: number
 }
 
@@ -150,6 +161,16 @@ const loadCustomers = async () => {
           gpuUsed: 3,
           storageUsed: 450
         },
+        hosts: {
+          total: 3,
+          running: 2,
+          stopped: 1,
+          hostList: [
+            { name: '北京B区-598机', status: 'running', gpu: 'RTX 5090 x2', cpu: '16核' },
+            { name: '北京B区-353机', status: 'running', gpu: 'RTX 4090 x1', cpu: '8核' },
+            { name: '西北B区-102机', status: 'stopped', gpu: 'RTX 4090 x2', cpu: '16核' }
+          ]
+        },
         issueCount: 2
       },
       {
@@ -170,6 +191,18 @@ const loadCustomers = async () => {
           memoryUsed: 300,
           gpuUsed: 8,
           storageUsed: 1200
+        },
+        hosts: {
+          total: 5,
+          running: 4,
+          stopped: 1,
+          hostList: [
+            { name: '北京A区-201机', status: 'running', gpu: 'RTX 5090 x4', cpu: '32核' },
+            { name: '北京A区-202机', status: 'running', gpu: 'RTX 5090 x4', cpu: '32核' },
+            { name: '重庆A区-301机', status: 'running', gpu: 'RTX 4090 x2', cpu: '16核' },
+            { name: '重庆A区-302机', status: 'running', gpu: 'RTX 4090 x2', cpu: '16核' },
+            { name: '内蒙B区-401机', status: 'stopped', gpu: 'RTX 4090 x1', cpu: '8核' }
+          ]
         },
         issueCount: 0
       }
@@ -294,6 +327,12 @@ const handleSaveCustomer = async () => {
           memoryUsed: 0,
           gpuUsed: 0,
           storageUsed: 0
+        },
+        hosts: {
+          total: 0,
+          running: 0,
+          stopped: 0,
+          hostList: []
         },
         issueCount: 0
       }
@@ -513,14 +552,19 @@ onMounted(() => {
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="资源使用" width="200">
+        <el-table-column label="主机信息" width="250">
           <template #default="{ row }">
-            <div class="resource-usage">
-              <div class="usage-item">
-                GPU: {{ row.resources.gpuUsed }}/{{ row.resources.gpuQuota }}
+            <div class="host-info">
+              <div class="host-summary">
+                <el-tag type="success" size="small">运行中: {{ row.hosts.running }}</el-tag>
+                <el-tag type="info" size="small" style="margin-left: 4px">已停止: {{ row.hosts.stopped }}</el-tag>
               </div>
-              <div class="usage-item">
-                CPU: {{ row.resources.cpuUsed }}/{{ row.resources.cpuQuota }}
+              <div class="host-detail" v-if="row.hosts.running > 0">
+                <div v-for="host in row.hosts.hostList.filter(h => h.status === 'running').slice(0, 2)"
+                     :key="host.name"
+                     class="host-item">
+                  {{ host.name }}: {{ host.gpu }}
+                </div>
               </div>
             </div>
           </template>
@@ -535,7 +579,7 @@ onMounted(() => {
             <el-button size="small" :icon="Edit" @click="handleEditCustomer(row)">
               编辑
             </el-button>
-            <el-button size="small" :icon="Setting" @click="handleConfigResource(row)">
+            <el-button size="small" :icon="Setting" @click="router.push('/admin/computing-market')">
               配置资源
             </el-button>
             <el-button
@@ -745,6 +789,26 @@ onMounted(() => {
 .header-actions {
   display: flex;
   align-items: center;
+}
+
+.host-info {
+  font-size: 13px;
+}
+
+.host-summary {
+  margin-bottom: 6px;
+}
+
+.host-detail {
+  color: #606266;
+}
+
+.host-item {
+  margin-bottom: 2px;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .resource-usage {

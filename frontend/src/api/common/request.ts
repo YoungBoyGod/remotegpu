@@ -9,7 +9,6 @@ import axios, {
   type AxiosError,
 } from 'axios'
 import { ElMessage } from 'element-plus'
-import { mockMatcher } from '@/mock'
 
 // 请求配置
 const config: AxiosRequestConfig = {
@@ -32,37 +31,14 @@ service.interceptors.request.use(
       const metadata = (config as any).metadata || {}
       metadata.startTime = Date.now()
       ;(config as any).metadata = metadata
-      console.debug('[API Request]', {
-        method: config.method,
-        url: config.url,
-        params: config.params,
-        data: config.data,
-      })
-    }
-
-    // Mock 数据拦截
-    const useMock = import.meta.env.VITE_USE_MOCK === 'true'
-    if (useMock) {
-      const mockData = mockMatcher({
-        url: config.url || '',
-        method: config.method || 'get',
-        data: config.data,
-      })
-
-      if (mockData) {
-        // 返回 mock 数据，取消真实请求
-        return Promise.reject({
-          config,
-          response: {
-            data: mockData,
-            status: mockData.code || 200,
-            statusText: 'OK',
-            headers: {},
-            config,
-          },
-          isMock: true,
-        })
-      }
+      console.log(
+        `%c[API Request] %c${config.method?.toUpperCase()} %c${config.url}`,
+        'color: #2196F3; font-weight: bold',
+        'color: #4CAF50; font-weight: bold',
+        'color: #FF9800; font-weight: bold',
+        '\n📤 Params:', config.params,
+        '\n📦 Data:', config.data
+      )
     }
 
     // 从 localStorage 获取 token
@@ -86,12 +62,15 @@ service.interceptors.response.use(
     if (enableDebugLog) {
       const metadata = (response.config as any)?.metadata
       const duration = metadata?.startTime ? Date.now() - metadata.startTime : undefined
-      console.debug('[API Response]', {
-        url: response.config.url,
-        code: res?.code,
-        duration,
-        data: res?.data,
-      })
+      const statusColor = res?.code === 0 ? '#4CAF50' : '#F44336'
+      console.log(
+        `%c[API Response] %c${response.config.url} %c${duration}ms`,
+        'color: #2196F3; font-weight: bold',
+        'color: #FF9800; font-weight: bold',
+        `color: ${statusColor}; font-weight: bold`,
+        '\n✅ Code:', res?.code,
+        '\n📥 Data:', res?.data
+      )
     }
 
     if (res && typeof res.code !== 'undefined' && res.code !== 0) {
@@ -113,27 +92,15 @@ service.interceptors.response.use(
     return res
   },
   (error: AxiosError | any) => {
-    // 处理 Mock 数据
-    if (error.isMock && error.response) {
-      const mockResponse = error.response.data
-
-      // Mock 数据错误处理（如登录失败）
-      if (mockResponse.code !== 200) {
-        ElMessage.error(mockResponse.msg || mockResponse.message || '请求失败')
-        return Promise.reject(mockResponse)
-      }
-
-      // 返回 Mock 数据
-      return mockResponse
-    }
-
     console.error('响应错误:', error)
     if (enableDebugLog) {
-      console.debug('[API Error]', {
-        url: error.config?.url,
-        message: error.message,
-        response: error.response?.data,
-      })
+      console.log(
+        `%c[API Error] %c${error.config?.url}`,
+        'color: #F44336; font-weight: bold',
+        'color: #FF9800; font-weight: bold',
+        '\n❌ Message:', error.message,
+        '\n📛 Response:', error.response?.data
+      )
     }
 
     if (error.response) {

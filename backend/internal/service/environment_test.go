@@ -156,8 +156,8 @@ type MockResourceQuotaService struct {
 	mock.Mock
 }
 
-func (m *MockResourceQuotaService) CheckQuota(customerID uint, workspaceID *uint, req *ResourceRequest) (bool, error) {
-	args := m.Called(customerID, workspaceID, req)
+func (m *MockResourceQuotaService) CheckQuota(userID uint, req *ResourceRequest) (bool, error) {
+	args := m.Called(userID, req)
 	return args.Bool(0), args.Error(1)
 }
 
@@ -519,7 +519,7 @@ func TestCreateEnvironment_QuotaCheckFailed(t *testing.T) {
 	}
 
 	// Mock 配额检查失败
-	mockQuotaService.On("CheckQuota", uint(1), (*uint)(nil), mock.AnythingOfType("*service.ResourceRequest")).Return(false, nil)
+	mockQuotaService.On("CheckQuota", uint(1), mock.AnythingOfType("*service.ResourceRequest")).Return(false, nil)
 
 	service := &EnvironmentService{
 		hostDao:      mockHostDao,
@@ -549,7 +549,7 @@ func TestCreateEnvironment_HostSelectionFailed(t *testing.T) {
 	}
 
 	// Mock 配额检查通过
-	mockQuotaService.On("CheckQuota", uint(1), (*uint)(nil), mock.AnythingOfType("*service.ResourceRequest")).Return(true, nil)
+	mockQuotaService.On("CheckQuota", uint(1), mock.AnythingOfType("*service.ResourceRequest")).Return(true, nil)
 	// Mock 主机选择失败
 	mockHostDao.On("ListByStatus", "active").Return([]*entity.Host{}, nil)
 
@@ -1148,7 +1148,7 @@ func TestCreateEnvironment_QuotaCheckError(t *testing.T) {
 		GPU:    1,
 	}
 
-	mockQuotaService.On("CheckQuota", uint(1), (*uint)(nil), mock.AnythingOfType("*service.ResourceRequest")).Return(false, fmt.Errorf("quota service error"))
+	mockQuotaService.On("CheckQuota", uint(1), mock.AnythingOfType("*service.ResourceRequest")).Return(false, fmt.Errorf("quota service error"))
 
 	service := &EnvironmentService{
 		quotaService: mockQuotaService,

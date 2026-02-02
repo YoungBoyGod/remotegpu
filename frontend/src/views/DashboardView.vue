@@ -4,7 +4,6 @@ import { ElMessage } from 'element-plus'
 import MetricCard from '@/components/dashboard/MetricCard.vue'
 import ResourceChart from '@/components/dashboard/ResourceChart.vue'
 import RecentEnvironments from '@/components/dashboard/RecentEnvironments.vue'
-import RecentJobs from '@/components/dashboard/RecentJobs.vue'
 
 // 加载状态
 const loading = ref(false)
@@ -105,20 +104,14 @@ onMounted(() => {
           <el-button type="success" size="large" class="action-btn">
             上传数据集
           </el-button>
-          <el-button type="warning" size="large" class="action-btn">
-            提交训练任务
-          </el-button>
         </div>
       </el-col>
     </el-row>
 
     <!-- 最近活动 -->
     <el-row :gutter="20" class="recent-section">
-      <el-col :xs="24" :lg="12">
+      <el-col :xs="24">
         <RecentEnvironments />
-      </el-col>
-      <el-col :xs="24" :lg="12">
-        <RecentJobs />
       </el-col>
     </el-row>
   </div>
