@@ -1,50 +1,79 @@
 package router
 
 import (
-	v1 "github.com/YoungBoyGod/remotegpu/internal/controller/v1"
+	"github.com/gin-gonic/gin"
+
+	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
-	"github.com/YoungBoyGod/remotegpu/internal/service"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/YoungBoyGod/remotegpu/pkg/storage"
-	"github.com/gin-gonic/gin"
+
+	// 服务层
+	serviceAllocation "github.com/YoungBoyGod/remotegpu/internal/service/allocation"
+	serviceAuth "github.com/YoungBoyGod/remotegpu/internal/service/auth"
+	serviceCustomer "github.com/YoungBoyGod/remotegpu/internal/service/customer"
+	serviceDataset "github.com/YoungBoyGod/remotegpu/internal/service/dataset"
+	serviceMachine "github.com/YoungBoyGod/remotegpu/internal/service/machine"
+	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
+	serviceStorage "github.com/YoungBoyGod/remotegpu/internal/service/storage"
+	serviceTask "github.com/YoungBoyGod/remotegpu/internal/service/task"
+
+	// 控制器层
+	ctrlAuth "github.com/YoungBoyGod/remotegpu/internal/controller/v1/auth"
+	ctrlCustomer "github.com/YoungBoyGod/remotegpu/internal/controller/v1/customer"
+	ctrlDataset "github.com/YoungBoyGod/remotegpu/internal/controller/v1/dataset"
+	ctrlMachine "github.com/YoungBoyGod/remotegpu/internal/controller/v1/machine"
+	ctrlOps "github.com/YoungBoyGod/remotegpu/internal/controller/v1/ops"
+	ctrlTask "github.com/YoungBoyGod/remotegpu/internal/controller/v1/task"
 )
 
 // InitRouter 初始化路由
 func InitRouter(r *gin.Engine) {
 	db := database.GetDB()
-	// Storage manager should be initialized in main and passed here ideally,
-	// or retrieved from a global/package level if using singleton pattern.
-	// For now assuming it's available via package function or constructing new (lightweight)
-	// In a real app, use dependency injection.
-	storageMgr, _ := storage.NewManager(storage.Config{Type: "local", Local: storage.LocalConfig{RootPath: "./uploads"}})
-
-	// --- Services ---
-	authService := service.NewAuthService(db)
-	machineService := service.NewMachineService(db)
-	allocService := service.NewAllocationService(db)
-	custService := service.NewCustomerService(db)
-	taskService := service.NewTaskService(db)
-	datasetService := service.NewDatasetService(db)
-	opsService := service.NewOpsService(db)
-	agentService := service.NewAgentService()
-	monitorService := service.NewMonitorService()
-	storageService := service.NewStorageService(storageMgr)
-	dashboardService := service.NewDashboardService(machineService, custService, allocService)
-
-	// --- Controllers ---
-	authCtrl := v1.NewAuthController(authService)
-	dashboardCtrl := v1.NewDashboardController(dashboardService)
-	machineCtrl := v1.NewMachineController(machineService, allocService)
-	custCtrl := v1.NewCustomerController(custService)
-	monitorCtrl := v1.NewMonitorController(monitorService)
-	alertCtrl := v1.NewAlertController(opsService)
 	
-	myMachineCtrl := v1.NewMyMachineController(machineService, agentService)
-	taskCtrl := v1.NewTaskController(taskService)
-	datasetCtrl := v1.NewDatasetController(datasetService, storageService, agentService)
+	// 存储设置
+	storageMgr, _ := storage.NewManager(config.GlobalConfig.Storage)
 
+	// 本地存储的静态文件服务（仅开发环境）
+	if config.GlobalConfig.Server.Mode == "debug" {
+		// 假设 "local-main" 是默认或其中一个后端
+		// 更健壮的方式是遍历后端并找到本地的
+		for _, backend := range config.GlobalConfig.Storage.Backends {
+			if backend.Type == "local" && backend.Enabled {
+				// 在 /uploads 路径下提供服务，例如 http://localhost:8080/uploads/filename.jpg
+				r.Static("/uploads", backend.Path)
+				break 
+			}
+		}
+	}
 
-	// API v1 路由组
+	// --- 服务层初始化 ---
+	authSvc := serviceAuth.NewAuthService(db)
+	machineSvc := serviceMachine.NewMachineService(db)
+	allocSvc := serviceAllocation.NewAllocationService(db)
+	custSvc := serviceCustomer.NewCustomerService(db)
+	taskSvc := serviceTask.NewTaskService(db)
+	datasetSvc := serviceDataset.NewDatasetService(db)
+	opsSvc := serviceOps.NewOpsService(db)
+	agentSvc := serviceOps.NewAgentService()
+	monitorSvc := serviceOps.NewMonitorService()
+	storageSvc := serviceStorage.NewStorageService(storageMgr)
+	
+	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc)
+
+	// --- 控制器层初始化 ---
+	authController := ctrlAuth.NewAuthController(authSvc)
+	dashboardController := ctrlOps.NewDashboardController(dashboardSvc)
+	machineController := ctrlMachine.NewMachineController(machineSvc, allocSvc)
+	customerController := ctrlCustomer.NewCustomerController(custSvc)
+	monitorController := ctrlOps.NewMonitorController(monitorSvc)
+	alertController := ctrlOps.NewAlertController(opsSvc)
+	
+	myMachineController := ctrlCustomer.NewMyMachineController(machineSvc, agentSvc)
+	taskController := ctrlTask.NewTaskController(taskSvc)
+	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc)
+
+	// API v1 路由
 	apiV1 := r.Group("/api/v1")
 	{
 		apiV1.GET("/health", func(c *gin.Context) {
@@ -54,58 +83,58 @@ func InitRouter(r *gin.Engine) {
 		// 1. Auth Module
 		authGroup := apiV1.Group("/auth")
 		{
-			authGroup.POST("/login", authCtrl.Login)
-			authGroup.POST("/refresh", authCtrl.Refresh)
-			authGroup.POST("/logout", authCtrl.Logout)
+			authGroup.POST("/login", authController.Login)
+			authGroup.POST("/refresh", authController.Refresh)
+			authGroup.POST("/logout", authController.Logout)
 			
-			// Protected Profile
-			authGroup.GET("/profile", middleware.Auth(), authCtrl.GetProfile)
+			// 受保护的个人资料
+			authGroup.GET("/profile", middleware.Auth(), authController.GetProfile)
 		}
 
 		// 2. Admin Module (Protected + Role Check)
 		adminGroup := apiV1.Group("/admin")
-		adminGroup.Use(middleware.Auth()) // Add middleware.RequireRole("admin")
+		adminGroup.Use(middleware.Auth()) // TODO: 添加 middleware.RequireRole("admin")
 		{
-			// Dashboard
-			adminGroup.GET("/dashboard/stats", dashboardCtrl.GetStats)
-			adminGroup.GET("/dashboard/gpu-trend", dashboardCtrl.GetGPUTrend)
-			adminGroup.GET("/allocations/recent", dashboardCtrl.GetRecentAllocations)
+			// 仪表板
+			adminGroup.GET("/dashboard/stats", dashboardController.GetStats)
+			adminGroup.GET("/dashboard/gpu-trend", dashboardController.GetGPUTrend)
+			adminGroup.GET("/allocations/recent", dashboardController.GetRecentAllocations)
 
-			// Machines
-			adminGroup.GET("/machines", machineCtrl.List)
-			adminGroup.POST("/machines", machineCtrl.Create)
-			adminGroup.POST("/machines/import", machineCtrl.Import)
-			adminGroup.POST("/machines/:id/allocate", machineCtrl.Allocate)
-			adminGroup.POST("/machines/:id/reclaim", machineCtrl.Reclaim)
+			// 机器管理
+			adminGroup.GET("/machines", machineController.List)
+			adminGroup.POST("/machines", machineController.Create)
+			adminGroup.POST("/machines/import", machineController.Import)
+			adminGroup.POST("/machines/:id/allocate", machineController.Allocate)
+			adminGroup.POST("/machines/:id/reclaim", machineController.Reclaim)
 
-			// Customers
-			adminGroup.GET("/customers", custCtrl.List)
-			adminGroup.POST("/customers", custCtrl.Create)
-			adminGroup.POST("/customers/:id/disable", custCtrl.Disable)
+			// 客户管理
+			adminGroup.GET("/customers", customerController.List)
+			adminGroup.POST("/customers", customerController.Create)
+			adminGroup.POST("/customers/:id/disable", customerController.Disable)
 
-			// Monitoring & Ops
-			adminGroup.GET("/monitoring/realtime", monitorCtrl.GetRealtime)
-			adminGroup.GET("/alerts", alertCtrl.List)
+			// 监控与运维
+			adminGroup.GET("/monitoring/realtime", monitorController.GetRealtime)
+			adminGroup.GET("/alerts", alertController.List)
 		}
 
 		// 3. Customer Module (Protected)
 		custGroup := apiV1.Group("/customer")
 		custGroup.Use(middleware.Auth())
 		{
-			// Machines
-			custGroup.GET("/machines", myMachineCtrl.List)
-			custGroup.GET("/machines/:id/connection", myMachineCtrl.GetConnection)
-			custGroup.POST("/machines/:id/ssh-reset", myMachineCtrl.ResetSSH)
+			// 机器管理
+			custGroup.GET("/machines", myMachineController.List)
+			custGroup.GET("/machines/:id/connection", myMachineController.GetConnection)
+			custGroup.POST("/machines/:id/ssh-reset", myMachineController.ResetSSH)
 
-			// Tasks
-			custGroup.GET("/tasks", taskCtrl.List)
-			custGroup.POST("/tasks/training", taskCtrl.CreateTraining)
-			custGroup.POST("/tasks/:id/stop", taskCtrl.Stop)
+			// 任务管理
+			custGroup.GET("/tasks", taskController.List)
+			custGroup.POST("/tasks/training", taskController.CreateTraining)
+			custGroup.POST("/tasks/:id/stop", taskController.Stop)
 
-			// Datasets
-			custGroup.GET("/datasets", datasetCtrl.List)
-			custGroup.POST("/datasets/init-multipart", datasetCtrl.InitUpload)
-			custGroup.POST("/datasets/:id/mount", datasetCtrl.Mount)
+			// 数据集管理
+			custGroup.GET("/datasets", datasetController.List)
+			custGroup.POST("/datasets/init-multipart", datasetController.InitUpload)
+			custGroup.POST("/datasets/:id/mount", datasetController.Mount)
 		}
 	}
 }

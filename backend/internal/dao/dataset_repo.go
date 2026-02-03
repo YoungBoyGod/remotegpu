@@ -7,17 +7,17 @@ import (
 	"gorm.io/gorm"
 )
 
-type DatasetRepo struct {
+type DatasetDao struct {
 	*BaseDao[entity.Dataset]
 }
 
-func NewDatasetRepo(db *gorm.DB) *DatasetRepo {
-	return &DatasetRepo{
+func NewDatasetDao(db *gorm.DB) *DatasetDao {
+	return &DatasetDao{
 		BaseDao: NewBaseDao[entity.Dataset](db),
 	}
 }
 
-func (d *DatasetRepo) ListByCustomerID(ctx context.Context, customerID uint, page, pageSize int) ([]entity.Dataset, int64, error) {
+func (d *DatasetDao) ListByCustomerID(ctx context.Context, customerID uint, page, pageSize int) ([]entity.Dataset, int64, error) {
 	var datasets []entity.Dataset
 	var total int64
 

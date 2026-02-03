@@ -1,7 +1,7 @@
 /**
  * 问题单管理模块 - 类型定义
  */
-import { Timestamps, UUIDField } from '../common/types'
+import type { Timestamps, UUIDField } from '../common/types'
 
 // 问题单
 export interface Issue extends Timestamps, UUIDField {

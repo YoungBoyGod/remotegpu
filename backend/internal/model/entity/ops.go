@@ -6,7 +6,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-// AuditLog records sensitive operations
+// AuditLog 审计日志实体，记录敏感操作
 type AuditLog struct {
 	ID         uint   `gorm:"primarykey" json:"id"`
 	CustomerID *uint  `json:"customer_id,omitempty"`
@@ -24,7 +24,7 @@ type AuditLog struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
-// AlertRule defines conditions for triggering alerts
+// AlertRule 告警规则实体，定义触发告警的条件
 type AlertRule struct {
 	ID         uint    `gorm:"primarykey" json:"id"`
 	Name       string  `gorm:"type:varchar(128);not null" json:"name"`
@@ -37,7 +37,7 @@ type AlertRule struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// ActiveAlert represents currently firing alerts
+// ActiveAlert 活动告警实体，表示当前触发的告警
 type ActiveAlert struct {
 	ID     uint   `gorm:"primarykey" json:"id"`
 	RuleID uint   `gorm:"not null" json:"rule_id"`

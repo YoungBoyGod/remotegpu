@@ -1,7 +1,7 @@
 /**
  * 镜像管理模块 - 类型定义
  */
-import { Timestamps } from '../common/types'
+import type { Timestamps } from '../common/types'
 
 // 镜像信息
 export interface Image extends Timestamps {

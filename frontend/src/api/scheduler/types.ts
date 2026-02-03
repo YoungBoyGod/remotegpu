@@ -1,7 +1,7 @@
 /**
  * 资源调度模块 - 类型定义
  */
-import { Timestamps } from '../common/types'
+import type { Timestamps } from '../common/types'
 
 // 调度策略
 export interface SchedulerPolicy extends Timestamps {

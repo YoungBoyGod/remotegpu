@@ -1,7 +1,7 @@
 /**
  * CMDB 设备管理模块 - 类型定义
  */
-import { Timestamps, UUIDField } from '../common/types'
+import type { Timestamps, UUIDField } from '../common/types'
 
 // 资产状态
 export type OperationalStatus = 'available' | 'maintenance' | 'faulty' | 'retired' | 'reserved'

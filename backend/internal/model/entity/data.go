@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Image represents a system or custom Docker image
+// Image 镜像实体，表示系统或自定义 Docker 镜像
 type Image struct {
 	ID          uint   `gorm:"primarykey" json:"id"`
 	Name        string `gorm:"type:varchar(256);not null;unique" json:"name"`
@@ -23,7 +23,7 @@ type Image struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
-// Dataset represents a collection of data files
+// Dataset 数据集实体，表示数据文件的集合
 type Dataset struct {
 	BaseEntity
 	UUID string `gorm:"type:uuid;default:uuid_generate_v4();uniqueIndex;not null" json:"uuid"`
@@ -46,7 +46,7 @@ type Dataset struct {
 	DatasetMounts []DatasetMount `gorm:"foreignKey:DatasetID" json:"mounts,omitempty"`
 }
 
-// DatasetMount represents a dataset mounted on a specific host
+// DatasetMount 数据集挂载实体，表示挂载到特定主机上的数据集
 type DatasetMount struct {
 	ID        uint   `gorm:"primarykey" json:"id"`
 	DatasetID uint   `gorm:"not null" json:"dataset_id"`

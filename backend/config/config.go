@@ -15,6 +15,7 @@ type Config struct {
 	JWT        JWTConfig        `yaml:"jwt"`
 	Log        LogConfig        `yaml:"log"`
 	Storage    StorageConfig    `yaml:"storage"`
+	Mail       MailConfig       `yaml:"mail"` // 新增邮件配置
 	Harbor     HarborConfig     `yaml:"harbor"`
 	Etcd       EtcdConfig       `yaml:"etcd"`
 	Prometheus PrometheusConfig `yaml:"prometheus"`
@@ -85,6 +86,17 @@ type StorageBackend struct {
 	AccessKey string `yaml:"access_key"` // 访问密钥
 	SecretKey string `yaml:"secret_key"` // 秘密密钥
 	Bucket    string `yaml:"bucket"`     // 存储桶名称
+}
+
+// MailConfig 邮件配置
+type MailConfig struct {
+	Enabled  bool   `yaml:"enabled"`
+	Host     string `yaml:"host"`
+	Port     int    `yaml:"port"`
+	User     string `yaml:"user"`
+	Password string `yaml:"password"`
+	From     string `yaml:"from"`     // 发件人名称
+	UseSSL   bool   `yaml:"use_ssl"`  // 是否使用 SSL/TLS
 }
 
 // HarborConfig Harbor 镜像仓库配置

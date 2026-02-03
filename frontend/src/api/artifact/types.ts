@@ -1,7 +1,7 @@
 /**
  * 制品管理模块 - 类型定义
  */
-import { Timestamps } from '../common/types'
+import type { Timestamps } from '../common/types'
 
 // 制品类型
 export type ArtifactType = 'python' | 'npm' | 'maven' | 'docker' | 'generic'

@@ -6,7 +6,7 @@ import (
 	"gorm.io/datatypes"
 )
 
-// Task represents a training or inference job
+// Task 任务实体，表示训练或推理作业
 type Task struct {
 	ID         string `gorm:"primarykey;type:varchar(64)" json:"id"`
 	CustomerID uint   `gorm:"not null" json:"customer_id"`

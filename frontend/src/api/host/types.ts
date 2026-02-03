@@ -1,7 +1,7 @@
 /**
  * Host Management Module - Type Definitions
  */
-import { PaginationParams } from '../common/types'
+import type { PaginationParams } from '../common/types'
 
 export interface Host {
   id: string

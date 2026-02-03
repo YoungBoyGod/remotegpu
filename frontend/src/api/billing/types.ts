@@ -1,7 +1,7 @@
 /**
  * 计费管理模块 - 类型定义
  */
-import { Timestamps } from '../common/types'
+import type { Timestamps } from '../common/types'
 
 // 计费记录
 export interface BillingRecord extends Timestamps {

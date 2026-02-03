@@ -1,7 +1,7 @@
 /**
  * 需求单管理模块 - 类型定义
  */
-import { Timestamps, UUIDField } from '../common/types'
+import type { Timestamps, UUIDField } from '../common/types'
 
 // 需求单
 export interface Requirement extends Timestamps, UUIDField {

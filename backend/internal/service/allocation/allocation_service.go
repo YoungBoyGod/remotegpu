@@ -1,0 +1,113 @@
+package allocation
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/YoungBoyGod/remotegpu/internal/dao"
+	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	"github.com/google/uuid"
+	"gorm.io/gorm"
+)
+
+type AllocationService struct {
+	db            *gorm.DB
+	allocationDao *dao.AllocationDao
+	machineDao    *dao.MachineDao
+}
+
+func NewAllocationService(db *gorm.DB) *AllocationService {
+	return &AllocationService{
+		db:            db,
+		allocationDao: dao.NewAllocationDao(db),
+		machineDao:    dao.NewMachineDao(db),
+	}
+}
+
+func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint, hostID string, durationMonths int, remark string) (*entity.Allocation, error) {
+	// 使用事务确保原子性
+	var allocation *entity.Allocation
+	
+	err := s.db.Transaction(func(tx *gorm.DB) error {
+		machineDao := dao.NewMachineDao(tx)
+		allocationDao := dao.NewAllocationDao(tx)
+
+		// 1. 检查机器状态 (如果可能应加锁，此处仅检查状态)
+		host, err := machineDao.FindByID(ctx, hostID)
+		if err != nil {
+			return err
+		}
+		if host.Status != "idle" && host.Status != "online" { // 假设 'online' 表示空闲/可用
+			return errors.New("机器不可用")
+		}
+
+		// 2. 更新机器状态
+		if err := machineDao.UpdateStatus(ctx, hostID, "allocated"); err != nil {
+			return err
+		}
+
+		// 3. 创建分配记录
+		startTime := time.Now()
+		endTime := startTime.AddDate(0, durationMonths, 0)
+		allocation = &entity.Allocation{
+			ID:         "alloc-" + uuid.New().String(),
+			CustomerID: customerID,
+			HostID:     hostID,
+			StartTime:  startTime,
+			EndTime:    endTime,
+			Status:     "active",
+			Remark:     remark,
+		}
+		if err := allocationDao.Create(ctx, allocation); err != nil {
+			return err
+		}
+		
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	// TODO: 异步触发 Agent 重置 SSH
+	// go s.agentService.ResetMachine(hostID)
+
+	return allocation, nil
+}
+
+func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) error {
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		machineDao := dao.NewMachineDao(tx)
+		allocationDao := dao.NewAllocationDao(tx)
+
+		// 1. 查找活跃分配
+		alloc, err := allocationDao.FindActiveByHostID(ctx, hostID)
+		if err != nil {
+			return fmt.Errorf("未找到活跃分配: %w", err)
+		}
+
+		// 2. 更新分配状态
+		now := time.Now()
+		alloc.Status = "reclaimed"
+		alloc.ActualEndTime = &now
+		// 在实际 dao 中，应该有特定的更新方法或使用通用更新
+		if err := tx.Save(alloc).Error; err != nil {
+			return err
+		}
+
+		// 3. 更新机器状态 (进入维护/清理状态)
+		if err := machineDao.UpdateStatus(ctx, hostID, "maintenance"); err != nil {
+			return err
+		}
+
+		return nil
+	})
+	
+	// TODO: 触发清理流程
+}
+
+func (s *AllocationService) GetRecent(ctx context.Context) ([]entity.Allocation, error) {
+	return s.allocationDao.FindRecent(ctx, 5)
+}

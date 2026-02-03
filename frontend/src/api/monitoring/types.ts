@@ -1,7 +1,7 @@
 /**
  * 监控告警模块 - 类型定义
  */
-import { Timestamps } from '../common/types'
+import type { Timestamps } from '../common/types'
 
 // 监控指标
 export interface Metric {

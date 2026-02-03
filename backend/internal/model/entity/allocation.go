@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Allocation represents a resource allocation (lease) to a customer
+// Allocation 资源分配实体，表示分配给客户的资源（租约）
 type Allocation struct {
 	ID          string `gorm:"primarykey;type:varchar(64)" json:"id"`
 	CustomerID  uint   `gorm:"not null;index" json:"customer_id"`

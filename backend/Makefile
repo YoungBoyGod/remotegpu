@@ -10,11 +10,11 @@ help:
 
 build:
 	@echo "编译项目..."
-	@go build -o bin/server cmd/main.go
+	@go build -o bin/server ./cmd
 
 run:
 	@echo "运行项目..."
-	@go run cmd/main.go
+	@go run ./cmd
 
 dev:
 	@echo "启动开发模式（热更新）..."

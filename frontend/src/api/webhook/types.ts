@@ -1,7 +1,7 @@
 /**
  * Webhook 管理模块 - 类型定义
  */
-import { Timestamps } from '../common/types'
+import type { Timestamps } from '../common/types'
 
 // Webhook 事件类型
 export type WebhookEvent =

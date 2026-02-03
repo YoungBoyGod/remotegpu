@@ -4,12 +4,10 @@ import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
-import { useRoleNavigation } from '@/composables/useRoleNavigation'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const { navigateTo } = useRoleNavigation()
 
 // 表单数据
 const loginForm = reactive({
@@ -47,7 +45,6 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
         await authStore.login({
           username: loginForm.username,
           password: loginForm.password,
-          remember_me: loginForm.remember,
         })
         ElMessage.success('登录成功')
         router.push('/')
@@ -60,17 +57,6 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
   })
 }
 
-// 一键填写管理员账号
-const fillAdminAccount = () => {
-  loginForm.username = 'admin'
-  loginForm.password = 'admin123'
-}
-
-// 一键填写普通用户账号
-const fillUserAccount = () => {
-  loginForm.username = 'user'
-  loginForm.password = 'user123'
-}
 </script>
 
 <template>
@@ -113,7 +99,9 @@ const fillUserAccount = () => {
         <el-form-item>
           <div class="login-options">
             <el-checkbox v-model="loginForm.remember">记住我</el-checkbox>
-            <el-link type="primary" underline="never">忘记密码？</el-link>
+            <el-link type="primary" underline="never" @click="router.push('/forgot-password')">
+              忘记密码？
+            </el-link>
           </div>
         </el-form-item>
 
@@ -129,28 +117,8 @@ const fillUserAccount = () => {
         </el-form-item>
       </el-form>
 
-      <!-- 快速登录按钮 -->
-      <div class="quick-login">
-        <el-button
-          class="quick-login-btn"
-          @click="fillAdminAccount"
-        >
-          管理员账号
-        </el-button>
-        <el-button
-          class="quick-login-btn"
-          @click="fillUserAccount"
-        >
-          普通用户账号
-        </el-button>
-      </div>
-
-      <!-- 注册链接 -->
       <div class="login-footer">
-        <span>还没有账号？</span>
-        <el-link type="primary" underline="never" @click="router.push('/register')">
-          立即注册
-        </el-link>
+        <span>请使用公司账号登录</span>
       </div>
     </div>
   </div>
@@ -208,26 +176,10 @@ const fillUserAccount = () => {
   font-size: 16px;
 }
 
-.quick-login {
-  display: flex;
-  gap: 12px;
-  margin-top: 20px;
-  margin-bottom: 20px;
-}
-
-.quick-login-btn {
-  flex: 1;
-  height: 36px;
-}
-
 .login-footer {
   text-align: center;
   margin-top: 24px;
   font-size: 14px;
   color: #606266;
-}
-
-.login-footer span {
-  margin-right: 8px;
 }
 </style>

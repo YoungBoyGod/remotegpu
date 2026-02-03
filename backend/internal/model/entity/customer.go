@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Customer represents a user/tenant in the system
+// Customer 客户实体，表示系统中的用户/租户
 type Customer struct {
 	BaseEntity
 	UUID string `gorm:"type:uuid;default:uuid_generate_v4();uniqueIndex;not null" json:"uuid"`
@@ -42,12 +42,12 @@ type Customer struct {
 	Workspaces  []Workspace  `gorm:"foreignKey:OwnerID" json:"workspaces,omitempty"`
 }
 
-// TableName overrides the table name used by User to `customers`
+// TableName 覆盖 User 使用的表名为 `customers`
 func (Customer) TableName() string {
 	return "customers"
 }
 
-// SSHKey represents an SSH public key added by a customer
+// SSHKey SSH密钥实体，表示客户添加的 SSH 公钥
 type SSHKey struct {
 	ID         uint      `gorm:"primarykey" json:"id"`
 	CustomerID uint      `gorm:"not null;index" json:"customer_id"`
@@ -57,7 +57,7 @@ type SSHKey struct {
 	CreatedAt  time.Time `json:"created_at"`
 }
 
-// Workspace represents a logical grouping of resources (Team)
+// Workspace 工作空间实体，表示资源的逻辑分组（团队）
 type Workspace struct {
 	ID        uint      `gorm:"primarykey" json:"id"`
 	UUID      string    `gorm:"type:uuid;default:uuid_generate_v4();uniqueIndex;not null" json:"uuid"`

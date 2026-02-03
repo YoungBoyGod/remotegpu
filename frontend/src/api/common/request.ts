@@ -42,7 +42,7 @@ service.interceptors.request.use(
     }
 
     // 从 localStorage 获取 token
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('accessToken')
     if (token) {
       config.headers.Authorization = `Bearer ${token}`
     }
@@ -74,11 +74,11 @@ service.interceptors.response.use(
     }
 
     if (res && typeof res.code !== 'undefined' && res.code !== 0) {
-      const message = res.msg || res.message || '请求失败'
+      const message = res.message || res.msg || '请求失败'
 
       if (res.code === 401) {
         ElMessage.error('未授权，请重新登录')
-        localStorage.removeItem('token')
+        localStorage.removeItem('accessToken')
         window.location.href = '/login'
       } else if (res.code === 403) {
         ElMessage.error('拒绝访问')
@@ -110,7 +110,7 @@ service.interceptors.response.use(
         case 401:
           ElMessage.error('未授权，请重新登录')
           // 清除 token 并跳转到登录页
-          localStorage.removeItem('token')
+          localStorage.removeItem('accessToken')
           window.location.href = '/login'
           break
         case 403:

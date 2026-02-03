@@ -36,8 +36,8 @@ func Auth() gin.HandlerFunc {
 			return
 		}
 
-		// 将用户信息存入上下文
-		c.Set("user_id", claims.UserID)
+		// 将用户信息存入上下文 (Fixed Key Name)
+		c.Set("userID", claims.UserID) // Changed from user_id
 		c.Set("username", claims.Username)
 		c.Set("role", claims.Role)
 

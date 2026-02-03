@@ -1,7 +1,7 @@
 /**
  * 数据与存储模块 - 类型定义
  */
-import { Timestamps, UUIDField } from '../common/types'
+import type { Timestamps, UUIDField } from '../common/types'
 
 // 可见性类型
 export type Visibility = 'public' | 'workspace' | 'private'

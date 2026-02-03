@@ -16,6 +16,7 @@ interface Machine {
   gpuDriver: string
   status: 'available' | 'allocated'
   loginInfo: {
+    host: string      // SSH域名
     ip: string
     port: number
     username: string
@@ -138,10 +139,11 @@ const loadMachines = async () => {
         gpuDriver: '580.76.05',
         status: 'available',
         loginInfo: {
+          host: '6hiflzwte2xnkroq.ssh.x-gpu.com',
           ip: '192.168.1.101',
-          port: 22,
+          port: 56376,
           username: 'root',
-          password: 'Abc123456'
+          password: 'kD2oTIydfOKmQadjma0gH5JyDApG0uWn'
         }
       },
       {
@@ -157,10 +159,11 @@ const loadMachines = async () => {
         gpuDriver: '580.76.05',
         status: 'available',
         loginInfo: {
+          host: '8mxp3vkwn7qjzrla.ssh.x-gpu.com',
           ip: '192.168.1.102',
-          port: 22,
+          port: 52847,
           username: 'root',
-          password: 'Abc123456'
+          password: 'Pq9xLm3nVb8cWdRt2fYhGj5kZa1sXe4u'
         }
       },
       // RTX 5090 - 已分配
@@ -177,10 +180,11 @@ const loadMachines = async () => {
         gpuDriver: '580.76.05',
         status: 'allocated',
         loginInfo: {
+          host: '4ry2bwqn9xjk5tpm.ssh.x-gpu.com',
           ip: '192.168.2.201',
-          port: 22,
+          port: 58923,
           username: 'root',
-          password: 'Abc123456'
+          password: 'Hn7vBx4mQp2wKj9rLt6cYf3sZa8dGe1n'
         },
         allocatedTo: {
           customerId: 1,
@@ -203,10 +207,11 @@ const loadMachines = async () => {
         gpuDriver: '535.54.03',
         status: 'available',
         loginInfo: {
+          host: '7nz5qwxm3pjk8rla.ssh.x-gpu.com',
           ip: '192.168.3.102',
-          port: 22,
+          port: 54129,
           username: 'root',
-          password: 'Abc123456'
+          password: 'Wt8xNm5vQp3rKj7cLb2yFh9sZa6dGe4n'
         }
       },
       {
@@ -222,10 +227,11 @@ const loadMachines = async () => {
         gpuDriver: '535.54.03',
         status: 'available',
         loginInfo: {
+          host: '2bv9xwqn5mjk7tpl.ssh.x-gpu.com',
           ip: '192.168.4.301',
-          port: 22,
+          port: 51638,
           username: 'root',
-          password: 'Abc123456'
+          password: 'Yx3mQp8vKj5rLt2cWb9nFh7sZa4dGe6x'
         }
       },
       // RTX 4090 - 已分配
@@ -242,10 +248,11 @@ const loadMachines = async () => {
         gpuDriver: '535.54.03',
         status: 'allocated',
         loginInfo: {
+          host: '9kx4pwqn6mjz8rla.ssh.x-gpu.com',
           ip: '192.168.4.302',
-          port: 22,
+          port: 59274,
           username: 'root',
-          password: 'Abc123456'
+          password: 'Zm6vQp4xKj8rLt3cWb5nFh2sYa9dGe7x'
         },
         allocatedTo: {
           customerId: 2,
@@ -268,10 +275,11 @@ const loadMachines = async () => {
         gpuDriver: '535.54.03',
         status: 'available',
         loginInfo: {
+          host: '3cx7vwqn2mjk9tpl.ssh.x-gpu.com',
           ip: '192.168.5.401',
-          port: 22,
+          port: 53845,
           username: 'root',
-          password: 'Abc123456'
+          password: 'Rt5xQp9vKj2rLt7cWb4nFh8sZa3dGe6m'
         }
       }
     ]
@@ -534,17 +542,24 @@ onMounted(() => {
                     <span>驱动: {{ machine.gpuDriver }}</span>
                   </div>
                   <div class="login-info">
+                    <div class="login-title">SSH 登录信息</div>
                     <div class="login-item">
-                      <span class="login-label">IP地址：</span>
-                      <span class="login-value">{{ machine.loginInfo.ip }}:{{ machine.loginInfo.port }}</span>
+                      <span class="login-label">连接主机：</span>
+                      <span class="login-value">{{ machine.loginInfo.host }}</span>
                     </div>
                     <div class="login-item">
-                      <span class="login-label">用户名：</span>
+                      <span class="login-label">端口：</span>
+                      <span class="login-value">{{ machine.loginInfo.port }}</span>
+                    </div>
+                    <div class="login-item">
+                      <span class="login-label">用户：</span>
                       <span class="login-value">{{ machine.loginInfo.username }}</span>
+                      <span class="login-label" style="margin-left: 20px">密码：</span>
+                      <span class="login-value">{{ machine.loginInfo.password }}</span>
                     </div>
                     <div class="login-item">
-                      <span class="login-label">密码：</span>
-                      <span class="login-value">{{ machine.loginInfo.password }}</span>
+                      <span class="login-label">连接命令：</span>
+                      <span class="login-value">ssh -p {{ machine.loginInfo.port }} {{ machine.loginInfo.username }}@{{ machine.loginInfo.host }}</span>
                     </div>
                   </div>
                 </div>
@@ -589,17 +604,24 @@ onMounted(() => {
                     <span>驱动: {{ machine.gpuDriver }}</span>
                   </div>
                   <div class="login-info">
+                    <div class="login-title">SSH 登录信息</div>
                     <div class="login-item">
-                      <span class="login-label">IP地址：</span>
-                      <span class="login-value">{{ machine.loginInfo.ip }}:{{ machine.loginInfo.port }}</span>
+                      <span class="login-label">连接主机：</span>
+                      <span class="login-value">{{ machine.loginInfo.host }}</span>
                     </div>
                     <div class="login-item">
-                      <span class="login-label">用户名：</span>
+                      <span class="login-label">端口：</span>
+                      <span class="login-value">{{ machine.loginInfo.port }}</span>
+                    </div>
+                    <div class="login-item">
+                      <span class="login-label">用户：</span>
                       <span class="login-value">{{ machine.loginInfo.username }}</span>
+                      <span class="login-label" style="margin-left: 20px">密码：</span>
+                      <span class="login-value">{{ machine.loginInfo.password }}</span>
                     </div>
                     <div class="login-item">
-                      <span class="login-label">密码：</span>
-                      <span class="login-value">{{ machine.loginInfo.password }}</span>
+                      <span class="login-label">连接命令：</span>
+                      <span class="login-value">ssh -p {{ machine.loginInfo.port }} {{ machine.loginInfo.username }}@{{ machine.loginInfo.host }}</span>
                     </div>
                   </div>
                   <div class="allocation-info">
@@ -884,10 +906,19 @@ onMounted(() => {
 
 .login-info {
   margin-top: 8px;
-  padding: 8px;
+  padding: 10px;
   background: #f0f9ff;
   border-radius: 4px;
   border: 1px solid #d1e7ff;
+}
+
+.login-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #409EFF;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #d1e7ff;
 }
 
 .login-item {
@@ -903,7 +934,7 @@ onMounted(() => {
 
 .login-label {
   color: #606266;
-  min-width: 60px;
+  min-width: 70px;
   font-weight: 500;
 }
 

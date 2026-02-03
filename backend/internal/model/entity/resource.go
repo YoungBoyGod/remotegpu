@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Host represents a physical machine or node
+// Host 主机实体，表示物理机器或节点
 type Host struct {
 	ID       string `gorm:"primarykey;type:varchar(64)" json:"id"` // Machine ID, e.g., "node-01"
 	Name     string `gorm:"type:varchar(128);not null" json:"name"`
@@ -39,7 +39,7 @@ type Host struct {
 	Allocations []Allocation `gorm:"foreignKey:HostID" json:"allocations,omitempty"`
 }
 
-// GPU represents a GPU device on a host
+// GPU GPU 设备实体，表示主机上的 GPU 设备
 type GPU struct {
 	ID     uint   `gorm:"primarykey" json:"id"`
 	HostID string `gorm:"type:varchar(64);not null;index;uniqueIndex:idx_host_gpu_index" json:"host_id"`

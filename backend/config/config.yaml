@@ -44,23 +44,14 @@ storage:
       secret_key: "19IEWuomU63LpKsVtHkJgPCcTx0evdfAOGDqwX7h"
       bucket: "remotegpu"
 
-    - name: "s3-aws"
-      type: s3
-      enabled: false
-      endpoint: ""
-      region: "us-east-1"
-      access_key: "xxx"
-      secret_key: "xxx"
-      bucket: "bucket1"
-
-    - name: "s3-aliyun"
-      type: s3
-      enabled: false
-      endpoint: "https://oss-cn-hangzhou.aliyuncs.com"
-      region: "cn-hangzhou"
-      access_key: "xxx"
-      secret_key: "xxx"
-      bucket: "bucket2"
+mail:
+  enabled: false
+  host: "smtp.example.com"
+  port: 587
+  user: "alert@example.com"
+  password: "your_password"
+  from: "RemoteGPU Alert"
+  use_ssl: false
 
 harbor:
   enabled: true

@@ -3,8 +3,8 @@ package deployment
 import (
 	"fmt"
 
-	"github.com/YoungBoyGod/remotegpu/pkg/network"
-	"github.com/YoungBoyGod/remotegpu/pkg/volume"
+	"github.com/YoungBoyGod/remotegpu/pkg/infra/network"
+	"github.com/YoungBoyGod/remotegpu/pkg/infra/volume"
 )
 
 // DockerDeploymentConfig Docker 部署配置

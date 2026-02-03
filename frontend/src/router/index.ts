@@ -1,6 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
+// 布局组件
+const AdminLayout = () => import('@/components/layout/AdminLayout.vue')
+const CustomerLayout = () => import('@/components/layout/CustomerLayout.vue')
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -11,15 +15,14 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
-      path: '/register',
-      name: 'register',
-      component: () => import('@/views/RegisterView.vue'),
+      path: '/forgot-password',
+      name: 'forgot-password',
+      component: () => import('@/views/ForgotPasswordView.vue'),
       meta: { requiresAuth: false },
     },
     {
       path: '/',
       redirect: (to) => {
-        // 根据用户角色重定向到不同的首页
         const authStore = useAuthStore()
         if (!authStore.isAuthenticated) {
           return '/login'
@@ -27,13 +30,13 @@ const router = createRouter({
         if (authStore.user?.role === 'admin') {
           return '/admin/dashboard'
         }
-        return '/portal/environments'
+        return '/customer/dashboard'
       },
     },
     // 管理员路由
     {
       path: '/admin',
-      component: () => import('@/layouts/MainLayout.vue'),
+      component: AdminLayout,
       meta: { requiresAuth: true, requiresRole: 'admin' },
       children: [
         {
@@ -43,346 +46,92 @@ const router = createRouter({
         {
           path: 'dashboard',
           name: 'admin-dashboard',
-          component: () => import('@/views/DashboardView.vue'),
+          component: () => import('@/views/admin/DashboardView.vue'),
+          meta: { title: '管理后台首页' },
+        },
+        // 机器管理
+        {
+          path: 'machines/list',
+          name: 'admin-machines-list',
+          component: () => import('@/views/admin/MachineListView.vue'),
+          meta: { title: '机器列表' },
         },
         {
-          path: 'resource-center',
-          name: 'admin-resource-center',
-          component: () => import('@/views/ResourceCenterView.vue'),
+          path: 'machines/add',
+          name: 'admin-machines-add',
+          component: () => import('@/views/admin/MachineAddView.vue'),
+          meta: { title: '添加机器' },
+        },
+        // 客户管理
+        {
+          path: 'customers/list',
+          name: 'admin-customers-list',
+          component: () => import('@/views/admin/CustomerListView.vue'),
+          meta: { title: '客户列表' },
         },
         {
-          path: 'resource-platform',
-          name: 'admin-resource-platform',
-          component: () => import('@/views/ResourcePlatformView.vue'),
+          path: 'customers/:id',
+          name: 'admin-customers-detail',
+          component: () => import('@/views/admin/CustomerDetailView.vue'),
+          meta: { title: '客户详情' },
+        },
+        // 分配管理
+        {
+          path: 'allocations/list',
+          name: 'admin-allocations-list',
+          component: () => import('@/views/admin/AllocationListView.vue'),
+          meta: { title: '分配记录' },
         },
         {
-          path: 'resource-list',
-          name: 'admin-resource-list',
-          component: () => import('@/views/ResourceListView.vue'),
+          path: 'allocations/quick',
+          name: 'admin-allocations-quick',
+          component: () => import('@/views/admin/QuickAllocateView.vue'),
+          meta: { title: '快速分配' },
         },
         {
-          path: 'monitoring-center',
-          name: 'admin-monitoring-center',
-          component: () => import('@/views/MonitoringCenterView.vue'),
-        },
-        {
-          path: 'alert-center',
-          name: 'admin-alert-center',
-          component: () => import('@/views/AlertCenterView.vue'),
-        },
-        {
-          path: 'customer-center',
-          name: 'admin-customer-center',
-          component: () => import('@/views/CustomerCenterView.vue'),
-        },
-        {
-          path: 'customer-center/:id',
-          name: 'admin-customer-dashboard',
-          component: () => import('@/views/CustomerDashboardView.vue'),
-        },
-        {
-          path: 'computing-market',
-          name: 'admin-computing-market',
-          component: () => import('@/views/ComputingMarketView.vue'),
-        },
-        {
-          path: 'release-version',
-          name: 'admin-release-version',
-          component: () => import('@/views/ReleaseVersionView.vue'),
-        },
-        {
-          path: 'document-center',
-          name: 'admin-document-center',
-          component: () => import('@/views/DocumentCenterView.vue'),
-        },
-        {
-          path: 'download-center',
-          name: 'admin-download-center',
-          component: () => import('@/views/DownloadCenterView.vue'),
-        },
-        {
-          path: 'quotas',
-          name: 'admin-quotas',
-          component: () => import('@/views/QuotaManagementView.vue'),
-        },
-        {
-          path: 'quotas/create',
-          name: 'admin-quota-create',
-          component: () => import('@/views/QuotaFormView.vue'),
-        },
-        {
-          path: 'quotas/:id/edit',
-          name: 'admin-quota-edit',
-          component: () => import('@/views/QuotaFormView.vue'),
+          path: ':pathMatch(.*)*',
+          name: 'admin-coming-soon',
+          component: () => import('@/views/ComingSoonView.vue'),
+          meta: { title: '功能开发中' },
         },
       ],
     },
-    // 客户门户路由
+    // 客户路由
     {
-      path: '/portal',
-      component: () => import('@/layouts/MainLayout.vue'),
-      meta: { requiresAuth: true, requiresRole: 'customer' },
+      path: '/customer',
+      component: CustomerLayout,
+      meta: { requiresAuth: true, requiresRole: ['customer_owner', 'customer_member'] },
       children: [
         {
           path: '',
-          redirect: '/portal/environments',
-        },
-        // {
-        //   path: 'dashboard',
-        //   name: 'portal-dashboard',
-        //   component: () => import('@/views/DashboardView.vue'),
-        // },
-        {
-          path: 'environments',
-          name: 'portal-environments',
-          component: () => import('@/views/EnvironmentListView.vue'),
-        },
-        // {
-        //   path: 'environments/create',
-        //   name: 'portal-environment-create',
-        //   component: () => import('@/views/EnvironmentCreateView.vue'),
-        // },
-        {
-          path: 'environments/:id',
-          name: 'portal-environment-detail',
-          component: () => import('@/views/EnvironmentDetailView.vue'),
+          redirect: '/customer/dashboard',
         },
         {
-          path: 'hosts',
-          name: 'portal-hosts',
-          component: () => import('@/views/HostSelectionView.vue'),
-        },
-        {
-          path: 'datasets',
-          name: 'portal-datasets',
-          component: () => import('@/views/DatasetListView.vue'),
-        },
-        {
-          path: 'datasets/upload',
-          name: 'portal-dataset-upload',
-          component: () => import('@/views/DatasetUploadView.vue'),
-        },
-        {
-          path: 'datasets/:id',
-          name: 'portal-dataset-detail',
-          component: () => import('@/views/DatasetDetailView.vue'),
-        },
-        {
-          path: 'images',
-          name: 'portal-images',
-          component: () => import('@/views/ImageListView.vue'),
-        },
-        {
-          path: 'images/build',
-          name: 'portal-image-build',
-          component: () => import('@/views/ImageBuildView.vue'),
-        },
-        // {
-        //   path: 'training',
-        //   name: 'portal-training',
-        //   component: () => import('@/views/TrainingListView.vue'),
-        // },
-        // {
-        //   path: 'training/create',
-        //   name: 'portal-training-create',
-        //   component: () => import('@/views/TrainingCreateView.vue'),
-        // },
-        // {
-        //   path: 'training/:id',
-        //   name: 'portal-training-detail',
-        //   component: () => import('@/views/TrainingDetailView.vue'),
-        // },
-        {
-          path: 'model-repository',
-          name: 'portal-model-repository',
-          component: () => import('@/views/ModelRepositoryView.vue'),
-        },
-        {
-          path: 'settings',
-          name: 'portal-settings',
-          component: () => import('@/views/SettingsView.vue'),
-        },
-        {
-          path: 'workspace',
-          name: 'portal-workspace',
-          component: () => import('@/views/WorkspaceSettingsView.vue'),
-        },
-        {
-          path: 'workspaces',
-          name: 'portal-workspaces',
-          component: () => import('@/views/WorkspaceListView.vue'),
-        },
-        {
-          path: 'workspaces/create',
-          name: 'portal-workspace-create',
-          component: () => import('@/views/WorkspaceFormView.vue'),
-        },
-        {
-          path: 'workspaces/:id',
-          name: 'portal-workspace-detail',
-          component: () => import('@/views/WorkspaceDetailView.vue'),
-        },
-        {
-          path: 'workspaces/:id/edit',
-          name: 'portal-workspace-edit',
-          component: () => import('@/views/WorkspaceFormView.vue'),
-        },
-        // {
-        //   path: 'quota-usage',
-        //   name: 'portal-quota-usage',
-        //   component: () => import('@/views/QuotaUsageView.vue'),
-        // },
-        {
-          path: 'computing-market',
-          name: 'portal-computing-market',
-          component: () => import('@/views/ComputingMarketView.vue'),
-        },
-        {
-          path: 'release-version',
-          name: 'portal-release-version',
-          component: () => import('@/views/ReleaseVersionView.vue'),
-        },
-        {
-          path: 'document-center',
-          name: 'portal-document-center',
-          component: () => import('@/views/DocumentCenterView.vue'),
-        },
-        {
-          path: 'download-center',
-          name: 'portal-download-center',
-          component: () => import('@/views/DownloadCenterView.vue'),
-        },
-        {
-          path: 'resource-center',
-          name: 'resource-center',
-          component: () => import('@/views/ResourceCenterView.vue'),
-        },
-        {
-          path: 'resource-platform',
-          name: 'resource-platform',
-          component: () => import('@/views/ResourcePlatformView.vue'),
-        },
-        {
-          path: 'resource-list',
-          name: 'resource-list',
-          component: () => import('@/views/ResourceListView.vue'),
-        },
-        {
-          path: 'computing-market',
-          name: 'computing-market',
-          component: () => import('@/views/ComputingMarketView.vue'),
-        },
-        {
-          path: 'release-version',
-          name: 'release-version',
-          component: () => import('@/views/ReleaseVersionView.vue'),
-        },
-        {
-          path: 'document-center',
-          name: 'document-center',
-          component: () => import('@/views/DocumentCenterView.vue'),
-        },
-        {
-          path: 'download-center',
-          name: 'download-center',
-          component: () => import('@/views/DownloadCenterView.vue'),
-        },
-        {
-          path: 'monitoring-center',
-          name: 'monitoring-center',
-          component: () => import('@/views/MonitoringCenterView.vue'),
-        },
-        {
-          path: 'alert-center',
-          name: 'alert-center',
-          component: () => import('@/views/AlertCenterView.vue'),
-        },
-        {
-          path: 'customer-center',
-          name: 'customer-center',
-          component: () => import('@/views/CustomerCenterView.vue'),
-        },
-        {
-          path: 'customer-center/:id',
+          path: 'dashboard',
           name: 'customer-dashboard',
-          component: () => import('@/views/CustomerDashboardView.vue'),
+          component: () => import('@/views/customer/DashboardView.vue'),
+          meta: { title: '工作台首页' },
+        },
+        // 我的机器
+        {
+          path: 'machines/list',
+          name: 'customer-machines-list',
+          component: () => import('@/views/customer/MachineListView.vue'),
+          meta: { title: '机器列表' },
         },
         {
-          path: 'model-repository',
-          name: 'model-repository',
-          component: () => import('@/views/ModelRepositoryView.vue'),
-        },
-        {
-          path: 'environments',
-          name: 'environments',
-          component: () => import('@/views/EnvironmentListView.vue'),
-        },
-        // {
-        //   path: 'environments/create',
-        //   name: 'environment-create',
-        //   component: () => import('@/views/EnvironmentCreateView.vue'),
-        // },
-        {
-          path: 'environments/:id',
-          name: 'environment-detail',
-          component: () => import('@/views/EnvironmentDetailView.vue'),
-        },
-        {
-          path: 'hosts',
-          name: 'hosts',
-          component: () => import('@/views/HostSelectionView.vue'),
-        },
-        {
-          path: 'datasets',
-          name: 'datasets',
-          component: () => import('@/views/DatasetListView.vue'),
-        },
-        {
-          path: 'datasets/upload',
-          name: 'dataset-upload',
-          component: () => import('@/views/DatasetUploadView.vue'),
-        },
-        {
-          path: 'datasets/:id',
-          name: 'dataset-detail',
-          component: () => import('@/views/DatasetDetailView.vue'),
-        },
-        {
-          path: 'images',
-          name: 'images',
-          component: () => import('@/views/ImageListView.vue'),
-        },
-        {
-          path: 'images/build',
-          name: 'image-build',
-          component: () => import('@/views/ImageBuildView.vue'),
-        },
-        // {
-        //   path: 'training',
-        //   name: 'training',
-        //   component: () => import('@/views/TrainingListView.vue'),
-        // },
-        // {
-        //   path: 'training/create',
-        //   name: 'training-create',
-        //   component: () => import('@/views/TrainingCreateView.vue'),
-        // },
-        // {
-        //   path: 'training/:id',
-        //   name: 'training-detail',
-        //   component: () => import('@/views/TrainingDetailView.vue'),
-        // },
-        {
-          path: 'settings',
-          name: 'settings',
-          component: () => import('@/views/SettingsView.vue'),
-        },
-        {
-          path: 'workspace',
-          name: 'workspace',
-          component: () => import('@/views/WorkspaceSettingsView.vue'),
+          path: ':pathMatch(.*)*',
+          name: 'customer-coming-soon',
+          component: () => import('@/views/ComingSoonView.vue'),
+          meta: { title: '功能开发中' },
         },
       ],
+    },
+    {
+      path: '/:pathMatch(.*)*',
+      name: 'not-found',
+      component: () => import('@/views/NotFoundView.vue'),
+      meta: { requiresAuth: false },
     },
   ],
 })
@@ -391,7 +140,7 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   const authStore = useAuthStore()
   const requiresAuth = to.meta.requiresAuth !== false
-  const requiresRole = to.meta.requiresRole as 'admin' | 'customer' | undefined
+  const requiresRole = to.meta.requiresRole as string | string[] | undefined
 
   // 未登录用户访问需要认证的页面，重定向到登录页
   if (requiresAuth && !authStore.isAuthenticated) {
@@ -414,20 +163,23 @@ router.beforeEach(async (to, from, next) => {
     if (authStore.user?.role === 'admin') {
       next('/admin/dashboard')
     } else {
-      next('/portal/environments')
+      next('/customer/dashboard')
     }
     return
   }
 
   // 检查角色权限
-  if (requiresRole && authStore.user?.role !== requiresRole) {
-    // 用户角色不匹配，重定向到对应角色的首页
-    if (authStore.user?.role === 'admin') {
-      next('/admin/dashboard')
-    } else {
-      next('/portal/environments')
+  if (requiresRole) {
+    const role = authStore.user?.role
+    const allowedRoles = Array.isArray(requiresRole) ? requiresRole : [requiresRole]
+    if (!role || !allowedRoles.includes(role)) {
+      if (role === 'admin') {
+        next('/admin/dashboard')
+      } else {
+        next('/customer/dashboard')
+      }
+      return
     }
-    return
   }
 
   next()

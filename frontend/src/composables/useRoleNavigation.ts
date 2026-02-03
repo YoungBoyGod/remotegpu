@@ -12,11 +12,10 @@ export function useRoleNavigation() {
   /**
    * 根据用户角色获取完整路径
    * @param path 基础路径，如 '/dashboard', '/environments'
-   * @returns 带角色前缀的完整路径，如 '/admin/dashboard' 或 '/portal/dashboard'
+   * @returns 带角色前缀的完整路径，如 '/admin/dashboard' 或 '/customer/dashboard'
    */
   const getRolePath = (path: string): string => {
-    // 如果路径已经包含角色前缀，直接返回
-    if (path.startsWith('/admin/') || path.startsWith('/portal/')) {
+    if (path.startsWith('/admin/') || path.startsWith('/customer/')) {
       return path
     }
 
@@ -30,7 +29,7 @@ export function useRoleNavigation() {
     if (role === 'admin') {
       return `/admin${path}`
     }
-    return `/portal${path}`
+    return `/customer${path}`
   }
 
   /**

@@ -7,19 +7,19 @@ import (
 	"gorm.io/gorm"
 )
 
-type TaskRepo struct {
+type TaskDao struct {
 	db *gorm.DB
 }
 
-func NewTaskRepo(db *gorm.DB) *TaskRepo {
-	return &TaskRepo{db: db}
+func NewTaskDao(db *gorm.DB) *TaskDao {
+	return &TaskDao{db: db}
 }
 
-func (d *TaskRepo) Create(ctx context.Context, task *entity.Task) error {
+func (d *TaskDao) Create(ctx context.Context, task *entity.Task) error {
 	return d.db.WithContext(ctx).Create(task).Error
 }
 
-func (d *TaskRepo) ListByCustomerID(ctx context.Context, customerID uint, page, pageSize int) ([]entity.Task, int64, error) {
+func (d *TaskDao) ListByCustomerID(ctx context.Context, customerID uint, page, pageSize int) ([]entity.Task, int64, error) {
 	var tasks []entity.Task
 	var total int64
 
@@ -36,6 +36,6 @@ func (d *TaskRepo) ListByCustomerID(ctx context.Context, customerID uint, page, 
 	return tasks, total, nil
 }
 
-func (d *TaskRepo) UpdateStatus(ctx context.Context, id string, status string) error {
+func (d *TaskDao) UpdateStatus(ctx context.Context, id string, status string) error {
 	return d.db.WithContext(ctx).Model(&entity.Task{}).Where("id = ?", id).Update("status", status).Error
 }
