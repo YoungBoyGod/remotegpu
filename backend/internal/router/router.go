@@ -3,103 +3,109 @@ package router
 import (
 	v1 "github.com/YoungBoyGod/remotegpu/internal/controller/v1"
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
+	"github.com/YoungBoyGod/remotegpu/internal/service"
+	"github.com/YoungBoyGod/remotegpu/pkg/database"
+	"github.com/YoungBoyGod/remotegpu/pkg/storage"
 	"github.com/gin-gonic/gin"
 )
 
 // InitRouter 初始化路由
 func InitRouter(r *gin.Engine) {
-	// 初始化控制器
-	userController := v1.NewUserController()
-	healthController := v1.NewHealthController()
-	hostController := v1.NewHostController()
-	gpuController := v1.NewGPUController()
-	environmentController := v1.NewEnvironmentController()
-	quotaController := v1.NewResourceQuotaController()
+	db := database.GetDB()
+	// Storage manager should be initialized in main and passed here ideally,
+	// or retrieved from a global/package level if using singleton pattern.
+	// For now assuming it's available via package function or constructing new (lightweight)
+	// In a real app, use dependency injection.
+	storageMgr, _ := storage.NewManager(storage.Config{Type: "local", Local: storage.LocalConfig{RootPath: "./uploads"}})
+
+	// --- Services ---
+	authService := service.NewAuthService(db)
+	machineService := service.NewMachineService(db)
+	allocService := service.NewAllocationService(db)
+	custService := service.NewCustomerService(db)
+	taskService := service.NewTaskService(db)
+	datasetService := service.NewDatasetService(db)
+	opsService := service.NewOpsService(db)
+	agentService := service.NewAgentService()
+	monitorService := service.NewMonitorService()
+	storageService := service.NewStorageService(storageMgr)
+	dashboardService := service.NewDashboardService(machineService, custService, allocService)
+
+	// --- Controllers ---
+	authCtrl := v1.NewAuthController(authService)
+	dashboardCtrl := v1.NewDashboardController(dashboardService)
+	machineCtrl := v1.NewMachineController(machineService, allocService)
+	custCtrl := v1.NewCustomerController(custService)
+	monitorCtrl := v1.NewMonitorController(monitorService)
+	alertCtrl := v1.NewAlertController(opsService)
+	
+	myMachineCtrl := v1.NewMyMachineController(machineService, agentService)
+	taskCtrl := v1.NewTaskController(taskService)
+	datasetCtrl := v1.NewDatasetController(datasetService, storageService, agentService)
+
 
 	// API v1 路由组
 	apiV1 := r.Group("/api/v1")
 	{
-		// 健康检查
 		apiV1.GET("/health", func(c *gin.Context) {
-			c.JSON(200, gin.H{
-				"status": "ok",
-			})
+			c.JSON(200, gin.H{"status": "ok"})
 		})
 
-		// 用户路由（公开）
-		user := apiV1.Group("/user")
+		// 1. Auth Module
+		authGroup := apiV1.Group("/auth")
 		{
-			user.POST("/register", userController.Register)
-			user.POST("/login", userController.Login)
-			user.GET("/:id", userController.GetUserByID)
+			authGroup.POST("/login", authCtrl.Login)
+			authGroup.POST("/refresh", authCtrl.Refresh)
+			authGroup.POST("/logout", authCtrl.Logout)
+			
+			// Protected Profile
+			authGroup.GET("/profile", middleware.Auth(), authCtrl.GetProfile)
 		}
 
-		// 需要认证的路由
-		auth := apiV1.Group("")
-		auth.Use(middleware.Auth())
+		// 2. Admin Module (Protected + Role Check)
+		adminGroup := apiV1.Group("/admin")
+		adminGroup.Use(middleware.Auth()) // Add middleware.RequireRole("admin")
 		{
-			// 用户相关（需要认证）
-			auth.GET("/user/info", userController.GetUserInfo)
-			auth.PUT("/user/info", userController.UpdateUser)
+			// Dashboard
+			adminGroup.GET("/dashboard/stats", dashboardCtrl.GetStats)
+			adminGroup.GET("/dashboard/gpu-trend", dashboardCtrl.GetGPUTrend)
+			adminGroup.GET("/allocations/recent", dashboardCtrl.GetRecentAllocations)
 
-			// 资源配额查询（需要认证）
-			auth.GET("/quotas/usage", quotaController.GetUsage)
+			// Machines
+			adminGroup.GET("/machines", machineCtrl.List)
+			adminGroup.POST("/machines", machineCtrl.Create)
+			adminGroup.POST("/machines/import", machineCtrl.Import)
+			adminGroup.POST("/machines/:id/allocate", machineCtrl.Allocate)
+			adminGroup.POST("/machines/:id/reclaim", machineCtrl.Reclaim)
 
-			// 环境管理（需要认证，普通用户只能操作自己的环境）
-			auth.POST("/environments", environmentController.Create)
-			auth.GET("/environments", environmentController.List)
-			auth.GET("/environments/:id", environmentController.GetByID)
-			auth.DELETE("/environments/:id", environmentController.Delete)
-			auth.POST("/environments/:id/start", environmentController.Start)
-			auth.POST("/environments/:id/stop", environmentController.Stop)
-			auth.POST("/environments/:id/restart", environmentController.Restart)
-			auth.GET("/environments/:id/access", environmentController.GetAccessInfo)
-			auth.GET("/environments/:id/logs", environmentController.GetLogs)
+			// Customers
+			adminGroup.GET("/customers", custCtrl.List)
+			adminGroup.POST("/customers", custCtrl.Create)
+			adminGroup.POST("/customers/:id/disable", custCtrl.Disable)
+
+			// Monitoring & Ops
+			adminGroup.GET("/monitoring/realtime", monitorCtrl.GetRealtime)
+			adminGroup.GET("/alerts", alertCtrl.List)
 		}
 
-		// 管理员路由（需要管理员权限）
-		admin := apiV1.Group("/admin")
-		admin.Use(middleware.Auth(), middleware.RequireAdmin())
+		// 3. Customer Module (Protected)
+		custGroup := apiV1.Group("/customer")
+		custGroup.Use(middleware.Auth())
 		{
-			// 健康检查
-			admin.GET("/health/all", healthController.CheckAll)
-			admin.GET("/health/:service", healthController.CheckService)
+			// Machines
+			custGroup.GET("/machines", myMachineCtrl.List)
+			custGroup.GET("/machines/:id/connection", myMachineCtrl.GetConnection)
+			custGroup.POST("/machines/:id/ssh-reset", myMachineCtrl.ResetSSH)
 
-			// 主机管理
-			admin.POST("/hosts", hostController.Create)
-			admin.GET("/hosts", hostController.List)
-			admin.GET("/hosts/:id", hostController.GetByID)
-			admin.PUT("/hosts/:id", hostController.Update)
-			admin.DELETE("/hosts/:id", hostController.Delete)
-			admin.POST("/hosts/:id/heartbeat", hostController.Heartbeat)
+			// Tasks
+			custGroup.GET("/tasks", taskCtrl.List)
+			custGroup.POST("/tasks/training", taskCtrl.CreateTraining)
+			custGroup.POST("/tasks/:id/stop", taskCtrl.Stop)
 
-			// GPU管理
-			admin.POST("/gpus", gpuController.Create)
-			admin.GET("/gpus", gpuController.List)
-			admin.GET("/gpus/:id", gpuController.GetByID)
-			admin.PUT("/gpus/:id", gpuController.Update)
-			admin.DELETE("/gpus/:id", gpuController.Delete)
-			admin.POST("/gpus/:id/allocate", gpuController.Allocate)
-			admin.POST("/gpus/:id/release", gpuController.Release)
-			admin.GET("/hosts/:id/gpus", gpuController.GetByHostID)
-
-			// 环境管理
-			admin.POST("/environments", environmentController.Create)
-			admin.GET("/environments", environmentController.List)
-			admin.GET("/environments/:id", environmentController.GetByID)
-			admin.DELETE("/environments/:id", environmentController.Delete)
-			admin.POST("/environments/:id/start", environmentController.Start)
-			admin.POST("/environments/:id/stop", environmentController.Stop)
-			admin.POST("/environments/:id/restart", environmentController.Restart)
-			admin.GET("/environments/:id/access", environmentController.GetAccessInfo)
-			admin.GET("/environments/:id/logs", environmentController.GetLogs)
-
-			// 资源配额管理
-			admin.POST("/quotas", quotaController.SetQuota)
-			admin.GET("/quotas", quotaController.List)
-			admin.GET("/quotas/:id", quotaController.GetQuota)
-			admin.PUT("/quotas/:id", quotaController.UpdateQuota)
-			admin.DELETE("/quotas/:id", quotaController.DeleteQuota)
+			// Datasets
+			custGroup.GET("/datasets", datasetCtrl.List)
+			custGroup.POST("/datasets/init-multipart", datasetCtrl.InitUpload)
+			custGroup.POST("/datasets/:id/mount", datasetCtrl.Mount)
 		}
 	}
 }
