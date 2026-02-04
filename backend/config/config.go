@@ -26,10 +26,12 @@ type Config struct {
 	K8s        K8sConfig        `yaml:"k8s"`
 	HotReload  HotReloadConfig  `yaml:"hot_reload"`
 	Graceful   GracefulConfig   `yaml:"graceful"`
+	Swagger    SwaggerConfig    `yaml:"swagger"`
 }
 
 // ServerConfig 服务器配置
 type ServerConfig struct {
+	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
 	Mode string `yaml:"mode"` // debug, release, test
 }
@@ -177,6 +179,17 @@ type GracefulConfig struct {
 	ShutdownTimeout int `yaml:"shutdown_timeout"` // 关闭超时时间(秒)
 	RetryInterval   int `yaml:"retry_interval"`   // 重试间隔(秒)
 	MaxRetries      int `yaml:"max_retries"`      // 最大重试次数，0表示无限重试
+}
+
+// SwaggerConfig Swagger API文档配置
+type SwaggerConfig struct {
+	Enabled     bool     `yaml:"enabled"`     // 是否启用Swagger
+	Title       string   `yaml:"title"`       // API标题
+	Description string   `yaml:"description"` // API描述
+	Version     string   `yaml:"version"`     // API版本
+	BasePath    string   `yaml:"base_path"`   // API基础路径
+	OpenAPIPath string   `yaml:"openapi_path"` // OpenAPI 文档路径
+	Schemes     []string `yaml:"schemes"`     // 支持的协议 (http, https)
 }
 
 var GlobalConfig *Config

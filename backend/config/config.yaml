@@ -1,4 +1,5 @@
 server:
+  host: "localhost" # 对外访问域名(用于日志展示)
   port: 8080
   mode: debug # debug, release, test
 
@@ -118,10 +119,21 @@ hot_reload:
     - ".git"
     - "tmp"
     - "logs"
-  build_cmd: "go build -o ./tmp/main ./cmd/main.go" # 构建命令
+  build_cmd: "go build -o ./tmp/main ./cmd" # 构建命令
   debounce: 1 # 防抖时间(秒)
 
 graceful:
   shutdown_timeout: 10 # 关闭超时时间(秒)
   retry_interval: 5 # 重试间隔(秒)
   max_retries: 0 # 最大重试次数，0表示无限重试
+
+swagger:
+  enabled: true # 是否启用Swagger
+  title: "RemoteGPU API"
+  description: "RemoteGPU 远程GPU管理平台 API 文档"
+  version: "1.0.0"
+  base_path: "/api/v1"
+  openapi_path: "/openapi.yaml" # OpenAPI 文档路径
+  schemes:
+    - "http"
+    - "https"
