@@ -117,4 +117,56 @@ Agent 通信 (P0)
 
 | 日期 | 更新内容 |
 |------|----------|
+| 2026-02-05 | 添加 Agent 通信模块详细设计 |
 | 2026-02-05 | 初始化项目计划书 |
+
+---
+
+## Agent 通信模块设计 (当前任务)
+
+### 1. 架构设计
+
+```
+Backend                          Agent (每台机器)
+┌─────────────┐                 ┌─────────────┐
+│ AgentClient │ ──── gRPC ────► │ gRPC Server │
+│             │ ──── HTTP ────► │ HTTP Server │
+└─────────────┘                 └─────────────┘
+```
+
+### 2. 目录结构
+
+```
+internal/
+├── agent/
+│   ├── client.go          # 统一客户端接口
+│   ├── grpc_client.go     # gRPC 实现
+│   ├── http_client.go     # HTTP 实现
+│   └── types.go           # 类型定义
+api/
+└── proto/
+    └── agent.proto        # gRPC 协议定义
+```
+
+### 3. 接口定义
+
+| 方法 | 功能 | 参数 |
+|------|------|------|
+| StopProcess | 停止进程 | hostID, processID |
+| ResetSSH | 重置SSH密钥 | hostID, publicKey |
+| CleanupMachine | 清理机器 | hostID |
+| MountDataset | 挂载数据集 | hostID, datasetID, path |
+| GetSystemInfo | 获取系统信息 | hostID |
+| ExecuteCommand | 执行命令 | hostID, command |
+
+### 4. 实现步骤
+
+- [x] 4.1 添加 Agent 配置 (config.go, config.yaml)
+- [x] 4.2 定义类型和接口 (types.go, client.go)
+- [x] 4.3 实现 HTTP 客户端 (http_client.go)
+- [x] 4.4 实现 gRPC 客户端 (grpc_client.go) - 占位
+- [x] 4.5 定义 proto 文件 (agent.proto)
+- [x] 4.6 更新 AgentService
+- [ ] 4.7 集成到 TaskService 和 AllocationService
+- [ ] 4.8 生成 proto Go 代码
+- [ ] 4.9 完善 gRPC 客户端实现

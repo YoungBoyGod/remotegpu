@@ -7,7 +7,24 @@
 
 ## 正在进行
 
-当前无进行中的任务。
+### Agent 通信模块实现
+- **开始时间**: 2026-02-05
+- **优先级**: P0
+- **状态**: 进行中
+- **当前步骤**: 集成到 TaskService 和 AllocationService
+- **已完成**:
+  - 配置结构 (AgentConfig)
+  - 类型定义 (types.go)
+  - 客户端接口 (client.go)
+  - HTTP 客户端 (http_client.go)
+  - gRPC 客户端占位 (grpc_client.go)
+  - Proto 定义 (agent.proto)
+  - AgentService 更新
+- **涉及文件**:
+  - `internal/agent/*`
+  - `api/proto/agent.proto`
+  - `config/config.go`
+  - `internal/service/ops/agent_service.go`
 
 ---
 
