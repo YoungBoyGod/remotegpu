@@ -2,6 +2,7 @@ package allocation
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"time"
 
@@ -84,25 +85,32 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 	return allocation, nil
 }
 
+// ReclaimMachine 回收机器
+// @author Claude
+// @description 回收已分配的机器，更新分配状态和机器状态，并记录审计日志
+// @reason 修复原实现中审计代码不可达的bug
+// @modified 2026-02-04
 func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) error {
-	return s.db.Transaction(func(tx *gorm.DB) error {
+	var allocID string
+
+	err := s.db.Transaction(func(tx *gorm.DB) error {
 		machineDao := dao.NewMachineDao(tx)
 		allocationDao := dao.NewAllocationDao(tx)
 
 		// 1. 查找活跃分配
 		alloc, err := allocationDao.FindActiveByHostID(ctx, hostID)
 		if err != nil {
-			if errors.Is(err, gorm.ErrRecordNotFound) {
+			if stderrors.Is(err, gorm.ErrRecordNotFound) {
 				return errors.New(errors.ErrorAllocationNotFound, "no active allocation found for this host")
 			}
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
+		allocID = alloc.ID
 
 		// 2. 更新分配状态
 		now := time.Now()
 		alloc.Status = "reclaimed"
 		alloc.ActualEndTime = &now
-		// 在实际 dao 中，应该有特定的更新方法或使用通用更新
 		if err := tx.Save(alloc).Error; err != nil {
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
@@ -114,22 +122,23 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 
 		return nil
 	})
-	
+
 	if err != nil {
 		return err
 	}
 
-	// 4. Log Audit (Fire and Forget or handle error)
+	// 4. 记录审计日志
 	_ = s.auditService.CreateLog(
 		ctx,
 		nil, // System action, no customer ID
-		"system", "127.0.0.1", "POST", "/reclaim",
+		"system", "127.0.0.1", "POST", fmt.Sprintf("/admin/machines/%s/reclaim", hostID),
 		"reclaim_machine", "machine", hostID,
-		map[string]interface{}{"reason": "admin_request"},
+		map[string]interface{}{"allocation_id": allocID, "reason": "admin_request"},
 		200,
 	)
 
-	// TODO: 触发清理流程
+	// TODO: 触发异步清理流程（重置SSH、清理用户数据等）
+
 	return nil
 }
 
