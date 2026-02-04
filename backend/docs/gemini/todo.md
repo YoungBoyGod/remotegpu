@@ -63,3 +63,36 @@
 - **Prometheus Client**: `github.com/prometheus/client_golang/api` (用于 GPU 监控)
 - **Harbor SDK**: `github.com/goharbor/go-client` (可选，用于镜像同步)
 - **RPC/Messaging**: `google.golang.org/grpc` 或 `redis` (用于 Agent 通信)
+
+---
+
+# 补充建议 (Additional Suggestions)
+
+基于对 `backend/docs/claude/todo.md` 和 `backend/docs/codex/todo.md` 的分析，建议补充以下任务以完善企业级能力：
+
+## 5. 通知系统 (Notification System)
+
+- **涉及功能**: 告警触发、机器分配通知、密码重置邮件。
+- **缺失原因**: 当前系统仅有数据层面的状态变更，缺乏主动触达用户的渠道。
+- **实现建议**:
+  1.  **渠道集成**: 实现 Email (SMTP), Slack/DingTalk Webhook 集成。
+  2.  **事件驱动**: 在 `AlertService` 和 `AllocationService` 中埋点，通过 Channel 或 MQ 发送事件。
+  3.  **用户配置**: 允许用户在 `/profile` 中设置接收偏好。
+- **依赖**: `gopkg.in/gomail.v2` (邮件) 或 HTTP Client。
+
+## 6. 用量报表与导出 (Usage Reporting)
+
+- **涉及功能**: B2B 结算、资源使用审计。
+- **缺失原因**: 虽不涉及在线支付，但企业客户需要月度资源使用清单进行线下结算或成本核算。
+- **实现建议**:
+  1.  **定时任务**: 每日/每月运行 Cron Job，统计 `allocations` 表时长。
+  2.  **报表生成**: 生成 CSV/Excel 文件 (`github.com/xuri/excelize`)。
+  3.  **API**: 提供 `GET /admin/reports/usage` 下载接口。
+
+## 7. 系统加固 (System Hardening)
+
+- **涉及功能**: 接口限流 (Rate Limiting)、单元测试。
+- **缺失原因**: 当前主要关注功能实现，非功能性质量保障（测试覆盖率、防攻击）尚未提上日程。
+- **实现建议**:
+  1.  **限流**: 引入 `gin-contrib/rate-limiter` 或基于 Redis 的限流中间件，保护 `/auth/*` 和 `/admin/*` 接口。
+  2.  **测试**: 为核心 Service (`AuthService`, `AllocationService`) 编写 Unit Test，目标覆盖率 > 60%。
