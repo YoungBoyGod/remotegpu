@@ -10,19 +10,42 @@ import (
 )
 
 type MonitorService struct {
-	// redis client, influxdb client etc.
+	machineService *machine.MachineService
 }
 
-func NewMonitorService() *MonitorService {
-	return &MonitorService{}
+func NewMonitorService(ms *machine.MachineService) *MonitorService {
+	return &MonitorService{
+		machineService: ms,
+	}
 }
 
+// GetGlobalSnapshot 获取全局监控快照
+// @author Claude
+// @description 获取系统实时监控数据，包括机器状态统计
+// @reason 原实现返回Mock数据，现改为从MachineService获取真实数据
+// @modified 2026-02-04
+// TODO: 接入Redis缓存，设置采样频率（如30秒）避免频繁查询数据库
 func (s *MonitorService) GetGlobalSnapshot(ctx context.Context) (map[string]interface{}, error) {
-	// Mock data for now
+	// 获取机器状态统计
+	stats, err := s.machineService.GetStatusStats(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// 计算总数和在线数
+	var totalMachines int64
+	for _, count := range stats {
+		totalMachines += count
+	}
+	onlineMachines := stats["idle"] + stats["allocated"]
+
 	return map[string]interface{}{
-		"total_machines": 100,
-		"online_machines": 95,
-		"avg_gpu_util": 75.5,
+		"total_machines":     totalMachines,
+		"online_machines":    onlineMachines,
+		"idle_machines":      stats["idle"],
+		"allocated_machines": stats["allocated"],
+		"offline_machines":   stats["offline"],
+		"avg_gpu_util":       0.0, // TODO: 从监控系统获取GPU利用率
 	}, nil
 }
 
