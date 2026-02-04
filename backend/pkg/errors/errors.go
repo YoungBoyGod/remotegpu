@@ -23,6 +23,7 @@ const (
 	ErrorPasswordIncorrect = 2003
 	ErrorTokenInvalid      = 2004
 	ErrorTokenExpired      = 2005
+	ErrorUserDisabled      = 2006
 
 	// 工作空间相关错误 (3000-3999)
 	ErrorWorkspaceNotFound     = 3001
@@ -89,6 +90,7 @@ var ErrorMsg = map[int]string{
 	ErrorPasswordIncorrect: "密码错误",
 	ErrorTokenInvalid:      "Token无效",
 	ErrorTokenExpired:      "Token已过期",
+	ErrorUserDisabled:      "账号已禁用",
 
 	// 工作空间相关错误
 	ErrorWorkspaceNotFound:       "工作空间不存在",
