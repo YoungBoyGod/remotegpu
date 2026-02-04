@@ -5,16 +5,20 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
+	"github.com/YoungBoyGod/remotegpu/pkg/cache"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/YoungBoyGod/remotegpu/pkg/storage"
 
 	// 服务层
 	serviceAllocation "github.com/YoungBoyGod/remotegpu/internal/service/allocation"
+	serviceAudit "github.com/YoungBoyGod/remotegpu/internal/service/audit"
 	serviceAuth "github.com/YoungBoyGod/remotegpu/internal/service/auth"
 	serviceCustomer "github.com/YoungBoyGod/remotegpu/internal/service/customer"
 	serviceDataset "github.com/YoungBoyGod/remotegpu/internal/service/dataset"
+	serviceImage "github.com/YoungBoyGod/remotegpu/internal/service/image"
 	serviceMachine "github.com/YoungBoyGod/remotegpu/internal/service/machine"
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
+	serviceSSHKey "github.com/YoungBoyGod/remotegpu/internal/service/sshkey"
 	serviceStorage "github.com/YoungBoyGod/remotegpu/internal/service/storage"
 	serviceTask "github.com/YoungBoyGod/remotegpu/internal/service/task"
 
@@ -30,7 +34,12 @@ import (
 // InitRouter 初始化路由
 func InitRouter(r *gin.Engine) {
 	db := database.GetDB()
-	
+
+	// 设置Swagger文档
+	if err := middleware.SetupSwagger(r); err != nil {
+		panic(err)
+	}
+
 	// 存储设置
 	storageMgr, _ := storage.NewManager(config.GlobalConfig.Storage)
 
@@ -48,7 +57,7 @@ func InitRouter(r *gin.Engine) {
 	}
 
 	// --- 服务层初始化 ---
-	authSvc := serviceAuth.NewAuthService(db)
+	authSvc := serviceAuth.NewAuthService(db, cache.GetCache())
 	machineSvc := serviceMachine.NewMachineService(db)
 	allocSvc := serviceAllocation.NewAllocationService(db)
 	custSvc := serviceCustomer.NewCustomerService(db)
@@ -58,6 +67,9 @@ func InitRouter(r *gin.Engine) {
 	agentSvc := serviceOps.NewAgentService()
 	monitorSvc := serviceOps.NewMonitorService()
 	storageSvc := serviceStorage.NewStorageService(storageMgr)
+	sshKeySvc := serviceSSHKey.NewSSHKeyService(db)
+	auditSvc := serviceAudit.NewAuditService(db)
+	imageSvc := serviceImage.NewImageService(db)
 	
 	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc)
 
@@ -72,6 +84,9 @@ func InitRouter(r *gin.Engine) {
 	myMachineController := ctrlCustomer.NewMyMachineController(machineSvc, agentSvc)
 	taskController := ctrlTask.NewTaskController(taskSvc)
 	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc)
+	sshKeyController := ctrlCustomer.NewSSHKeyController(sshKeySvc)
+	auditController := ctrlOps.NewAuditController(auditSvc)
+	imageController := ctrlOps.NewImageController(imageSvc)
 
 	// API v1 路由
 	apiV1 := r.Group("/api/v1")
@@ -93,7 +108,7 @@ func InitRouter(r *gin.Engine) {
 
 		// 2. Admin Module (Protected + Role Check)
 		adminGroup := apiV1.Group("/admin")
-		adminGroup.Use(middleware.Auth()) // TODO: 添加 middleware.RequireRole("admin")
+		adminGroup.Use(middleware.Auth(), middleware.RequireAdmin())
 		{
 			// 仪表板
 			adminGroup.GET("/dashboard/stats", dashboardController.GetStats)
@@ -115,6 +130,12 @@ func InitRouter(r *gin.Engine) {
 			// 监控与运维
 			adminGroup.GET("/monitoring/realtime", monitorController.GetRealtime)
 			adminGroup.GET("/alerts", alertController.List)
+
+			// 审计日志
+			adminGroup.GET("/audit/logs", auditController.List)
+
+			// 镜像管理
+			adminGroup.GET("/images", imageController.List)
 		}
 
 		// 3. Customer Module (Protected)
@@ -135,6 +156,11 @@ func InitRouter(r *gin.Engine) {
 			custGroup.GET("/datasets", datasetController.List)
 			custGroup.POST("/datasets/init-multipart", datasetController.InitUpload)
 			custGroup.POST("/datasets/:id/mount", datasetController.Mount)
+
+			// SSH 密钥管理
+			custGroup.GET("/keys", sshKeyController.List)
+			custGroup.POST("/keys", sshKeyController.Create)
+			custGroup.DELETE("/keys/:id", sshKeyController.Delete)
 		}
 	}
 }
