@@ -20,15 +20,24 @@ func NewTaskController(ts *serviceTask.TaskService) *TaskController {
 	}
 }
 
+// List 获取当前用户的任务列表
+// @author Claude
+// @description 根据JWT中的userID过滤，只返回当前用户的任务
+// @reason 原实现使用硬编码userID，存在数据泄露风险
+// @modified 2026-02-04
 func (c *TaskController) List(ctx *gin.Context) {
-	// userID := ctx.GetUint("userID")
-	userID := uint(1) // Mock
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
 
-	tasks, total, err := c.taskService.ListTasks(ctx, userID, page, pageSize)
+	tasks, total, err := c.taskService.ListTasks(ctx, userID.(uint), page, pageSize)
 	if err != nil {
-		c.Error(ctx, 500, "Failed to list tasks")
+		c.Error(ctx, 500, "获取任务列表失败")
 		return
 	}
 
@@ -40,29 +49,54 @@ func (c *TaskController) List(ctx *gin.Context) {
 	})
 }
 
+// CreateTraining 创建训练任务
+// @author Claude
+// @description 创建训练任务并绑定当前用户，从JWT获取userID
+// @reason 原实现使用硬编码CustomerID，存在安全风险
+// @modified 2026-02-04
 func (c *TaskController) CreateTraining(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
 	var task entity.Task
 	if err := ctx.ShouldBindJSON(&task); err != nil {
 		c.Error(ctx, 400, err.Error())
 		return
 	}
-	
+
 	task.Type = "training"
-	// task.CustomerID = ctx.GetUint("userID")
-	task.CustomerID = 1 // Mock
+	task.CustomerID = userID.(uint)
 
 	if err := c.taskService.SubmitTask(ctx, &task); err != nil {
-		c.Error(ctx, 500, "Failed to submit task")
+		c.Error(ctx, 500, "创建任务失败")
 		return
 	}
 	c.Success(ctx, task)
 }
 
+// Stop 停止任务
+// @author Claude
+// @description 停止任务前校验任务是否属于当前用户，防止越权操作
+// @reason 原实现无权限校验，存在越权风险
+// @modified 2026-02-04
 func (c *TaskController) Stop(ctx *gin.Context) {
-	id := ctx.Param("id")
-	if err := c.taskService.StopTask(ctx, id); err != nil {
-		c.Error(ctx, 500, "Failed to stop task")
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
 		return
 	}
-	c.Success(ctx, gin.H{"message": "Task stopped"})
+
+	id := ctx.Param("id")
+	if err := c.taskService.StopTaskWithAuth(ctx, id, userID.(uint)); err != nil {
+		if err.Error() == "无权限访问该资源" {
+			c.Error(ctx, 403, "无权限操作该任务")
+			return
+		}
+		c.Error(ctx, 500, "停止任务失败")
+		return
+	}
+	c.Success(ctx, gin.H{"message": "任务已停止"})
 }
