@@ -5,6 +5,7 @@ import (
 
 	apiV1 "github.com/YoungBoyGod/remotegpu/api/v1"
 	"github.com/YoungBoyGod/remotegpu/internal/controller/v1/common"
+	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	serviceAuth "github.com/YoungBoyGod/remotegpu/internal/service/auth"
 	"github.com/YoungBoyGod/remotegpu/pkg/errors"
 	"github.com/gin-gonic/gin"
@@ -21,6 +22,17 @@ func NewAuthController(authService *serviceAuth.AuthService) *AuthController {
 	}
 }
 
+// Login 用户登录
+// @Summary 用户登录
+// @Description 使用用户名和密码获取访问令牌
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body v1.LoginRequest true "登录请求"
+// @Success 200 {object} v1.LoginResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Router /auth/login [post]
 func (c *AuthController) Login(ctx *gin.Context) {
 	var req apiV1.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -45,6 +57,17 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	})
 }
 
+// Refresh 刷新令牌
+// @Summary 刷新令牌
+// @Description 使用刷新令牌获取新的访问令牌
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body v1.RefreshTokenRequest true "刷新令牌请求"
+// @Success 200 {object} v1.LoginResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Router /auth/refresh [post]
 func (c *AuthController) Refresh(ctx *gin.Context) {
 	var req apiV1.RefreshTokenRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -69,6 +92,15 @@ func (c *AuthController) Refresh(ctx *gin.Context) {
 	})
 }
 
+// Logout 用户登出
+// @Summary 用户登出
+// @Description 使当前访问令牌失效
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Router /auth/logout [post]
 func (c *AuthController) Logout(ctx *gin.Context) {
 	// 从 Header 获取 token
 	authHeader := ctx.GetHeader("Authorization")
@@ -79,6 +111,16 @@ func (c *AuthController) Logout(ctx *gin.Context) {
 	c.Success(ctx, gin.H{"message": "Logged out successfully"})
 }
 
+// GetProfile 获取个人资料
+// @Summary 获取个人资料
+// @Description 获取当前登录用户的详细信息
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} entity.Customer
+// @Failure 401 {object} common.ErrorResponse
+// @Router /auth/profile [get]
 func (c *AuthController) GetProfile(ctx *gin.Context) {
 	// User ID comes from middleware
 	userID := ctx.GetUint("userID")
@@ -90,7 +132,18 @@ func (c *AuthController) GetProfile(ctx *gin.Context) {
 	c.Success(ctx, profile)
 }
 
-// AdminLogin Admin 专用登录接口
+// AdminLogin 管理员登录
+// @Summary 管理员登录
+// @Description 管理员专用登录接口，校验管理员角色
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body v1.LoginRequest true "登录请求"
+// @Success 200 {object} v1.LoginResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Failure 403 {object} common.ErrorResponse
+// @Router /auth/admin/login [post]
 func (c *AuthController) AdminLogin(ctx *gin.Context) {
 	var req apiV1.LoginRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
