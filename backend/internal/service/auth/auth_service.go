@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
@@ -24,10 +25,19 @@ const (
 	refreshTokenTTL = 7 * 24 * time.Hour
 )
 
+var (
+	ErrInvalidCredentials  = errors.New("invalid credentials")
+	ErrAccountDisabled     = errors.New("account disabled")
+	ErrPermissionDenied    = errors.New("permission denied")
+	ErrRefreshTokenInvalid = errors.New("invalid or expired refresh token")
+)
+
 type AuthService struct {
 	customerDao *dao.CustomerDao
 	db          *gorm.DB
 	cache       cache.Cache
+	refreshMu   sync.RWMutex
+	refreshMap  map[string]uint
 }
 
 func NewAuthService(db *gorm.DB, c cache.Cache) *AuthService {
@@ -35,27 +45,73 @@ func NewAuthService(db *gorm.DB, c cache.Cache) *AuthService {
 		customerDao: dao.NewCustomerDao(db),
 		db:          db,
 		cache:       c,
+		refreshMap:  make(map[string]uint),
 	}
 }
 
 // storeRefreshToken 存储刷新 token
 func (s *AuthService) storeRefreshToken(ctx context.Context, refreshToken string, userID uint) error {
 	if s.cache == nil {
+		s.refreshMu.Lock()
+		defer s.refreshMu.Unlock()
+		s.refreshMap[refreshToken] = userID
 		return nil
 	}
 	key := refreshTokenPrefix + refreshToken
-	// 存储 UserID
-	return s.cache.Set(ctx, key, userID, refreshTokenTTL)
+	return s.cache.Set(ctx, key, strconv.FormatUint(uint64(userID), 10), refreshTokenTTL)
+}
+
+func (s *AuthService) loadRefreshToken(ctx context.Context, refreshToken string) (uint, error) {
+	if refreshToken == "" {
+		return 0, ErrRefreshTokenInvalid
+	}
+	if s.cache == nil {
+		s.refreshMu.RLock()
+		defer s.refreshMu.RUnlock()
+		userID, ok := s.refreshMap[refreshToken]
+		if !ok {
+			return 0, ErrRefreshTokenInvalid
+		}
+		return userID, nil
+	}
+	key := refreshTokenPrefix + refreshToken
+	userIDStr, err := s.cache.Get(ctx, key)
+	if err != nil || userIDStr == "" {
+		return 0, ErrRefreshTokenInvalid
+	}
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		return 0, ErrRefreshTokenInvalid
+	}
+	return uint(userID), nil
+}
+
+func (s *AuthService) deleteRefreshToken(ctx context.Context, refreshToken string) {
+	if refreshToken == "" {
+		return
+	}
+	if s.cache == nil {
+		s.refreshMu.Lock()
+		defer s.refreshMu.Unlock()
+		delete(s.refreshMap, refreshToken)
+		return
+	}
+	key := refreshTokenPrefix + refreshToken
+	_ = s.cache.Delete(ctx, key)
 }
 
 func (s *AuthService) Login(ctx context.Context, username, password string) (string, string, int64, error) {
 	customer, err := s.customerDao.FindByUsername(ctx, username)
 	if err != nil {
-		return "", "", 0, errors.New("invalid credentials")
+		return "", "", 0, ErrInvalidCredentials
 	}
 
 	if !auth.CheckPasswordHash(password, customer.PasswordHash) {
-		return "", "", 0, errors.New("invalid credentials")
+		return "", "", 0, ErrInvalidCredentials
+	}
+
+	if customer.Status != "active" {
+		return "", "", 0, ErrAccountDisabled
 	}
 
 	// 更新最后登录时间
@@ -90,22 +146,22 @@ func (s *AuthService) GetProfile(ctx context.Context, userID uint) (*entity.Cust
 func (s *AuthService) AdminLogin(ctx context.Context, username, password string) (string, string, int64, error) {
 	customer, err := s.customerDao.FindByUsername(ctx, username)
 	if err != nil {
-		return "", "", 0, errors.New("invalid credentials")
+		return "", "", 0, ErrInvalidCredentials
 	}
 
 	// 验证密码
 	if !auth.CheckPasswordHash(password, customer.PasswordHash) {
-		return "", "", 0, errors.New("invalid credentials")
+		return "", "", 0, ErrInvalidCredentials
 	}
 
 	// 验证是否是 admin 角色
 	if customer.Role != "admin" {
-		return "", "", 0, errors.New("permission denied: admin role required")
+		return "", "", 0, ErrPermissionDenied
 	}
 
 	// 验证账号状态
 	if customer.Status != "active" {
-		return "", "", 0, errors.New("account is disabled")
+		return "", "", 0, ErrAccountDisabled
 	}
 
 	// 更新最后登录时间
@@ -134,30 +190,17 @@ func (s *AuthService) AdminLogin(ctx context.Context, username, password string)
 
 // RefreshToken 使用刷新令牌获取新的访问令牌
 func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (string, string, int64, error) {
-	if s.cache == nil {
-		return "", "", 0, errors.New("cache service not available")
-	}
-
-	// 1. Check if token exists
-	key := refreshTokenPrefix + refreshToken
-	userIDStr, err := s.cache.Get(ctx, key)
-	if err != nil || userIDStr == "" {
-		return "", "", 0, errors.New("invalid or expired refresh token")
-	}
-
-	// 2. Parse UserID
-	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	userID, err := s.loadRefreshToken(ctx, refreshToken)
 	if err != nil {
-		return "", "", 0, errors.New("invalid token data")
+		return "", "", 0, err
 	}
 
-	// 3. Get User (check status)
-	customer, err := s.customerDao.FindByID(ctx, uint(userID))
+	customer, err := s.customerDao.FindByID(ctx, userID)
 	if err != nil {
-		return "", "", 0, errors.New("user not found")
+		return "", "", 0, ErrRefreshTokenInvalid
 	}
 	if customer.Status != "active" {
-		return "", "", 0, errors.New("account is disabled")
+		return "", "", 0, ErrAccountDisabled
 	}
 
 	// 4. Generate new tokens
@@ -171,8 +214,7 @@ func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (st
 	}
 
 	// 5. Rotate tokens (delete old, save new)
-	_ = s.cache.Delete(ctx, key)
-
+	s.deleteRefreshToken(ctx, refreshToken)
 	if err := s.storeRefreshToken(ctx, newRefreshToken, customer.ID); err != nil {
 		return "", "", 0, err
 	}
