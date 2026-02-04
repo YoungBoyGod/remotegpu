@@ -129,6 +129,24 @@
 
 ---
 
+### 6. 回收机器Bug修复 (`/admin/machines/:id/reclaim`)
+
+**目标**: 修复回收机器功能中审计代码不可达的bug
+
+**修改文件**:
+
+| 文件路径 | 修改类型 | 说明 |
+|---------|---------|------|
+| `internal/service/allocation/allocation_service.go` | Bug修复 | 修复 `return s.db.Transaction(...)` 导致审计代码不执行的问题 |
+
+**代码审查发现的问题**:
+- 原实现第87行直接 `return s.db.Transaction(...)`，导致第118-133行的审计代码永远不会执行（unreachable code）
+
+**Git 提交**:
+- `4b39131` fix(service): 修复ReclaimMachine审计代码不可达bug
+
+---
+
 ## 注释规范
 
 所有关键函数添加以下格式的注释：
@@ -149,8 +167,8 @@ func FunctionName() {}
 
 ## 待完成任务
 
-根据 `docs/任务清单.md`，以下任务待完成：
+根据 `docs/任务清单.md`，所有任务已完成：
 
 - [x] 告警列表 `/admin/alerts` - 已完成分页、筛选、确认功能
-- [ ] 回收机器 `/admin/machines/:id/reclaim`
-- [ ] Swagger/OpenAPI 文档完善
+- [x] 回收机器 `/admin/machines/:id/reclaim` - 已修复审计代码bug
+- [x] Swagger/OpenAPI 文档完善 - 已由其他开发者完成
