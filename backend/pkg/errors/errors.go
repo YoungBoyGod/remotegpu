@@ -53,6 +53,8 @@ const (
 	ErrorGPUNotFound      = 6003
 	ErrorGPUNotAvailable  = 6004
 	ErrorGPUAllocationFailed = 6005
+	ErrorMachineNotAvailable = 6006
+	ErrorAllocationNotFound = 6007
 
 	// 存储相关错误 (7000-7999)
 	ErrorStorageNotFound   = 7001
@@ -120,6 +122,8 @@ var ErrorMsg = map[int]string{
 	ErrorGPUNotFound:         "GPU不存在",
 	ErrorGPUNotAvailable:     "GPU不可用",
 	ErrorGPUAllocationFailed: "GPU分配失败",
+	ErrorMachineNotAvailable: "机器当前不可用",
+	ErrorAllocationNotFound:  "未找到活跃分配记录",
 
 	// 存储相关错误
 	ErrorStorageNotFound:     "存储不存在",
