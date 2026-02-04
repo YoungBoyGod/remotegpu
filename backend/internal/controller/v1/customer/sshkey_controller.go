@@ -21,15 +21,24 @@ func NewSSHKeyController(svc *sshkey.SSHKeyService) *SSHKeyController {
 	}
 }
 
+func (c *SSHKeyController) getUserID(ctx *gin.Context) (uint, bool) {
+	// CodeX 2026-02-04: avoid type-assert panic by using GetUint.
+	userID := ctx.GetUint("userID")
+	if userID == 0 {
+		c.Error(ctx, 401, "未授权")
+		return 0, false
+	}
+	return userID, true
+}
+
 // List 列出当前用户的所有 SSH 密钥
 func (c *SSHKeyController) List(ctx *gin.Context) {
-	userID, exists := ctx.Get("userID")
-	if !exists {
-		c.Error(ctx, 401, "未授权")
+	userID, ok := c.getUserID(ctx)
+	if !ok {
 		return
 	}
 
-	keys, err := c.sshKeyService.ListKeys(ctx, userID.(uint))
+	keys, err := c.sshKeyService.ListKeys(ctx, userID)
 	if err != nil {
 		c.Error(ctx, 500, "获取 SSH 密钥列表失败")
 		return
@@ -40,9 +49,8 @@ func (c *SSHKeyController) List(ctx *gin.Context) {
 
 // Create 创建新的 SSH 密钥
 func (c *SSHKeyController) Create(ctx *gin.Context) {
-	userID, exists := ctx.Get("userID")
-	if !exists {
-		c.Error(ctx, 401, "未授权")
+	userID, ok := c.getUserID(ctx)
+	if !ok {
 		return
 	}
 
@@ -52,7 +60,7 @@ func (c *SSHKeyController) Create(ctx *gin.Context) {
 		return
 	}
 
-	key, err := c.sshKeyService.CreateKey(ctx, userID.(uint), req.Name, req.PublicKey)
+	key, err := c.sshKeyService.CreateKey(ctx, userID, req.Name, req.PublicKey)
 	if err != nil {
 		if errors.Is(err, sshkey.ErrInvalidPublicKey) {
 			c.Error(ctx, 400, "无效的 SSH 公钥格式")
@@ -71,9 +79,8 @@ func (c *SSHKeyController) Create(ctx *gin.Context) {
 
 // Delete 删除 SSH 密钥
 func (c *SSHKeyController) Delete(ctx *gin.Context) {
-	userID, exists := ctx.Get("userID")
-	if !exists {
-		c.Error(ctx, 401, "未授权")
+	userID, ok := c.getUserID(ctx)
+	if !ok {
 		return
 	}
 
@@ -84,7 +91,7 @@ func (c *SSHKeyController) Delete(ctx *gin.Context) {
 		return
 	}
 
-	err = c.sshKeyService.DeleteKey(ctx, userID.(uint), uint(keyID))
+	err = c.sshKeyService.DeleteKey(ctx, userID, uint(keyID))
 	if err != nil {
 		if errors.Is(err, sshkey.ErrKeyNotFound) {
 			c.Error(ctx, 404, "SSH 密钥不存在")
