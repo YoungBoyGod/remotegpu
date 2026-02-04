@@ -15,7 +15,7 @@ type Config struct {
 	JWT        JWTConfig        `yaml:"jwt"`
 	Log        LogConfig        `yaml:"log"`
 	Storage    StorageConfig    `yaml:"storage"`
-	Mail       MailConfig       `yaml:"mail"` // 新增邮件配置
+	Mail       MailConfig       `yaml:"mail"`
 	Harbor     HarborConfig     `yaml:"harbor"`
 	Etcd       EtcdConfig       `yaml:"etcd"`
 	Prometheus PrometheusConfig `yaml:"prometheus"`
@@ -27,6 +27,7 @@ type Config struct {
 	HotReload  HotReloadConfig  `yaml:"hot_reload"`
 	Graceful   GracefulConfig   `yaml:"graceful"`
 	Swagger    SwaggerConfig    `yaml:"swagger"`
+	Agent      AgentConfig      `yaml:"agent"`
 }
 
 // ServerConfig 服务器配置
@@ -183,13 +184,28 @@ type GracefulConfig struct {
 
 // SwaggerConfig Swagger API文档配置
 type SwaggerConfig struct {
-	Enabled     bool     `yaml:"enabled"`     // 是否启用Swagger
-	Title       string   `yaml:"title"`       // API标题
-	Description string   `yaml:"description"` // API描述
-	Version     string   `yaml:"version"`     // API版本
-	BasePath    string   `yaml:"base_path"`   // API基础路径
+	Enabled     bool     `yaml:"enabled"`      // 是否启用Swagger
+	Title       string   `yaml:"title"`        // API标题
+	Description string   `yaml:"description"`  // API描述
+	Version     string   `yaml:"version"`      // API版本
+	BasePath    string   `yaml:"base_path"`    // API基础路径
 	OpenAPIPath string   `yaml:"openapi_path"` // OpenAPI 文档路径
-	Schemes     []string `yaml:"schemes"`     // 支持的协议 (http, https)
+	Schemes     []string `yaml:"schemes"`      // 支持的协议 (http, https)
+}
+
+// AgentConfig Agent 通信配置
+type AgentConfig struct {
+	Enabled     bool   `yaml:"enabled"`      // 是否启用 Agent 通信
+	Protocol    string `yaml:"protocol"`     // 通信协议: grpc, http
+	Port        int    `yaml:"port"`         // Agent 默认端口
+	GRPCPort    int    `yaml:"grpc_port"`    // gRPC 端口
+	HTTPPort    int    `yaml:"http_port"`    // HTTP 端口
+	Timeout     int    `yaml:"timeout"`      // 请求超时时间(秒)
+	RetryCount  int    `yaml:"retry_count"`  // 重试次数
+	RetryDelay  int    `yaml:"retry_delay"`  // 重试间隔(秒)
+	TLSEnabled  bool   `yaml:"tls_enabled"`  // 是否启用 TLS
+	TLSCertFile string `yaml:"tls_cert"`     // TLS 证书文件
+	TLSKeyFile  string `yaml:"tls_key"`      // TLS 密钥文件
 }
 
 var GlobalConfig *Config

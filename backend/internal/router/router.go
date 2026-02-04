@@ -65,7 +65,7 @@ func InitRouter(r *gin.Engine) {
 	taskSvc := serviceTask.NewTaskService(db)
 	datasetSvc := serviceDataset.NewDatasetService(db)
 	opsSvc := serviceOps.NewOpsService(db)
-	agentSvc := serviceOps.NewAgentService()
+	agentSvc := serviceOps.NewAgentService(db, &config.GlobalConfig.Agent)
 	monitorSvc := serviceOps.NewMonitorService(machineSvc)
 	storageSvc := serviceStorage.NewStorageService(storageMgr)
 	sshKeySvc := serviceSSHKey.NewSSHKeyService(db)

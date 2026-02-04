@@ -137,3 +137,13 @@ swagger:
   schemes:
     - "http"
     - "https"
+
+agent:
+  enabled: true
+  protocol: "http"      # 默认协议: grpc, http
+  grpc_port: 50051      # gRPC 端口
+  http_port: 8090       # HTTP 端口
+  timeout: 30           # 请求超时(秒)
+  retry_count: 3        # 重试次数
+  retry_delay: 2        # 重试间隔(秒)
+  tls_enabled: false    # 是否启用 TLS
