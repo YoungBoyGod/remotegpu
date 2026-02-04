@@ -1,6 +1,8 @@
 package ops
 
 import (
+	"strconv"
+
 	"github.com/YoungBoyGod/remotegpu/internal/controller/v1/common"
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	"github.com/gin-gonic/gin"
@@ -86,11 +88,52 @@ func NewAlertController(os *serviceOps.OpsService) *AlertController {
 	}
 }
 
+// List 获取告警列表
+// @author Claude
+// @description 支持分页和筛选的告警列表查询
+// @reason 原实现无分页和筛选，现添加完整功能
+// @modified 2026-02-04
 func (c *AlertController) List(ctx *gin.Context) {
-	alerts, err := c.opsService.ListActiveAlerts(ctx)
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
+	severity := ctx.Query("severity")
+
+	var acknowledged *bool
+	if ackStr := ctx.Query("acknowledged"); ackStr != "" {
+		ack := ackStr == "true"
+		acknowledged = &ack
+	}
+
+	alerts, total, err := c.opsService.ListAlerts(ctx, page, pageSize, severity, acknowledged)
 	if err != nil {
-		c.Error(ctx, 500, "Failed to list alerts")
+		c.Error(ctx, 500, "获取告警列表失败")
 		return
 	}
-	c.Success(ctx, alerts)
+
+	c.Success(ctx, gin.H{
+		"list":      alerts,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
+
+// Acknowledge 确认告警
+// @author Claude
+// @description 将告警标记为已确认
+// @modified 2026-02-04
+func (c *AlertController) Acknowledge(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的告警ID")
+		return
+	}
+
+	if err := c.opsService.AcknowledgeAlert(ctx, uint(id)); err != nil {
+		c.Error(ctx, 500, "确认告警失败")
+		return
+	}
+
+	c.Success(ctx, gin.H{"message": "告警已确认"})
 }
