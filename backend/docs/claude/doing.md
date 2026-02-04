@@ -20,6 +20,11 @@
   - gRPC 客户端占位 (grpc_client.go)
   - Proto 定义 (agent.proto)
   - AgentService 更新
+  - TaskService 集成
+- **待完成**:
+  - AllocationService 集成
+  - 生成 proto Go 代码
+  - 完善 gRPC 实现
 - **涉及文件**:
   - `internal/agent/*`
   - `api/proto/agent.proto`
