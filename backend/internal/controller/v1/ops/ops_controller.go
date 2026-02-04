@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/YoungBoyGod/remotegpu/internal/controller/v1/common"
+	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	"github.com/gin-gonic/gin"
 )
@@ -20,8 +21,15 @@ func NewDashboardController(ds *serviceOps.DashboardService) *DashboardControlle
 }
 
 // GetStats 获取仪表盘统计数据
-// @author Claude
-// @modified 2026-02-04
+// @Summary 获取仪表盘统计数据
+// @Description 获取系统整体统计信息，包括机器总数、活跃客户等
+// @Tags Admin - Dashboard
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/dashboard/stats [get]
 func (c *DashboardController) GetStats(ctx *gin.Context) {
 	stats, err := c.dashboardService.GetAggregatedStats(ctx)
 	if err != nil {
@@ -32,9 +40,15 @@ func (c *DashboardController) GetStats(ctx *gin.Context) {
 }
 
 // GetGPUTrend 获取 GPU 使用趋势
-// @author Claude
-// @modified 2026-02-04
-// @reason 统一错误信息为中文，移除多余的 data 包装保持返回格式一致
+// @Summary 获取 GPU 使用趋势
+// @Description 获取最近时间段的 GPU 利用率趋势数据
+// @Tags Admin - Dashboard
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {array} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/dashboard/gpu-trend [get]
 func (c *DashboardController) GetGPUTrend(ctx *gin.Context) {
 	trend, err := c.dashboardService.GetGPUTrend(ctx)
 	if err != nil {
@@ -45,9 +59,15 @@ func (c *DashboardController) GetGPUTrend(ctx *gin.Context) {
 }
 
 // GetRecentAllocations 获取最近分配记录
-// @author Claude
-// @modified 2026-02-04
-// @reason 统一错误信息为中文，移除多余的 data 包装
+// @Summary 获取最近分配记录
+// @Description 获取最近的机器分配记录
+// @Tags Admin - Dashboard
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {array} entity.Allocation
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/allocations/recent [get]
 func (c *DashboardController) GetRecentAllocations(ctx *gin.Context) {
 	allocations, err := c.dashboardService.GetRecentAllocations(ctx)
 	if err != nil {
@@ -68,6 +88,16 @@ func NewMonitorController(ms *serviceOps.MonitorService) *MonitorController {
 	}
 }
 
+// GetRealtime 获取实时监控数据
+// @Summary 获取实时监控数据
+// @Description 获取系统实时监控快照，包括机器在线状态等
+// @Tags Admin - Monitoring
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/monitoring/realtime [get]
 func (c *MonitorController) GetRealtime(ctx *gin.Context) {
 	snapshot, err := c.monitorService.GetGlobalSnapshot(ctx)
 	if err != nil {
@@ -89,10 +119,19 @@ func NewAlertController(os *serviceOps.OpsService) *AlertController {
 }
 
 // List 获取告警列表
-// @author Claude
-// @description 支持分页和筛选的告警列表查询
-// @reason 原实现无分页和筛选，现添加完整功能
-// @modified 2026-02-04
+// @Summary 获取告警列表
+// @Description 获取系统告警信息，支持分页和筛选
+// @Tags Admin - Monitoring
+// @Accept json
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param severity query string false "严重程度筛选"
+// @Param acknowledged query boolean false "是否已确认"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/alerts [get]
 func (c *AlertController) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
@@ -119,9 +158,17 @@ func (c *AlertController) List(ctx *gin.Context) {
 }
 
 // Acknowledge 确认告警
-// @author Claude
-// @description 将告警标记为已确认
-// @modified 2026-02-04
+// @Summary 确认告警
+// @Description 将指定告警标记为已确认
+// @Tags Admin - Monitoring
+// @Accept json
+// @Produce json
+// @Param id path int true "告警ID"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/alerts/{id}/acknowledge [post]
 func (c *AlertController) Acknowledge(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
