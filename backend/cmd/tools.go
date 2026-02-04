@@ -41,11 +41,11 @@ var resetDbCmd = &cobra.Command{
 		initDBOrDie()
 		fmt.Println("正在重置数据库...")
 		db := database.GetDB()
-		
+
 		if err := db.Exec("DROP SCHEMA public CASCADE; CREATE SCHEMA public;").Error; err != nil {
 			log.Fatalf("重置失败: %v", err)
 		}
-		
+
 		if err := db.Exec(`CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS "pgcrypto";`).Error; err != nil {
 			log.Fatalf("恢复扩展失败: %v", err)
 		}
@@ -89,9 +89,11 @@ var adminCmd = &cobra.Command{
 }
 
 var (
-	adminUser string
-	adminPass string
-	adminEmail string
+	adminUser      string
+	adminPass      string
+	adminEmail     string
+	resetAdminUser string
+	resetAdminPass string
 )
 
 var createAdminCmd = &cobra.Command{
@@ -131,6 +133,38 @@ var createAdminCmd = &cobra.Command{
 	},
 }
 
+var resetAdminCmd = &cobra.Command{
+	Use:   "reset",
+	Short: "重置管理员密码",
+	Run: func(cmd *cobra.Command, args []string) {
+		initDBOrDie()
+		db := database.GetDB()
+		customerDao := dao.NewCustomerDao(db)
+
+		customer, err := customerDao.FindByUsername(context.Background(), resetAdminUser)
+		if err != nil {
+			log.Fatalf("用户 %s 不存在: %v", resetAdminUser, err)
+		}
+
+		hash, err := auth.HashPassword(resetAdminPass)
+		if err != nil {
+			log.Fatalf("密码加密失败: %v", err)
+		}
+
+		updates := map[string]interface{}{
+			"password_hash": hash,
+			"role":          "admin",
+			"user_type":     "admin",
+			"status":        "active",
+		}
+		if err := db.Model(&entity.Customer{}).Where("id = ?", customer.ID).Updates(updates).Error; err != nil {
+			log.Fatalf("重置管理员失败: %v", err)
+		}
+
+		fmt.Printf("管理员 %s 密码已重置\n", resetAdminUser)
+	},
+}
+
 func init() {
 	rootCmd.AddCommand(toolsCmd)
 	toolsCmd.AddCommand(genPassCmd)
@@ -139,10 +173,14 @@ func init() {
 
 	rootCmd.AddCommand(adminCmd)
 	adminCmd.AddCommand(createAdminCmd)
+	adminCmd.AddCommand(resetAdminCmd)
 
 	createAdminCmd.Flags().StringVarP(&adminUser, "user", "u", "admin", "用户名")
 	createAdminCmd.Flags().StringVarP(&adminPass, "password", "p", "admin123", "密码")
 	createAdminCmd.Flags().StringVarP(&adminEmail, "email", "e", "admin@localhost", "邮箱")
+
+	resetAdminCmd.Flags().StringVarP(&resetAdminUser, "user", "u", "admin", "用户名")
+	resetAdminCmd.Flags().StringVarP(&resetAdminPass, "password", "p", "admin123", "新密码")
 }
 
 func initDBOrDie() {
