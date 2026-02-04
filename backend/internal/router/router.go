@@ -59,13 +59,13 @@ func InitRouter(r *gin.Engine) {
 	// --- 服务层初始化 ---
 	authSvc := serviceAuth.NewAuthService(db, cache.GetCache())
 	machineSvc := serviceMachine.NewMachineService(db)
-	auditSvc := serviceAudit.NewAuditService(db) // Move up
+	auditSvc := serviceAudit.NewAuditService(db)
 	allocSvc := serviceAllocation.NewAllocationService(db, auditSvc)
 	custSvc := serviceCustomer.NewCustomerService(db)
-	taskSvc := serviceTask.NewTaskService(db)
-	datasetSvc := serviceDataset.NewDatasetService(db)
 	opsSvc := serviceOps.NewOpsService(db)
 	agentSvc := serviceOps.NewAgentService(db, &config.GlobalConfig.Agent)
+	taskSvc := serviceTask.NewTaskService(db, agentSvc)
+	datasetSvc := serviceDataset.NewDatasetService(db)
 	monitorSvc := serviceOps.NewMonitorService(machineSvc)
 	storageSvc := serviceStorage.NewStorageService(storageMgr)
 	sshKeySvc := serviceSSHKey.NewSSHKeyService(db)

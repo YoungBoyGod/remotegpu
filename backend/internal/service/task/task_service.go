@@ -5,16 +5,19 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	"gorm.io/gorm"
 )
 
 type TaskService struct {
-	taskDao *dao.TaskDao
+	taskDao      *dao.TaskDao
+	agentService *serviceOps.AgentService
 }
 
-func NewTaskService(db *gorm.DB) *TaskService {
+func NewTaskService(db *gorm.DB, agentSvc *serviceOps.AgentService) *TaskService {
 	return &TaskService{
-		taskDao: dao.NewTaskDao(db),
+		taskDao:      dao.NewTaskDao(db),
+		agentService: agentSvc,
 	}
 }
 
@@ -28,7 +31,16 @@ func (s *TaskService) SubmitTask(ctx context.Context, task *entity.Task) error {
 }
 
 func (s *TaskService) StopTask(ctx context.Context, id string) error {
-	// TODO: Call Agent to kill process
+	task, err := s.taskDao.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+
+	// 调用 Agent 停止进程
+	if s.agentService != nil && task.HostID != "" {
+		_ = s.agentService.StopProcess(ctx, task.HostID, task.ID)
+	}
+
 	return s.taskDao.UpdateStatus(ctx, id, "stopped")
 }
 
@@ -55,6 +67,11 @@ func (s *TaskService) StopTaskWithAuth(ctx context.Context, id string, customerI
 	if task.CustomerID != customerID {
 		return entity.ErrUnauthorized
 	}
-	// TODO: Call Agent to kill process
+
+	// 调用 Agent 停止进程
+	if s.agentService != nil && task.HostID != "" {
+		_ = s.agentService.StopProcess(ctx, task.HostID, task.ID)
+	}
+
 	return s.taskDao.UpdateStatus(ctx, id, "stopped")
 }

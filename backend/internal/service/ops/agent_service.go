@@ -58,6 +58,23 @@ func (s *AgentService) ResetSSH(ctx context.Context, hostID string) error {
 	return err
 }
 
+// StopProcess 停止进程
+func (s *AgentService) StopProcess(ctx context.Context, hostID string, taskID string) error {
+	addr, err := s.getHostAddress(ctx, hostID)
+	if err != nil {
+		return err
+	}
+
+	if httpClient, ok := s.client.(*agent.HTTPClient); ok {
+		httpClient.RegisterHost(hostID, addr)
+	}
+
+	_, err = s.client.StopProcess(ctx, &agent.StopProcessRequest{
+		HostID: hostID,
+	})
+	return err
+}
+
 // MountDataset 挂载数据集
 func (s *AgentService) MountDataset(ctx context.Context, hostID string, datasetID uint, path string) error {
 	addr, err := s.getHostAddress(ctx, hostID)
