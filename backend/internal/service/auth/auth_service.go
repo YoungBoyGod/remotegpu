@@ -107,11 +107,12 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 	}
 
 	if !auth.CheckPasswordHash(password, customer.PasswordHash) {
-		return "", "", 0, ErrInvalidCredentials
+		return "", "", 0, errors.New("invalid credentials")
 	}
 
+	// 验证账号状态
 	if customer.Status != "active" {
-		return "", "", 0, ErrAccountDisabled
+		return "", "", 0, errors.New("account is disabled")
 	}
 
 	// 更新最后登录时间
