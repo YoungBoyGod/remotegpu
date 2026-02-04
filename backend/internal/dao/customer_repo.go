@@ -44,3 +44,21 @@ func (d *CustomerDao) List(ctx context.Context, page, pageSize int) ([]entity.Cu
 func (d *CustomerDao) UpdateStatus(ctx context.Context, id uint, status string) error {
 	return d.db.WithContext(ctx).Model(&entity.Customer{}).Where("id = ?", id).Update("status", status).Error
 }
+
+// CountActive 统计活跃客户数量
+// @description 统计状态为 active 的客户数量
+// @modified 2026-02-04
+func (d *CustomerDao) CountActive(ctx context.Context) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&entity.Customer{}).
+		Where("status = ?", "active").Count(&count).Error
+	return count, err
+}
+
+// Count 统计客户总数
+// @modified 2026-02-04
+func (d *CustomerDao) Count(ctx context.Context) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&entity.Customer{}).Count(&count).Error
+	return count, err
+}
