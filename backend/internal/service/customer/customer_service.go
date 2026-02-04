@@ -35,3 +35,9 @@ func (s *CustomerService) ListCustomers(ctx context.Context, page, pageSize int)
 func (s *CustomerService) UpdateStatus(ctx context.Context, id uint, status string) error {
 	return s.customerDao.UpdateStatus(ctx, id, status)
 }
+
+// CountActive 统计活跃客户数量
+// @modified 2026-02-04
+func (s *CustomerService) CountActive(ctx context.Context) (int64, error) {
+	return s.customerDao.CountActive(ctx)
+}
