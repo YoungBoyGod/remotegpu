@@ -13,6 +13,11 @@ type LoginResponse struct {
 	ExpiresIn    int64  `json:"expires_in"`
 }
 
+// RefreshRequest 刷新令牌请求
+type RefreshRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
+}
+
 // RefreshTokenRequest 刷新令牌请求
 type RefreshTokenRequest struct {
 	RefreshToken string `json:"refresh_token" binding:"required"`
