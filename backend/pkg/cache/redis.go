@@ -9,6 +9,7 @@ import (
 )
 
 var Client *redis.Client
+var GlobalCache Cache
 
 // Config Redis 配置 (Legacy for main.go)
 type Config struct {
@@ -40,12 +41,20 @@ func InitRedis(cfg Config) error {
 		return fmt.Errorf("连接 Redis 失败: %w", err)
 	}
 
+	// 初始化全局 Cache 实例
+	GlobalCache = &RedisCache{client: Client}
+
 	return nil
 }
 
 // GetRedis 获取 Redis 客户端
 func GetRedis() *redis.Client {
 	return Client
+}
+
+// GetCache 获取全局 Cache 实例
+func GetCache() Cache {
+	return GlobalCache
 }
 
 // --- New Implementation for Cache Interface ---
