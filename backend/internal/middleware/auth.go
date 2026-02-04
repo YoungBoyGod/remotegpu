@@ -1,14 +1,12 @@
 package middleware
 
 import (
-	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/auth"
 	"github.com/YoungBoyGod/remotegpu/pkg/cache"
-	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/YoungBoyGod/remotegpu/pkg/response"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -17,7 +15,7 @@ import (
 const tokenBlacklistPrefix = "auth:token:blacklist:"
 
 // Auth JWT 认证中间件
-func Auth() gin.HandlerFunc {
+func Auth(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 从 Header 获取 token
 		authHeader := c.GetHeader("Authorization")
@@ -50,7 +48,15 @@ func Auth() gin.HandlerFunc {
 			return
 		}
 
-		if !isAccountActive(c, claims.UserID) {
+		// Check user status in DB
+		var user entity.Customer
+		if err := db.Select("status").First(&user, claims.UserID).Error; err != nil {
+			response.Error(c, http.StatusUnauthorized, "User not found")
+			c.Abort()
+			return
+		}
+		if user.Status != "active" {
+			response.Error(c, http.StatusUnauthorized, "Account is disabled")
 			c.Abort()
 			return
 		}

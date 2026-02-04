@@ -103,12 +103,12 @@ func InitRouter(r *gin.Engine) {
 			authGroup.POST("/logout", authController.Logout)
 			
 			// 受保护的个人资料
-			authGroup.GET("/profile", middleware.Auth(), authController.GetProfile)
+			authGroup.GET("/profile", middleware.Auth(db), authController.GetProfile)
 		}
 
 		// 2. Admin Module (Protected + Role Check)
 		adminGroup := apiV1.Group("/admin")
-		adminGroup.Use(middleware.Auth(), middleware.RequireAdmin())
+		adminGroup.Use(middleware.Auth(db), middleware.RequireAdmin())
 		{
 			// 仪表板
 			adminGroup.GET("/dashboard/stats", dashboardController.GetStats)
@@ -140,7 +140,7 @@ func InitRouter(r *gin.Engine) {
 
 		// 3. Customer Module (Protected)
 		custGroup := apiV1.Group("/customer")
-		custGroup.Use(middleware.Auth())
+		custGroup.Use(middleware.Auth(db))
 		{
 			// 机器管理
 			custGroup.GET("/machines", myMachineController.List)
