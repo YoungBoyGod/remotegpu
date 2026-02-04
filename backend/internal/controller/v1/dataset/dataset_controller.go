@@ -26,15 +26,24 @@ func NewDatasetController(ds *serviceDataset.DatasetService, ss *serviceStorage.
 	}
 }
 
+// List 获取当前用户的数据集列表
+// @author Claude
+// @description 根据JWT中的userID过滤，只返回当前用户的数据集
+// @reason 原实现使用硬编码userID，存在数据泄露风险
+// @modified 2026-02-04
 func (c *DatasetController) List(ctx *gin.Context) {
-	// userID := ctx.GetUint("userID")
-	userID := uint(1) // Mock
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
 
-	datasets, total, err := c.datasetService.ListDatasets(ctx, userID, page, pageSize)
+	datasets, total, err := c.datasetService.ListDatasets(ctx, userID.(uint), page, pageSize)
 	if err != nil {
-		c.Error(ctx, 500, "Failed to list datasets")
+		c.Error(ctx, 500, "获取数据集列表失败")
 		return
 	}
 
@@ -66,9 +75,30 @@ func (c *DatasetController) InitUpload(ctx *gin.Context) {
 	})
 }
 
+// Mount 挂载数据集到机器
+// @author Claude
+// @description 挂载数据集前校验数据集是否属于当前用户
+// @reason 原实现无权限校验，存在越权风险
+// @modified 2026-02-04
 func (c *DatasetController) Mount(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
 	idStr := ctx.Param("id")
 	datasetID, _ := strconv.ParseUint(idStr, 10, 64)
+
+	// 验证数据集所有权
+	if err := c.datasetService.ValidateOwnership(ctx, uint(datasetID), userID.(uint)); err != nil {
+		if err.Error() == "无权限访问该资源" {
+			c.Error(ctx, 403, "无权限操作该数据集")
+			return
+		}
+		c.Error(ctx, 404, "数据集不存在")
+		return
+	}
 
 	var req apiV1.MountRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -76,10 +106,12 @@ func (c *DatasetController) Mount(ctx *gin.Context) {
 		return
 	}
 
+	// TODO: 验证机器是否属于当前用户（需要AllocationService支持）
+
 	if err := c.agentService.MountDataset(ctx, req.MachineID, uint(datasetID), req.MountPoint); err != nil {
-		c.Error(ctx, 500, "Failed to mount dataset")
+		c.Error(ctx, 500, "挂载数据集失败")
 		return
 	}
 
-	c.Success(ctx, gin.H{"message": "Mount command sent"})
+	c.Success(ctx, gin.H{"message": "挂载命令已发送"})
 }
