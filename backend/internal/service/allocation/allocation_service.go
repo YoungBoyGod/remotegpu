@@ -111,3 +111,15 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 func (s *AllocationService) GetRecent(ctx context.Context) ([]entity.Allocation, error) {
 	return s.allocationDao.FindRecent(ctx, 5)
 }
+
+// ListByCustomerID 获取指定客户的活跃分配列表
+// @author Claude
+// @description 根据客户ID查询其所有活跃的机器分配记录，用于客户端"我的机器"列表
+// @param customerID 客户ID（从JWT中获取）
+// @param page 页码
+// @param pageSize 每页数量
+// @return 分配列表、总数、错误
+// @modified 2026-02-04
+func (s *AllocationService) ListByCustomerID(ctx context.Context, customerID uint, page, pageSize int) ([]entity.Allocation, int64, error) {
+	return s.allocationDao.FindActiveByCustomerID(ctx, customerID, page, pageSize)
+}
