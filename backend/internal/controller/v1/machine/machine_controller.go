@@ -109,6 +109,35 @@ func (c *MachineController) Reclaim(ctx *gin.Context) {
 }
 
 func (c *MachineController) Import(ctx *gin.Context) {
-	// TODO: Handle Excel file upload and parsing
-	c.Success(ctx, gin.H{"message": "Import feature pending implementation"})
+	var req apiV1.ImportMachineRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, "Invalid import data")
+		return
+	}
+
+	var hosts []entity.Host
+	for _, m := range req.Machines {
+		hosts = append(hosts, entity.Host{
+			IPAddress:   m.HostIP,
+			SSHPort:     m.SSHPort,
+			Region:      m.Region,
+			GPUModel:    m.GPUModel,
+			GPUCount:    m.GPUCount,
+			CPUCores:    m.CPUCores,
+			RAMSize:     m.RAMSize,
+			DiskSize:    m.DiskSize,
+			Status:      "idle", // Default status
+			PriceHourly: float64(m.PriceHourly) / 100.0,
+		})
+	}
+
+	if err := c.machineService.ImportMachines(ctx, hosts); err != nil {
+		c.Error(ctx, 500, "Failed to import machines")
+		return
+	}
+
+	c.Success(ctx, gin.H{
+		"message": "Imported successfully",
+		"count":   len(hosts),
+	})
 }
