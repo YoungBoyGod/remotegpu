@@ -2,6 +2,7 @@ package audit
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
@@ -38,9 +39,14 @@ func (s *AuditService) CreateLog(
 	detail map[string]interface{},
 	statusCode int,
 ) error {
+	// CodeX 2026-02-04: marshal detail explicitly to catch errors.
 	var detailJSON datatypes.JSON
 	if detail != nil {
-		detailJSON, _ = datatypes.NewJSONType(detail).MarshalJSON()
+		payload, err := json.Marshal(detail)
+		if err != nil {
+			return err
+		}
+		detailJSON = datatypes.JSON(payload)
 	}
 
 	log := &entity.AuditLog{

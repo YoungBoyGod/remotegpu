@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
@@ -17,6 +18,7 @@ const tokenBlacklistPrefix = "auth:token:blacklist:"
 // Auth JWT 认证中间件
 func Auth(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// CodeX 2026-02-04: enforce account status check with DB when available.
 		// 从 Header 获取 token
 		authHeader := c.GetHeader("Authorization")
 		if authHeader == "" {
@@ -48,17 +50,23 @@ func Auth(db *gorm.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Check user status in DB
-		var user entity.Customer
-		if err := db.Select("status").First(&user, claims.UserID).Error; err != nil {
-			response.Error(c, http.StatusUnauthorized, "User not found")
-			c.Abort()
-			return
-		}
-		if user.Status != "active" {
-			response.Error(c, http.StatusUnauthorized, "Account is disabled")
-			c.Abort()
-			return
+		if db != nil {
+			var user entity.Customer
+			err := db.Select("status").First(&user, claims.UserID).Error
+			if err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					response.Error(c, http.StatusUnauthorized, "用户不存在")
+				} else {
+					response.Error(c, http.StatusInternalServerError, "认证失败")
+				}
+				c.Abort()
+				return
+			}
+			if user.Status != "active" {
+				response.Error(c, http.StatusForbidden, "账号已停用")
+				c.Abort()
+				return
+			}
 		}
 
 		// 将用户信息存入上下文 (Fixed Key Name)
@@ -82,29 +90,4 @@ func isTokenBlacklisted(c *gin.Context, token string) bool {
 		return false
 	}
 	return count > 0
-}
-
-func isAccountActive(c *gin.Context, userID uint) bool {
-	db := database.GetDB()
-	if db == nil {
-		return true
-	}
-
-	var customer entity.Customer
-	err := db.Select("status").First(&customer, userID).Error
-	if err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			response.Error(c, http.StatusUnauthorized, "用户不存在")
-			return false
-		}
-		response.Error(c, http.StatusInternalServerError, "认证失败")
-		return false
-	}
-
-	if customer.Status != "active" {
-		response.Error(c, http.StatusForbidden, "账号已停用")
-		return false
-	}
-
-	return true
 }
