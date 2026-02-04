@@ -1,6 +1,6 @@
 # CodeX 未完成任务清单
 
-> 说明：记录当前尚未完成的功能、原因、建议方案与依赖。
+> 说明：记录当前尚未完成的技术债务、原因、建议方案与依赖。
 
 ## 1. GPU 趋势真实数据
 
@@ -34,17 +34,7 @@
   4. 做去重与状态更新（已存在则更新元数据）。
 - 依赖：Harbor API 访问凭据、网络可达。
 
-## 4. 机器创建校验 / 导入幂等
-
-- 位置：`internal/service/machine/machine_service.go` (`CreateMachine`) + `ImportMachines`
-- 原因：未校验 IP 唯一性，导入可能重复。
-- 实现建议：
-  1. 创建前检查 `ip_address` / `hostname` 是否已存在。
-  2. 导入接口可先批量查询已存在记录。
-  3. 对重复条目做跳过或更新策略。
-- 依赖：数据库唯一索引（可选加强）。
-
-## 5. 机器分配后的异步动作
+## 4. 机器分配后的异步动作
 
 - 位置：`internal/service/allocation/allocation_service.go` (`AllocateMachine`, `ReclaimMachine`)
 - 原因：异步清理/重置 SSH 逻辑未实现。
@@ -54,7 +44,7 @@
   3. 可用 goroutine 或任务队列（如 Redis + worker）。
 - 依赖：Agent 接口可用、异步任务框架（可选）。
 
-## 6. 任务停止的 Agent 集成
+## 5. 任务停止的 Agent 集成
 
 - 位置：`internal/service/task/task_service.go` (`StopTask` / `StopTaskWithAuth`)
 - 原因：当前仅更新状态，未通知实际运行环境。
