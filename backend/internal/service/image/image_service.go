@@ -37,3 +37,9 @@ func (s *ImageService) Update(ctx context.Context, img *entity.Image) error {
 func (s *ImageService) Delete(ctx context.Context, id uint) error {
 	return s.imageDao.Delete(ctx, id)
 }
+
+func (s *ImageService) Sync(ctx context.Context) error {
+	// TODO: Implement actual sync logic with Harbor or local registry
+	// For now, we'll just mock it or do nothing
+	return nil
+}

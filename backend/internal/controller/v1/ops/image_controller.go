@@ -22,6 +22,13 @@ func NewImageController(svc *image.ImageService) *ImageController {
 func (c *ImageController) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "20"))
+	// CodeX 2026-02-04: normalize paging input to avoid invalid offsets.
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
 
 	params := dao.ImageListParams{
 		Page:      page,
@@ -43,4 +50,13 @@ func (c *ImageController) List(ctx *gin.Context) {
 		"page":      page,
 		"page_size": pageSize,
 	})
+}
+
+// Sync 同步镜像
+func (c *ImageController) Sync(ctx *gin.Context) {
+	if err := c.imageService.Sync(ctx); err != nil {
+		c.Error(ctx, 500, "同步镜像失败")
+		return
+	}
+	c.Success(ctx, gin.H{"message": "同步任务已触发"})
 }

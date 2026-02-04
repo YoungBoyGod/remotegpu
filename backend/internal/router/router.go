@@ -136,6 +136,7 @@ func InitRouter(r *gin.Engine) {
 
 			// 镜像管理
 			adminGroup.GET("/images", imageController.List)
+			adminGroup.POST("/images/sync", imageController.Sync)
 		}
 
 		// 3. Customer Module (Protected)
