@@ -130,6 +130,7 @@ func InitRouter(r *gin.Engine) {
 			// 监控与运维
 			adminGroup.GET("/monitoring/realtime", monitorController.GetRealtime)
 			adminGroup.GET("/alerts", alertController.List)
+			adminGroup.POST("/alerts/:id/acknowledge", alertController.Acknowledge)
 
 			// 审计日志
 			adminGroup.GET("/audit/logs", auditController.List)
