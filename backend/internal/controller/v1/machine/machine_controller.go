@@ -24,6 +24,21 @@ func NewMachineController(ms *serviceMachine.MachineService, as *serviceAllocati
 	}
 }
 
+// List 获取机器列表
+// @Summary 获取机器列表
+// @Description 获取所有机器的列表，支持分页和筛选
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param status query string false "状态筛选 (idle, allocated, maintenance, offline)"
+// @Param region query string false "区域筛选"
+// @Param gpu_model query string false "GPU型号筛选"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines [get]
 func (c *MachineController) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
@@ -53,6 +68,18 @@ func (c *MachineController) List(ctx *gin.Context) {
 	})
 }
 
+// Create 创建机器
+// @Summary 创建机器
+// @Description 添加新的机器到系统
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param request body entity.Host true "机器信息"
+// @Security Bearer
+// @Success 200 {object} entity.Host
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines [post]
 func (c *MachineController) Create(ctx *gin.Context) {
 	var host entity.Host
 	if err := ctx.ShouldBindJSON(&host); err != nil {
@@ -68,6 +95,19 @@ func (c *MachineController) Create(ctx *gin.Context) {
 	c.Success(ctx, host)
 }
 
+// Allocate 分配机器
+// @Summary 分配机器
+// @Description 将机器分配给客户
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param id path string true "机器ID"
+// @Param request body v1.AllocateRequest true "分配请求"
+// @Security Bearer
+// @Success 200 {object} entity.Allocation
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/{id}/allocate [post]
 func (c *MachineController) Allocate(ctx *gin.Context) {
 	// machineID from URL param
 	hostID := ctx.Param("id")
@@ -93,6 +133,18 @@ func (c *MachineController) Allocate(ctx *gin.Context) {
 	c.Success(ctx, alloc)
 }
 
+// Reclaim 回收机器
+// @Summary 回收机器
+// @Description 从客户处回收机器
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param id path string true "机器ID"
+// @Param request body v1.ReclaimRequest false "回收请求"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/{id}/reclaim [post]
 func (c *MachineController) Reclaim(ctx *gin.Context) {
 	hostID := ctx.Param("id")
 	
@@ -108,6 +160,18 @@ func (c *MachineController) Reclaim(ctx *gin.Context) {
 	c.Success(ctx, gin.H{"message": "Reclaim process started"})
 }
 
+// Import 批量导入机器
+// @Summary 批量导入机器
+// @Description 批量导入机器信息
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param request body v1.ImportMachineRequest true "导入请求"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/import [post]
 func (c *MachineController) Import(ctx *gin.Context) {
 	var req apiV1.ImportMachineRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
