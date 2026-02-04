@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"errors"
 	"strings"
 
 	apiV1 "github.com/YoungBoyGod/remotegpu/api/v1"
@@ -29,7 +30,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 
 	accessToken, refreshToken, expiresIn, err := c.authService.Login(ctx, req.Username, req.Password)
 	if err != nil {
-		c.Error(ctx, 401, "Authentication failed")
+		c.handleAuthError(ctx, err)
 		return
 	}
 
@@ -49,7 +50,7 @@ func (c *AuthController) Refresh(ctx *gin.Context) {
 
 	accessToken, refreshToken, expiresIn, err := c.authService.RefreshToken(ctx, req.RefreshToken)
 	if err != nil {
-		c.Error(ctx, 401, "Invalid refresh token")
+		c.handleRefreshError(ctx, err)
 		return
 	}
 
@@ -65,7 +66,10 @@ func (c *AuthController) Logout(ctx *gin.Context) {
 	authHeader := ctx.GetHeader("Authorization")
 	if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
 		token := strings.TrimPrefix(authHeader, "Bearer ")
-		c.authService.Logout(ctx, token)
+		if err := c.authService.Logout(ctx, token); err != nil {
+			c.Error(ctx, 500, "Logout failed")
+			return
+		}
 	}
 	c.Success(ctx, gin.H{"message": "Logged out successfully"})
 }
@@ -91,11 +95,7 @@ func (c *AuthController) AdminLogin(ctx *gin.Context) {
 
 	accessToken, refreshToken, expiresIn, err := c.authService.AdminLogin(ctx, req.Username, req.Password)
 	if err != nil {
-		if err.Error() == "permission denied: admin role required" {
-			c.Error(ctx, 403, "Permission denied")
-			return
-		}
-		c.Error(ctx, 401, "Authentication failed")
+		c.handleAuthError(ctx, err)
 		return
 	}
 
@@ -104,4 +104,28 @@ func (c *AuthController) AdminLogin(ctx *gin.Context) {
 		RefreshToken: refreshToken,
 		ExpiresIn:    expiresIn,
 	})
+}
+
+func (c *AuthController) handleAuthError(ctx *gin.Context, err error) {
+	switch {
+	case errors.Is(err, serviceAuth.ErrInvalidCredentials):
+		c.Error(ctx, 401, "Authentication failed")
+	case errors.Is(err, serviceAuth.ErrAccountDisabled):
+		c.Error(ctx, 403, "Account disabled")
+	case errors.Is(err, serviceAuth.ErrPermissionDenied):
+		c.Error(ctx, 403, "Permission denied")
+	default:
+		c.Error(ctx, 500, "Authentication failed")
+	}
+}
+
+func (c *AuthController) handleRefreshError(ctx *gin.Context, err error) {
+	switch {
+	case errors.Is(err, serviceAuth.ErrRefreshTokenInvalid):
+		c.Error(ctx, 401, "Invalid or expired refresh token")
+	case errors.Is(err, serviceAuth.ErrAccountDisabled):
+		c.Error(ctx, 403, "Account disabled")
+	default:
+		c.Error(ctx, 500, "Failed to refresh token")
+	}
 }
