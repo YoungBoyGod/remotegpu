@@ -104,6 +104,31 @@
 
 ---
 
+### 5. 告警列表完善 (`/admin/alerts`)
+
+**目标**: 完善告警列表功能，添加分页、筛选和确认机制
+
+**修改文件**:
+
+| 文件路径 | 修改类型 | 说明 |
+|---------|---------|------|
+| `internal/dao/ops_repo.go` | 新增方法 | 添加 `ListAlerts` 和 `AcknowledgeAlert` 方法 |
+| `internal/service/ops/ops_service.go` | 新增方法 | 添加 `ListAlerts` 和 `AcknowledgeAlert` 方法 |
+| `internal/controller/v1/ops/ops_controller.go` | 重构 | List 添加分页筛选，新增 Acknowledge 方法 |
+| `internal/router/router.go` | 新增路由 | 添加 `POST /admin/alerts/:id/acknowledge` |
+
+**代码审查发现的问题**:
+- 原 `List` 方法无分页和筛选功能
+- 缺少告警确认机制
+
+**Git 提交**:
+- `b9573e6` feat(dao): 添加告警分页查询和确认方法
+- `27faf7b` feat(service): 添加告警分页查询和确认方法
+- `0aa5860` feat(controller): 完善告警列表功能
+- `91ea958` feat(router): 添加告警确认路由
+
+---
+
 ## 注释规范
 
 所有关键函数添加以下格式的注释：
@@ -126,5 +151,6 @@ func FunctionName() {}
 
 根据 `docs/任务清单.md`，以下任务待完成：
 
-- [ ] 告警列表 `/admin/alerts` - 添加分页、筛选、确认功能
+- [x] 告警列表 `/admin/alerts` - 已完成分页、筛选、确认功能
+- [ ] 回收机器 `/admin/machines/:id/reclaim`
 - [ ] Swagger/OpenAPI 文档完善
