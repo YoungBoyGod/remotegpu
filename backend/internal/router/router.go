@@ -51,7 +51,7 @@ func InitRouter(r *gin.Engine) {
 			if backend.Type == "local" && backend.Enabled {
 				// 在 /uploads 路径下提供服务，例如 http://localhost:8080/uploads/filename.jpg
 				r.Static("/uploads", backend.Path)
-				break 
+				break
 			}
 		}
 	}
@@ -70,7 +70,7 @@ func InitRouter(r *gin.Engine) {
 	storageSvc := serviceStorage.NewStorageService(storageMgr)
 	sshKeySvc := serviceSSHKey.NewSSHKeyService(db)
 	imageSvc := serviceImage.NewImageService(db)
-	
+
 	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc)
 
 	// --- 控制器层初始化 ---
@@ -80,10 +80,10 @@ func InitRouter(r *gin.Engine) {
 	customerController := ctrlCustomer.NewCustomerController(custSvc)
 	monitorController := ctrlOps.NewMonitorController(monitorSvc)
 	alertController := ctrlOps.NewAlertController(opsSvc)
-	
+
 	myMachineController := ctrlCustomer.NewMyMachineController(machineSvc, agentSvc, allocSvc)
 	taskController := ctrlTask.NewTaskController(taskSvc)
-	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc)
+	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc, allocSvc)
 	sshKeyController := ctrlCustomer.NewSSHKeyController(sshKeySvc)
 	auditController := ctrlOps.NewAuditController(auditSvc)
 	imageController := ctrlOps.NewImageController(imageSvc)
@@ -101,14 +101,14 @@ func InitRouter(r *gin.Engine) {
 			authGroup.POST("/login", authController.Login)
 			authGroup.POST("/refresh", authController.Refresh)
 			authGroup.POST("/logout", authController.Logout)
-			
+
 			// 受保护的个人资料
 			authGroup.GET("/profile", middleware.Auth(db), authController.GetProfile)
 		}
 
 		// 2. Admin Module (Protected + Role Check)
 		adminGroup := apiV1.Group("/admin")
-		adminGroup.Use(middleware.Auth(db), middleware.RequireAdmin())
+		adminGroup.Use(middleware.Auth(db), middleware.RequireAdmin(), middleware.AuditMiddleware(auditSvc))
 		{
 			// 仪表板
 			adminGroup.GET("/dashboard/stats", dashboardController.GetStats)

@@ -2,23 +2,20 @@ package sshkey
 
 import (
 	"context"
-	"crypto/md5"
-	"crypto/sha256"
-	"encoding/base64"
 	"errors"
-	"fmt"
 	"strings"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	"golang.org/x/crypto/ssh"
 	"gorm.io/gorm"
 )
 
 var (
-	ErrInvalidPublicKey   = errors.New("无效的 SSH 公钥格式")
-	ErrKeyAlreadyExists   = errors.New("该 SSH 密钥已存在")
-	ErrKeyNotFound        = errors.New("SSH 密钥不存在")
-	ErrKeyNotOwnedByUser  = errors.New("无权操作此 SSH 密钥")
+	ErrInvalidPublicKey  = errors.New("无效的 SSH 公钥格式")
+	ErrKeyAlreadyExists  = errors.New("该 SSH 密钥已存在")
+	ErrKeyNotFound       = errors.New("SSH 密钥不存在")
+	ErrKeyNotOwnedByUser = errors.New("无权操作此 SSH 密钥")
 )
 
 type SSHKeyService struct {
@@ -103,46 +100,22 @@ func (s *SSHKeyService) GetKey(ctx context.Context, customerID, keyID uint) (*en
 
 // parseSSHPublicKey 解析 SSH 公钥并返回指纹
 func parseSSHPublicKey(publicKey string) (string, error) {
-	parts := strings.Fields(publicKey)
-	if len(parts) < 2 {
-		return "", ErrInvalidPublicKey
-	}
-
-	keyType := parts[0]
-	if keyType != "ssh-rsa" && keyType != "ssh-ed25519" &&
-	   keyType != "ecdsa-sha2-nistp256" && keyType != "ecdsa-sha2-nistp384" &&
-	   keyType != "ecdsa-sha2-nistp521" {
-		return "", ErrInvalidPublicKey
-	}
-
-	keyData, err := base64.StdEncoding.DecodeString(parts[1])
+	// CodeX 2026-02-04: use ssh.ParseAuthorizedKey for robust parsing.
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(strings.TrimSpace(publicKey)))
 	if err != nil {
 		return "", ErrInvalidPublicKey
 	}
 
-	// 生成 SHA256 指纹
-	hash := sha256.Sum256(keyData)
-	fingerprint := "SHA256:" + base64.RawStdEncoding.EncodeToString(hash[:])
-
-	return fingerprint, nil
+	return ssh.FingerprintSHA256(key), nil
 }
 
 // GetMD5Fingerprint 获取 MD5 格式的指纹（兼容旧格式）
 func GetMD5Fingerprint(publicKey string) (string, error) {
-	parts := strings.Fields(publicKey)
-	if len(parts) < 2 {
-		return "", ErrInvalidPublicKey
-	}
-
-	keyData, err := base64.StdEncoding.DecodeString(parts[1])
+	key, _, _, _, err := ssh.ParseAuthorizedKey([]byte(strings.TrimSpace(publicKey)))
 	if err != nil {
 		return "", ErrInvalidPublicKey
 	}
 
-	hash := md5.Sum(keyData)
-	var fp []string
-	for _, b := range hash {
-		fp = append(fp, fmt.Sprintf("%02x", b))
-	}
-	return strings.Join(fp, ":"), nil
+	fingerprint := ssh.FingerprintLegacyMD5(key)
+	return strings.TrimPrefix(fingerprint, "MD5:"), nil
 }

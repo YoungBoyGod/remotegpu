@@ -24,6 +24,13 @@ func NewAuditController(svc *audit.AuditService) *AuditController {
 func (c *AuditController) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "20"))
+	// CodeX 2026-02-04: normalize paging input to avoid invalid offsets.
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 || pageSize > 200 {
+		pageSize = 20
+	}
 
 	params := dao.AuditListParams{
 		Page:         page,

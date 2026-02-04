@@ -37,7 +37,7 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 
 	// 使用事务确保原子性
 	var allocation *entity.Allocation
-	
+
 	err := s.db.Transaction(func(tx *gorm.DB) error {
 		machineDao := dao.NewMachineDao(tx)
 		allocationDao := dao.NewAllocationDao(tx)
@@ -71,7 +71,7 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 		if err := allocationDao.Create(ctx, allocation); err != nil {
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
-		
+
 		return nil
 	})
 
@@ -144,6 +144,19 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 
 func (s *AllocationService) GetRecent(ctx context.Context) ([]entity.Allocation, error) {
 	return s.allocationDao.FindRecent(ctx, 5)
+}
+
+// ValidateHostOwnership 确认机器归属当前用户
+// CodeX 2026-02-04: enforce dataset mount authorization by allocation check.
+func (s *AllocationService) ValidateHostOwnership(ctx context.Context, hostID string, customerID uint) error {
+	_, err := s.allocationDao.FindActiveByHostAndCustomer(ctx, hostID, customerID)
+	if err != nil {
+		if stderrors.Is(err, gorm.ErrRecordNotFound) {
+			return entity.ErrUnauthorized
+		}
+		return err
+	}
+	return nil
 }
 
 // ListByCustomerID 获取指定客户的活跃分配列表

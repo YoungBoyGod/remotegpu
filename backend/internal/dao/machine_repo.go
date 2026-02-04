@@ -27,6 +27,51 @@ func (d *MachineDao) FindByID(ctx context.Context, id string) (*entity.Host, err
 	return &host, nil
 }
 
+func (d *MachineDao) FindByIPAddress(ctx context.Context, ip string) (*entity.Host, error) {
+	var host entity.Host
+	if err := d.db.WithContext(ctx).Where("ip_address = ?", ip).First(&host).Error; err != nil {
+		return nil, err
+	}
+	return &host, nil
+}
+
+func (d *MachineDao) FindByHostname(ctx context.Context, hostname string) (*entity.Host, error) {
+	var host entity.Host
+	if err := d.db.WithContext(ctx).Where("hostname = ?", hostname).First(&host).Error; err != nil {
+		return nil, err
+	}
+	return &host, nil
+}
+
+type HostKey struct {
+	IPAddress string
+	Hostname  string
+}
+
+func (d *MachineDao) FindExistingKeys(ctx context.Context, ips []string, hostnames []string) (map[HostKey]entity.Host, error) {
+	if len(ips) == 0 && len(hostnames) == 0 {
+		return map[HostKey]entity.Host{}, nil
+	}
+
+	var hosts []entity.Host
+	query := d.db.WithContext(ctx).Model(&entity.Host{})
+	if len(ips) > 0 {
+		query = query.Or("ip_address IN ?", ips)
+	}
+	if len(hostnames) > 0 {
+		query = query.Or("hostname IN ?", hostnames)
+	}
+	if err := query.Find(&hosts).Error; err != nil {
+		return nil, err
+	}
+
+	results := make(map[HostKey]entity.Host, len(hosts))
+	for _, host := range hosts {
+		results[HostKey{IPAddress: host.IPAddress, Hostname: host.Hostname}] = host
+	}
+	return results, nil
+}
+
 func (d *MachineDao) List(ctx context.Context, page, pageSize int, filters map[string]interface{}) ([]entity.Host, int64, error) {
 	var hosts []entity.Host
 	var total int64

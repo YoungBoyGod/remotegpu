@@ -2,6 +2,9 @@ package machine
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strings"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
@@ -18,23 +21,97 @@ func NewMachineService(db *gorm.DB) *MachineService {
 	}
 }
 
+var (
+	ErrHostDuplicateIP       = errors.New("host ip already exists")
+	ErrHostDuplicateHostname = errors.New("host hostname already exists")
+)
+
 func (s *MachineService) ListMachines(ctx context.Context, page, pageSize int, filters map[string]interface{}) ([]entity.Host, int64, error) {
 	return s.machineDao.List(ctx, page, pageSize, filters)
 }
 
 func (s *MachineService) CreateMachine(ctx context.Context, host *entity.Host) error {
-	// TODO: Add validation logic (e.g., check IP uniqueness)
+	// CodeX 2026-02-04: validate unique IP/hostname before create.
+	if host.IPAddress != "" {
+		if _, err := s.machineDao.FindByIPAddress(ctx, host.IPAddress); err == nil {
+			return ErrHostDuplicateIP
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
+	if host.Hostname != "" {
+		if _, err := s.machineDao.FindByHostname(ctx, host.Hostname); err == nil {
+			return ErrHostDuplicateHostname
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+	}
 	return s.machineDao.Create(ctx, host)
 }
 
 func (s *MachineService) ImportMachines(ctx context.Context, hosts []entity.Host) error {
-	// 实际实现中，应该使用 gorm 的批量插入
+	// CodeX 2026-02-04: skip duplicates by IP/hostname during import.
+	if len(hosts) == 0 {
+		return nil
+	}
+
+	ips := make([]string, 0, len(hosts))
+	hostnames := make([]string, 0, len(hosts))
 	for _, host := range hosts {
-		if err := s.machineDao.Create(ctx, &host); err != nil {
-			return err
+		if host.IPAddress != "" {
+			ips = append(ips, host.IPAddress)
+		}
+		if host.Hostname != "" {
+			hostnames = append(hostnames, host.Hostname)
 		}
 	}
+
+	existing, err := s.machineDao.FindExistingKeys(ctx, uniqueStrings(ips), uniqueStrings(hostnames))
+	if err != nil {
+		return err
+	}
+
+	for _, host := range hosts {
+		key := dao.HostKey{IPAddress: host.IPAddress, Hostname: host.Hostname}
+		if _, ok := existing[key]; ok {
+			continue
+		}
+		if err := s.machineDao.Create(ctx, &host); err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				continue
+			}
+			return fmt.Errorf("import host %s failed: %w", formatHostKey(host), err)
+		}
+	}
+
 	return nil
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		result = append(result, value)
+	}
+	return result
+}
+
+func formatHostKey(host entity.Host) string {
+	if host.Hostname != "" && host.IPAddress != "" {
+		return host.Hostname + " (" + host.IPAddress + ")"
+	}
+	if host.Hostname != "" {
+		return host.Hostname
+	}
+	return host.IPAddress
 }
 
 func (s *MachineService) GetConnectionInfo(ctx context.Context, hostID string) (map[string]interface{}, error) {

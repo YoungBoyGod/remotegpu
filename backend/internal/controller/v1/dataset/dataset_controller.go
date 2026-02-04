@@ -5,6 +5,7 @@ import (
 
 	apiV1 "github.com/YoungBoyGod/remotegpu/api/v1"
 	"github.com/YoungBoyGod/remotegpu/internal/controller/v1/common"
+	serviceAllocation "github.com/YoungBoyGod/remotegpu/internal/service/allocation"
 	serviceDataset "github.com/YoungBoyGod/remotegpu/internal/service/dataset"
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	serviceStorage "github.com/YoungBoyGod/remotegpu/internal/service/storage"
@@ -13,16 +14,18 @@ import (
 
 type DatasetController struct {
 	common.BaseController
-	datasetService *serviceDataset.DatasetService
-	storageService *serviceStorage.StorageService
-	agentService   *serviceOps.AgentService
+	datasetService    *serviceDataset.DatasetService
+	storageService    *serviceStorage.StorageService
+	agentService      *serviceOps.AgentService
+	allocationService *serviceAllocation.AllocationService
 }
 
-func NewDatasetController(ds *serviceDataset.DatasetService, ss *serviceStorage.StorageService, as *serviceOps.AgentService) *DatasetController {
+func NewDatasetController(ds *serviceDataset.DatasetService, ss *serviceStorage.StorageService, as *serviceOps.AgentService, alloc *serviceAllocation.AllocationService) *DatasetController {
 	return &DatasetController{
-		datasetService: ds,
-		storageService: ss,
-		agentService:   as,
+		datasetService:    ds,
+		storageService:    ss,
+		agentService:      as,
+		allocationService: alloc,
 	}
 }
 
@@ -70,7 +73,7 @@ func (c *DatasetController) InitUpload(ctx *gin.Context) {
 	}
 
 	c.Success(ctx, gin.H{
-		"upload_id": uploadID,
+		"upload_id":  uploadID,
 		"chunk_size": 5 * 1024 * 1024,
 	})
 }
@@ -106,7 +109,15 @@ func (c *DatasetController) Mount(ctx *gin.Context) {
 		return
 	}
 
-	// TODO: 验证机器是否属于当前用户（需要AllocationService支持）
+	// CodeX 2026-02-04: verify machine ownership before mounting.
+	if err := c.allocationService.ValidateHostOwnership(ctx, req.MachineID, userID.(uint)); err != nil {
+		if err.Error() == "无权限访问该资源" {
+			c.Error(ctx, 403, "无权限操作该机器")
+			return
+		}
+		c.Error(ctx, 404, "机器不存在或未分配")
+		return
+	}
 
 	if err := c.agentService.MountDataset(ctx, req.MachineID, uint(datasetID), req.MountPoint); err != nil {
 		c.Error(ctx, 500, "挂载数据集失败")

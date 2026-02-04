@@ -88,6 +88,10 @@ func (c *MachineController) Create(ctx *gin.Context) {
 	}
 
 	if err := c.machineService.CreateMachine(ctx, &host); err != nil {
+		if err == serviceMachine.ErrHostDuplicateIP || err == serviceMachine.ErrHostDuplicateHostname {
+			c.Error(ctx, 409, "Host already exists")
+			return
+		}
 		c.Error(ctx, 500, "Failed to create machine")
 		return
 	}
@@ -147,7 +151,7 @@ func (c *MachineController) Allocate(ctx *gin.Context) {
 // @Router /admin/machines/{id}/reclaim [post]
 func (c *MachineController) Reclaim(ctx *gin.Context) {
 	hostID := ctx.Param("id")
-	
+
 	// Optional: bind body for reason
 	var req apiV1.ReclaimRequest
 	ctx.ShouldBindJSON(&req)
