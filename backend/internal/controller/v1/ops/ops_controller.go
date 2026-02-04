@@ -17,23 +17,42 @@ func NewDashboardController(ds *serviceOps.DashboardService) *DashboardControlle
 	}
 }
 
+// GetStats 获取仪表盘统计数据
+// @author Claude
+// @modified 2026-02-04
 func (c *DashboardController) GetStats(ctx *gin.Context) {
 	stats, err := c.dashboardService.GetAggregatedStats(ctx)
 	if err != nil {
-		c.Error(ctx, 500, "Failed to get stats")
+		c.Error(ctx, 500, "获取统计数据失败")
 		return
 	}
 	c.Success(ctx, stats)
 }
 
+// GetGPUTrend 获取 GPU 使用趋势
+// @author Claude
+// @modified 2026-02-04
+// @reason 统一错误信息为中文，移除多余的 data 包装保持返回格式一致
 func (c *DashboardController) GetGPUTrend(ctx *gin.Context) {
-	// Should call MetricService
-	c.Success(ctx, []map[string]interface{}{})
+	trend, err := c.dashboardService.GetGPUTrend(ctx)
+	if err != nil {
+		c.Error(ctx, 500, "获取趋势数据失败")
+		return
+	}
+	c.Success(ctx, trend)
 }
 
+// GetRecentAllocations 获取最近分配记录
+// @author Claude
+// @modified 2026-02-04
+// @reason 统一错误信息为中文，移除多余的 data 包装
 func (c *DashboardController) GetRecentAllocations(ctx *gin.Context) {
-	// Should call AllocationService
-	c.Success(ctx, []map[string]interface{}{})
+	allocations, err := c.dashboardService.GetRecentAllocations(ctx)
+	if err != nil {
+		c.Error(ctx, 500, "获取分配记录失败")
+		return
+	}
+	c.Success(ctx, allocations)
 }
 
 type MonitorController struct {
