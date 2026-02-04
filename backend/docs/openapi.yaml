@@ -1,0 +1,1105 @@
+openapi: 3.0.3
+info:
+  title: RemoteGPU API
+  description: RemoteGPU 远程GPU管理平台 API 文档
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@remotegpu.com
+
+servers:
+  - url: http://0.0.0.:8080/api/v1
+    description: 开发环境
+  - url: https://0.0.0.0:8080/api/v1
+    description: 生产环境
+
+tags:
+  - name: Auth
+    description: 认证相关接口
+  - name: Admin - Dashboard
+    description: 管理员 - 仪表板
+  - name: Admin - Machines
+    description: 管理员 - 机器管理
+  - name: Admin - Customers
+    description: 管理员 - 客户管理
+  - name: Admin - Monitoring
+    description: 管理员 - 监控运维
+  - name: Customer - Machines
+    description: 客户 - 机器管理
+  - name: Customer - Tasks
+    description: 客户 - 任务管理
+  - name: Customer - Datasets
+    description: 客户 - 数据集管理
+
+security:
+  - BearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: 健康检查
+      description: 检查服务是否正常运行
+      security: []
+      responses:
+        '200':
+          description: 服务正常
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /auth/login:
+    post:
+      tags:
+        - Auth
+      summary: 用户登录
+      description: 使用用户名和密码登录系统
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: 登录成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LoginResponse'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: 认证失败
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/refresh:
+    post:
+      tags:
+        - Auth
+      summary: 刷新令牌
+      description: 使用刷新令牌获取新的访问令牌
+      security: []
+      responses:
+        '200':
+          description: 令牌刷新成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Token refreshed
+
+  /auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: 用户登出
+      description: 登出当前用户
+      security: []
+      responses:
+        '200':
+          description: 登出成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: Logged out successfully
+
+  /auth/profile:
+    get:
+      tags:
+        - Auth
+      summary: 获取用户资料
+      description: 获取当前登录用户的个人资料
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: 服务器错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/dashboard/stats:
+    get:
+      tags:
+        - Admin - Dashboard
+      summary: 获取仪表板统计数据
+      description: 获取系统整体统计信息
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DashboardStats'
+        '401':
+          description: 未授权
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/dashboard/gpu-trend:
+    get:
+      tags:
+        - Admin - Dashboard
+      summary: 获取GPU使用趋势
+      description: 获取GPU使用率的时间趋势数据
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/GPUTrendData'
+
+  /admin/allocations/recent:
+    get:
+      tags:
+        - Admin - Dashboard
+      summary: 获取最近分配记录
+      description: 获取最近的机器分配记录
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Allocation'
+
+  /admin/machines:
+    get:
+      tags:
+        - Admin - Machines
+      summary: 获取机器列表
+      description: 获取所有机器的列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [available, allocated, maintenance]
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Machine'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  page_size:
+                    type: integer
+
+    post:
+      tags:
+        - Admin - Machines
+      summary: 创建机器
+      description: 添加新的机器到系统
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMachineRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Machine'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/machines/import:
+    post:
+      tags:
+        - Admin - Machines
+      summary: 批量导入机器
+      description: 批量导入机器信息
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                machines:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/CreateMachineRequest'
+      responses:
+        '200':
+          description: 导入成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success_count:
+                    type: integer
+                  failed_count:
+                    type: integer
+
+  /admin/machines/{id}/allocate:
+    post:
+      tags:
+        - Admin - Machines
+      summary: 分配机器
+      description: 将机器分配给客户
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AllocateRequest'
+      responses:
+        '200':
+          description: 分配成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Allocation'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/machines/{id}/reclaim:
+    post:
+      tags:
+        - Admin - Machines
+      summary: 回收机器
+      description: 从客户处回收机器
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReclaimRequest'
+      responses:
+        '200':
+          description: 回收成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /admin/customers:
+    get:
+      tags:
+        - Admin - Customers
+      summary: 获取客户列表
+      description: 获取所有客户的列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Customer'
+                  total:
+                    type: integer
+
+    post:
+      tags:
+        - Admin - Customers
+      summary: 创建客户
+      description: 创建新的客户账户
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateCustomerRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Customer'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /admin/customers/{id}/disable:
+    post:
+      tags:
+        - Admin - Customers
+      summary: 禁用客户
+      description: 禁用指定的客户账户
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 禁用成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /admin/monitoring/realtime:
+    get:
+      tags:
+        - Admin - Monitoring
+      summary: 获取实时监控数据
+      description: 获取系统实时监控信息
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RealtimeMonitoring'
+
+  /admin/alerts:
+    get:
+      tags:
+        - Admin - Monitoring
+      summary: 获取告警列表
+      description: 获取系统告警信息
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: level
+          in: query
+          schema:
+            type: string
+            enum: [info, warning, error, critical]
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Alert'
+                  total:
+                    type: integer
+
+  /customer/machines:
+    get:
+      tags:
+        - Customer - Machines
+      summary: 获取我的机器列表
+      description: 获取当前客户的机器列表
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Machine'
+
+  /customer/machines/{id}/connection:
+    get:
+      tags:
+        - Customer - Machines
+      summary: 获取机器连接信息
+      description: 获取指定机器的连接信息（SSH、VNC等）
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectionInfo'
+
+  /customer/machines/{id}/ssh-reset:
+    post:
+      tags:
+        - Customer - Machines
+      summary: 重置SSH密码
+      description: 重置指定机器的SSH密码
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 重置成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  new_password:
+                    type: string
+
+  /customer/tasks:
+    get:
+      tags:
+        - Customer - Tasks
+      summary: 获取任务列表
+      description: 获取当前客户的任务列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [pending, running, completed, failed]
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Task'
+                  total:
+                    type: integer
+
+  /customer/tasks/training:
+    post:
+      tags:
+        - Customer - Tasks
+      summary: 创建训练任务
+      description: 创建新的训练任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTrainingTaskRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Task'
+
+  /customer/tasks/{id}/stop:
+    post:
+      tags:
+        - Customer - Tasks
+      summary: 停止任务
+      description: 停止指定的任务
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 停止成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+
+  /customer/datasets:
+    get:
+      tags:
+        - Customer - Datasets
+      summary: 获取数据集列表
+      description: 获取当前客户的数据集列表
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: page_size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Dataset'
+                  total:
+                    type: integer
+
+  /customer/datasets/init-multipart:
+    post:
+      tags:
+        - Customer - Datasets
+      summary: 初始化分片上传
+      description: 初始化数据集的分片上传
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitMultipartRequest'
+      responses:
+        '200':
+          description: 初始化成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InitMultipartResponse'
+
+  /customer/datasets/{id}/mount:
+    post:
+      tags:
+        - Customer - Datasets
+      summary: 挂载数据集
+      description: 将数据集挂载到指定机器
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MountRequest'
+      responses:
+        '200':
+          description: 挂载成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                  mount_path:
+                    type: string
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT 认证令牌
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - username
+        - password
+      properties:
+        username:
+          type: string
+          description: 用户名
+          example: admin
+        password:
+          type: string
+          format: password
+          description: 密码
+          example: password123
+
+    LoginResponse:
+      type: object
+      properties:
+        access_token:
+          type: string
+          description: 访问令牌
+        refresh_token:
+          type: string
+          description: 刷新令牌
+        expires_in:
+          type: integer
+          format: int64
+          description: 过期时间（秒）
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+          enum: [admin, customer]
+        created_at:
+          type: string
+          format: date-time
+
+    AllocateRequest:
+      type: object
+      required:
+        - customer_id
+        - host_id
+        - duration_months
+      properties:
+        customer_id:
+          type: integer
+          description: 客户ID
+        host_id:
+          type: string
+          description: 主机ID
+        duration_months:
+          type: integer
+          minimum: 1
+          description: 分配时长（月）
+        remark:
+          type: string
+          description: 备注
+
+    ReclaimRequest:
+      type: object
+      properties:
+        reason:
+          type: string
+          description: 回收原因
+        force:
+          type: boolean
+          description: 是否强制回收
+
+    CreateCustomerRequest:
+      type: object
+      required:
+        - username
+        - email
+        - password
+      properties:
+        username:
+          type: string
+          description: 用户名
+        email:
+          type: string
+          format: email
+          description: 邮箱
+        password:
+          type: string
+          minLength: 6
+          description: 密码
+        role:
+          type: string
+          description: 角色
+
+    InitMultipartRequest:
+      type: object
+      required:
+        - filename
+        - size
+      properties:
+        filename:
+          type: string
+          description: 文件名
+        size:
+          type: integer
+          format: int64
+          description: 文件大小（字节）
+        md5:
+          type: string
+          description: 文件MD5值
+
+    MountRequest:
+      type: object
+      required:
+        - machine_id
+        - mount_point
+      properties:
+        machine_id:
+          type: string
+          description: 机器ID
+        mount_point:
+          type: string
+          description: 挂载点路径
+        read_only:
+          type: boolean
+          description: 是否只读
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: 错误码
+        message:
+          type: string
+          description: 错误信息
+
+    Machine:
+      type: object
+      properties:
+        id:
+          type: string
+        host_id:
+          type: string
+        hostname:
+          type: string
+        ip:
+          type: string
+        status:
+          type: string
+          enum: [available, allocated, maintenance]
+        cpu_cores:
+          type: integer
+        memory_gb:
+          type: integer
+        gpu_model:
+          type: string
+        gpu_count:
+          type: integer
+        created_at:
+          type: string
+          format: date-time
+
+    Customer:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        email:
+          type: string
+        role:
+          type: string
+        status:
+          type: string
+          enum: [active, disabled]
+        created_at:
+          type: string
+          format: date-time
+
+    Allocation:
+      type: object
+      properties:
+        id:
+          type: integer
+        customer_id:
+          type: integer
+        machine_id:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        end_time:
+          type: string
+          format: date-time
+        status:
+          type: string
+        remark:
+          type: string
+
+    Task:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          type: string
+        status:
+          type: string
+          enum: [pending, running, completed, failed]
+        machine_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    Dataset:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        size:
+          type: integer
+          format: int64
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    DashboardStats:
+      type: object
+      properties:
+        total_machines:
+          type: integer
+        available_machines:
+          type: integer
+        allocated_machines:
+          type: integer
+        total_customers:
+          type: integer
+        active_tasks:
+          type: integer
+
+    GPUTrendData:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        usage_percent:
+          type: number
+          format: float
+
+    RealtimeMonitoring:
+      type: object
+      properties:
+        cpu_usage:
+          type: number
+          format: float
+        memory_usage:
+          type: number
+          format: float
+        gpu_usage:
+          type: number
+          format: float
+        network_in:
+          type: number
+          format: float
+        network_out:
+          type: number
+          format: float
+
+    Alert:
+      type: object
+      properties:
+        id:
+          type: integer
+        level:
+          type: string
+          enum: [info, warning, error, critical]
+        message:
+          type: string
+        source:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+
+    ConnectionInfo:
+      type: object
+      properties:
+        ssh:
+          type: object
+          properties:
+            host:
+              type: string
+            port:
+              type: integer
+            username:
+              type: string
+        vnc:
+          type: object
+          properties:
+            url:
+              type: string
+            password:
+              type: string
+
+    CreateMachineRequest:
+      type: object
+      required:
+        - host_id
+        - hostname
+        - ip
+      properties:
+        host_id:
+          type: string
+        hostname:
+          type: string
+        ip:
+          type: string
+        cpu_cores:
+          type: integer
+        memory_gb:
+          type: integer
+        gpu_model:
+          type: string
+        gpu_count:
+          type: integer
+
+    CreateTrainingTaskRequest:
+      type: object
+      required:
+        - name
+        - machine_id
+      properties:
+        name:
+          type: string
+        machine_id:
+          type: string
+        dataset_id:
+          type: string
+        command:
+          type: string
+        environment:
+          type: object
+          additionalProperties:
+            type: string
+
+    InitMultipartResponse:
+      type: object
+      properties:
+        upload_id:
+          type: string
+        dataset_id:
+          type: string
+        chunk_size:
+          type: integer
