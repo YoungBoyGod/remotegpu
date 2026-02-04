@@ -63,3 +63,40 @@ func (d *MachineDao) Count(ctx context.Context) (int64, error) {
 	err := d.db.WithContext(ctx).Model(&entity.Host{}).Count(&count).Error
 	return count, err
 }
+
+// CountByStatus 按状态统计机器数量
+// @description 统计指定状态的机器数量，用于仪表盘展示
+// @param status 机器状态 (idle/allocated/maintenance/offline)
+// @return 数量和错误
+// @modified 2026-02-04
+func (d *MachineDao) CountByStatus(ctx context.Context, status string) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&entity.Host{}).Where("status = ?", status).Count(&count).Error
+	return count, err
+}
+
+// GetStatusStats 获取各状态机器统计
+// @description 一次查询获取所有状态的机器数量统计
+// @return map[状态]数量
+// @modified 2026-02-04
+func (d *MachineDao) GetStatusStats(ctx context.Context) (map[string]int64, error) {
+	type StatusCount struct {
+		Status string
+		Count  int64
+	}
+	var results []StatusCount
+
+	err := d.db.WithContext(ctx).Model(&entity.Host{}).
+		Select("status, count(*) as count").
+		Group("status").
+		Scan(&results).Error
+	if err != nil {
+		return nil, err
+	}
+
+	stats := make(map[string]int64)
+	for _, r := range results {
+		stats[r.Status] = r.Count
+	}
+	return stats, nil
+}
