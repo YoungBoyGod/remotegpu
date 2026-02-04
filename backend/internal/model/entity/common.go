@@ -1,9 +1,18 @@
 package entity
 
 import (
+	"errors"
 	"time"
 
 	"gorm.io/gorm"
+)
+
+// 通用错误定义
+var (
+	// ErrUnauthorized 无权限访问资源
+	ErrUnauthorized = errors.New("无权限访问该资源")
+	// ErrNotFound 资源不存在
+	ErrNotFound = errors.New("资源不存在")
 )
 
 // BaseEntity 基础实体，包含所有表的通用字段
