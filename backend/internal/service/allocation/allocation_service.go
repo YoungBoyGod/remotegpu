@@ -7,6 +7,7 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	"github.com/YoungBoyGod/remotegpu/internal/service/audit"
 	"github.com/YoungBoyGod/remotegpu/pkg/errors"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -16,13 +17,15 @@ type AllocationService struct {
 	db            *gorm.DB
 	allocationDao *dao.AllocationDao
 	machineDao    *dao.MachineDao
+	auditService  *audit.AuditService
 }
 
-func NewAllocationService(db *gorm.DB) *AllocationService {
+func NewAllocationService(db *gorm.DB, auditSvc *audit.AuditService) *AllocationService {
 	return &AllocationService{
 		db:            db,
 		allocationDao: dao.NewAllocationDao(db),
 		machineDao:    dao.NewMachineDao(db),
+		auditService:  auditSvc,
 	}
 }
 
@@ -112,7 +115,22 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 		return nil
 	})
 	
+	if err != nil {
+		return err
+	}
+
+	// 4. Log Audit (Fire and Forget or handle error)
+	_ = s.auditService.CreateLog(
+		ctx,
+		nil, // System action, no customer ID
+		"system", "127.0.0.1", "POST", "/reclaim",
+		"reclaim_machine", "machine", hostID,
+		map[string]interface{}{"reason": "admin_request"},
+		200,
+	)
+
 	// TODO: 触发清理流程
+	return nil
 }
 
 func (s *AllocationService) GetRecent(ctx context.Context) ([]entity.Allocation, error) {
