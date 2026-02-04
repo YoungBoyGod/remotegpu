@@ -69,3 +69,13 @@
   - `backend/internal/controller/v1/ops/image_controller.go`
   - `backend/internal/controller/v1/customer/sshkey_controller.go`
   - `backend/docs/任务清单.md`
+
+### 6. 任务清单最终 Review
+- **时间**: Review Phase
+- **检查结果**: 
+  - 所有任务均标记为完成 `[x]`。
+- **遗留/待办项 (Technical Debt)**:
+  - `GetGPUTrend`: 目前返回 Mock 数据，需接入 Prometheus/InfluxDB。
+  - `ImageSync`: 目前为 Stub 实现，需接入 Harbor SDK。
+  - `ReclaimMachine`: 异步清理流程 (Agent重置) 仅留有 TODO，目前仅更新数据库状态。
+  - `GetGlobalSnapshot`: 建议后续接入 Redis 缓存以降低数据库压力。
