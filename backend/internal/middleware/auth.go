@@ -1,13 +1,17 @@
 package middleware
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 
+	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/auth"
 	"github.com/YoungBoyGod/remotegpu/pkg/cache"
+	"github.com/YoungBoyGod/remotegpu/pkg/database"
 	"github.com/YoungBoyGod/remotegpu/pkg/response"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 )
 
 const tokenBlacklistPrefix = "auth:token:blacklist:"
@@ -46,6 +50,11 @@ func Auth() gin.HandlerFunc {
 			return
 		}
 
+		if !isAccountActive(c, claims.UserID) {
+			c.Abort()
+			return
+		}
+
 		// 将用户信息存入上下文 (Fixed Key Name)
 		c.Set("userID", claims.UserID) // Changed from user_id
 		c.Set("username", claims.Username)
@@ -67,4 +76,29 @@ func isTokenBlacklisted(c *gin.Context, token string) bool {
 		return false
 	}
 	return count > 0
+}
+
+func isAccountActive(c *gin.Context, userID uint) bool {
+	db := database.GetDB()
+	if db == nil {
+		return true
+	}
+
+	var customer entity.Customer
+	err := db.Select("status").First(&customer, userID).Error
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			response.Error(c, http.StatusUnauthorized, "用户不存在")
+			return false
+		}
+		response.Error(c, http.StatusInternalServerError, "认证失败")
+		return false
+	}
+
+	if customer.Status != "active" {
+		response.Error(c, http.StatusForbidden, "账号已停用")
+		return false
+	}
+
+	return true
 }
