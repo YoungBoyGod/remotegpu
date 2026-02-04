@@ -5,9 +5,12 @@ import (
 	"strings"
 
 	"github.com/YoungBoyGod/remotegpu/pkg/auth"
+	"github.com/YoungBoyGod/remotegpu/pkg/cache"
 	"github.com/YoungBoyGod/remotegpu/pkg/response"
 	"github.com/gin-gonic/gin"
 )
+
+const tokenBlacklistPrefix = "auth:token:blacklist:"
 
 // Auth JWT 认证中间件
 func Auth() gin.HandlerFunc {
@@ -36,6 +39,13 @@ func Auth() gin.HandlerFunc {
 			return
 		}
 
+		// 检查 token 是否在黑名单中
+		if isTokenBlacklisted(c, parts[1]) {
+			response.Error(c, http.StatusUnauthorized, "令牌已失效，请重新登录")
+			c.Abort()
+			return
+		}
+
 		// 将用户信息存入上下文 (Fixed Key Name)
 		c.Set("userID", claims.UserID) // Changed from user_id
 		c.Set("username", claims.Username)
@@ -43,4 +53,18 @@ func Auth() gin.HandlerFunc {
 
 		c.Next()
 	}
+}
+
+// isTokenBlacklisted 检查 token 是否在黑名单中
+func isTokenBlacklisted(c *gin.Context, token string) bool {
+	cacheClient := cache.GetCache()
+	if cacheClient == nil {
+		return false
+	}
+	key := tokenBlacklistPrefix + token
+	count, err := cacheClient.Exists(c, key)
+	if err != nil {
+		return false
+	}
+	return count > 0
 }
