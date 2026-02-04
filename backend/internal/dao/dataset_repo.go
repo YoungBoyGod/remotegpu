@@ -33,3 +33,15 @@ func (d *DatasetDao) ListByCustomerID(ctx context.Context, customerID uint, page
 
 	return datasets, total, nil
 }
+
+// FindByID 根据ID查询数据集
+// @author Claude
+// @description 根据数据集ID查询详情，用于权限校验
+// @modified 2026-02-04
+func (d *DatasetDao) FindByID(ctx context.Context, id uint) (*entity.Dataset, error) {
+	var dataset entity.Dataset
+	if err := d.db.WithContext(ctx).First(&dataset, id).Error; err != nil {
+		return nil, err
+	}
+	return &dataset, nil
+}
