@@ -81,7 +81,7 @@ func InitRouter(r *gin.Engine) {
 	monitorController := ctrlOps.NewMonitorController(monitorSvc)
 	alertController := ctrlOps.NewAlertController(opsSvc)
 	
-	myMachineController := ctrlCustomer.NewMyMachineController(machineSvc, agentSvc)
+	myMachineController := ctrlCustomer.NewMyMachineController(machineSvc, agentSvc, allocSvc)
 	taskController := ctrlTask.NewTaskController(taskSvc)
 	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc)
 	sshKeyController := ctrlCustomer.NewSSHKeyController(sshKeySvc)
