@@ -55,3 +55,16 @@ func (s *MachineService) GetConnectionInfo(ctx context.Context, hostID string) (
 		"port":        host.SSHPort,
 	}, nil
 }
+
+// Count 获取机器总数
+// @modified 2026-02-04
+func (s *MachineService) Count(ctx context.Context) (int64, error) {
+	return s.machineDao.Count(ctx)
+}
+
+// GetStatusStats 获取各状态机器统计
+// @description 用于仪表盘展示机器状态分布
+// @modified 2026-02-04
+func (s *MachineService) GetStatusStats(ctx context.Context) (map[string]int64, error) {
+	return s.machineDao.GetStatusStats(ctx)
+}
