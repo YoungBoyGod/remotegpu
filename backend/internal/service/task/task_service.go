@@ -2,6 +2,7 @@ package task
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
@@ -36,9 +37,8 @@ func (s *TaskService) StopTask(ctx context.Context, id string) error {
 		return err
 	}
 
-	// 调用 Agent 停止进程
-	if s.agentService != nil && task.HostID != "" {
-		_ = s.agentService.StopProcess(ctx, task.HostID, task.ID)
+	if err := s.stopTaskProcess(ctx, task); err != nil {
+		return err
 	}
 
 	return s.taskDao.UpdateStatus(ctx, id, "stopped")
@@ -68,10 +68,33 @@ func (s *TaskService) StopTaskWithAuth(ctx context.Context, id string, customerI
 		return entity.ErrUnauthorized
 	}
 
-	// 调用 Agent 停止进程
-	if s.agentService != nil && task.HostID != "" {
-		_ = s.agentService.StopProcess(ctx, task.HostID, task.ID)
+	if err := s.stopTaskProcess(ctx, task); err != nil {
+		return err
 	}
 
 	return s.taskDao.UpdateStatus(ctx, id, "stopped")
+}
+
+func (s *TaskService) stopTaskProcess(ctx context.Context, task *entity.Task) error {
+	// CodeX 2026-02-05: validate process_id/host_id before stop and record failures.
+	if s.agentService == nil {
+		err := fmt.Errorf("agent service unavailable")
+		_ = s.taskDao.UpdateErrorMsg(ctx, task.ID, err.Error())
+		return err
+	}
+	if task.HostID == "" {
+		err := fmt.Errorf("host id missing")
+		_ = s.taskDao.UpdateErrorMsg(ctx, task.ID, err.Error())
+		return err
+	}
+	if task.ProcessID <= 0 {
+		err := fmt.Errorf("process id missing")
+		_ = s.taskDao.UpdateErrorMsg(ctx, task.ID, err.Error())
+		return err
+	}
+	if err := s.agentService.StopProcess(ctx, task.HostID, task.ProcessID); err != nil {
+		_ = s.taskDao.UpdateErrorMsg(ctx, task.ID, err.Error())
+		return err
+	}
+	return nil
 }

@@ -1,6 +1,7 @@
 package machine
 
 import (
+	"fmt"
 	"strconv"
 
 	apiV1 "github.com/YoungBoyGod/remotegpu/api/v1"
@@ -8,6 +9,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	serviceAllocation "github.com/YoungBoyGod/remotegpu/internal/service/allocation"
 	serviceMachine "github.com/YoungBoyGod/remotegpu/internal/service/machine"
+	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	"github.com/gin-gonic/gin"
 )
 
@@ -15,12 +17,14 @@ type MachineController struct {
 	common.BaseController
 	machineService    *serviceMachine.MachineService
 	allocationService *serviceAllocation.AllocationService
+	agentService      *serviceOps.AgentService
 }
 
-func NewMachineController(ms *serviceMachine.MachineService, as *serviceAllocation.AllocationService) *MachineController {
+func NewMachineController(ms *serviceMachine.MachineService, as *serviceAllocation.AllocationService, agentSvc *serviceOps.AgentService) *MachineController {
 	return &MachineController{
 		machineService:    ms,
 		allocationService: as,
+		agentService:      agentSvc,
 	}
 }
 
@@ -68,23 +72,79 @@ func (c *MachineController) List(ctx *gin.Context) {
 	})
 }
 
+// Detail 获取机器详情
+// @Summary 获取机器详情
+// @Description 获取单个机器的详细信息
+// @Tags Admin - Machines
+// @Produce json
+// @Param id path string true "机器ID"
+// @Security Bearer
+// @Success 200 {object} entity.Host
+// @Failure 404 {object} common.ErrorResponse
+// @Router /admin/machines/{id} [get]
+func (c *MachineController) Detail(ctx *gin.Context) {
+	hostID := ctx.Param("id")
+	host, err := c.machineService.GetHost(ctx, hostID)
+	if err != nil {
+		c.Error(ctx, 404, "Machine not found")
+		return
+	}
+	c.Success(ctx, host)
+}
+
 // Create 创建机器
 // @Summary 创建机器
 // @Description 添加新的机器到系统
 // @Tags Admin - Machines
 // @Accept json
 // @Produce json
-// @Param request body entity.Host true "机器信息"
+// @Param request body v1.CreateMachineRequest true "机器信息"
 // @Security Bearer
 // @Success 200 {object} entity.Host
 // @Failure 400 {object} common.ErrorResponse
 // @Failure 500 {object} common.ErrorResponse
 // @Router /admin/machines [post]
 func (c *MachineController) Create(ctx *gin.Context) {
-	var host entity.Host
-	if err := ctx.ShouldBindJSON(&host); err != nil {
+	var req apiV1.CreateMachineRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
 		c.Error(ctx, 400, err.Error())
 		return
+	}
+	if req.IPAddress == "" && req.Hostname == "" {
+		c.Error(ctx, 400, "Host address is required")
+		return
+	}
+
+	address := req.IPAddress
+	if address == "" {
+		address = req.Hostname
+	}
+	region := req.Region
+	if region == "" {
+		region = "default"
+	}
+
+	host := entity.Host{
+		ID:          req.Hostname,
+		Name:        req.Name,
+		Hostname:    req.Hostname,
+		Region:      region,
+		IPAddress:   address,
+		PublicIP:    req.PublicIP,
+		SSHPort:     req.SSHPort,
+		SSHUsername: req.SSHUsername,
+		SSHPassword: req.SSHPassword,
+		SSHKey:      req.SSHKey,
+		Status:      "offline",
+	}
+	if host.ID == "" {
+		host.ID = address
+	}
+
+	if c.agentService != nil {
+		if info, err := c.agentService.GetSystemInfo(ctx, host.ID, address); err == nil {
+			applySystemInfo(&host, info)
+		}
 	}
 
 	if err := c.machineService.CreateMachine(ctx, &host); err != nil {
@@ -97,6 +157,85 @@ func (c *MachineController) Create(ctx *gin.Context) {
 	}
 
 	c.Success(ctx, host)
+}
+
+// CollectSpec 触发采集机器硬件信息
+// @Summary 采集机器硬件信息
+// @Description 触发 Agent 采集并更新硬件信息
+// @Tags Admin - Machines
+// @Param id path string true "机器ID"
+// @Security Bearer
+// @Success 200 {object} entity.Host
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/{id}/collect [post]
+func (c *MachineController) CollectSpec(ctx *gin.Context) {
+	hostID := ctx.Param("id")
+	if hostID == "" {
+		c.Error(ctx, 400, "Host ID is required")
+		return
+	}
+	if c.agentService == nil {
+		c.Error(ctx, 500, "Agent service not available")
+		return
+	}
+
+	host, err := c.machineService.GetHost(ctx, hostID)
+	if err != nil {
+		c.Error(ctx, 404, "Host not found")
+		return
+	}
+
+	info, err := c.agentService.GetSystemInfo(ctx, host.ID, host.IPAddress)
+	if err != nil {
+		c.Error(ctx, 500, err.Error())
+		return
+	}
+
+	if err := c.machineService.CollectHostSpec(ctx, host, &serviceMachine.SystemInfoSnapshot{
+		Hostname:      info.Hostname,
+		CPUCores:      info.CPUCores,
+		MemoryTotalGB: info.MemoryTotalGB,
+		DiskTotalGB:   info.DiskTotalGB,
+		Collected:     info.Collected,
+	}); err != nil {
+		c.Error(ctx, 500, err.Error())
+		return
+	}
+
+	c.Success(ctx, host)
+}
+
+func applySystemInfo(host *entity.Host, info *serviceOps.SystemInfoSnapshot) {
+	if info == nil {
+		return
+	}
+	if host.Hostname == "" {
+		host.Hostname = info.Hostname
+	}
+	if host.Name == "" {
+		host.Name = info.Hostname
+	}
+	if info.OSType != "" {
+		host.OSType = info.OSType
+	}
+	if info.Kernel != "" {
+		host.OSVersion = info.Kernel
+	}
+	if info.CPUCores > 0 {
+		host.TotalCPU = info.CPUCores
+		host.CPUInfo = fmt.Sprintf("%d cores", info.CPUCores)
+	}
+	if info.MemoryTotalGB > 0 {
+		host.TotalMemoryGB = info.MemoryTotalGB
+	}
+	if info.DiskTotalGB > 0 {
+		host.TotalDiskGB = info.DiskTotalGB
+	}
+	if info.Collected {
+		host.Status = "idle"
+		host.HealthStatus = "healthy"
+	}
 }
 
 // Allocate 分配机器
@@ -186,16 +325,14 @@ func (c *MachineController) Import(ctx *gin.Context) {
 	var hosts []entity.Host
 	for _, m := range req.Machines {
 		hosts = append(hosts, entity.Host{
-			IPAddress:   m.HostIP,
-			SSHPort:     m.SSHPort,
-			Region:      m.Region,
-			GPUModel:    m.GPUModel,
-			GPUCount:    m.GPUCount,
-			CPUCores:    m.CPUCores,
-			RAMSize:     m.RAMSize,
-			DiskSize:    m.DiskSize,
-			Status:      "idle", // Default status
-			PriceHourly: float64(m.PriceHourly) / 100.0,
+			IPAddress:     m.HostIP,
+			SSHPort:       m.SSHPort,
+			Region:        m.Region,
+			CPUInfo:       m.GPUModel, // 暂存 GPU 型号信息
+			TotalCPU:      m.CPUCores,
+			TotalMemoryGB: int64(m.RAMSize),
+			TotalDiskGB:   int64(m.DiskSize),
+			Status:        "idle",
 		})
 	}
 
@@ -208,4 +345,62 @@ func (c *MachineController) Import(ctx *gin.Context) {
 		"message": "Imported successfully",
 		"count":   len(hosts),
 	})
+}
+
+// Delete 删除机器
+// @Summary 删除机器
+// @Description 从系统中删除机器
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param id path string true "机器ID"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/{id} [delete]
+func (c *MachineController) Delete(ctx *gin.Context) {
+	hostID := ctx.Param("id")
+
+	if err := c.machineService.DeleteMachine(ctx, hostID); err != nil {
+		c.Error(ctx, 500, err.Error())
+		return
+	}
+
+	c.Success(ctx, gin.H{"message": "Machine deleted"})
+}
+
+// SetMaintenance 设置机器维护状态
+// @Summary 设置机器维护状态
+// @Description 将机器设置为维护状态或取消维护状态
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param id path string true "机器ID"
+// @Param request body map[string]bool true "维护状态"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/{id}/maintenance [post]
+func (c *MachineController) SetMaintenance(ctx *gin.Context) {
+	hostID := ctx.Param("id")
+
+	var req struct {
+		Maintenance bool `json:"maintenance"`
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	status := "idle"
+	if req.Maintenance {
+		status = "maintenance"
+	}
+
+	if err := c.machineService.UpdateStatus(ctx, hostID, status); err != nil {
+		c.Error(ctx, 500, err.Error())
+		return
+	}
+
+	c.Success(ctx, gin.H{"message": "Status updated"})
 }

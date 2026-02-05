@@ -70,6 +70,9 @@ func (c *HTTPClient) doRequest(ctx context.Context, method, url string, body any
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
+	if !result.Success || result.Code != 0 {
+		return nil, fmt.Errorf("agent error: code=%d message=%s", result.Code, result.Message)
+	}
 	return &result, nil
 }
 

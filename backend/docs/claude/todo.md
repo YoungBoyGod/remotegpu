@@ -18,170 +18,114 @@
 
 ## 1. 监控系统 (P1)
 
-### 1.1 Redis 缓存接入
+### 1.1 Redis 缓存接入 ✅ 已完成
 
 **位置**: `internal/service/ops/monitor_service.go:27`
 
-**当前状态**: 每次请求都查询数据库
+**完成时间**: 2026-02-05
 
-**未完成原因**:
-- 需要设计缓存键结构
-- 需要确定缓存过期策略
-- 项目初期优先实现核心功能
+**实现内容**:
+- 在 `MonitorService` 中注入 Redis 客户端
+- 缓存键: `monitor:snapshot`
+- 缓存过期时间: 30 秒
+- 缓存未命中时查询数据库并写入缓存
 
-**实现步骤**:
-1. 在 `MonitorService` 中注入 Redis 客户端
-2. 设计缓存键: `monitor:snapshot:{timestamp}`
-3. 实现缓存读写逻辑，设置 30 秒过期
-4. 添加缓存失效机制
-
-**依赖**:
-- `pkg/cache` - Redis 客户端（已存在）
-
-**代码示例**:
-```go
-func (s *MonitorService) GetGlobalSnapshot(ctx context.Context) (map[string]interface{}, error) {
-    cacheKey := "monitor:snapshot"
-
-    // 尝试从缓存读取
-    if cached, err := s.cache.Get(ctx, cacheKey); err == nil {
-        return cached, nil
-    }
-
-    // 查询数据库
-    stats, err := s.machineService.GetStatusStats(ctx)
-    // ...
-
-    // 写入缓存，30秒过期
-    s.cache.Set(ctx, cacheKey, result, 30*time.Second)
-    return result, nil
-}
-```
+**修改文件**:
+- `internal/service/ops/monitor_service.go`
+- `internal/router/router.go`
 
 ---
 
-### 1.2 GPU 利用率监控
+### 1.2 GPU 利用率监控 ✅ 已完成
 
-**位置**: `internal/service/ops/monitor_service.go:48,111-113`
+**位置**: `internal/service/ops/monitor_service.go`
 
-**当前状态**: 返回硬编码值 `0.0`
+**完成时间**: 2026-02-05
 
-**未完成原因**:
-- 需要部署监控系统 (Prometheus/InfluxDB)
-- 需要在 Agent 端采集 GPU 指标
-- 监控基础设施尚未搭建
+**实现内容**:
+- 创建 Prometheus 客户端 (`pkg/prometheus/client.go`)
+- 创建 GPU 指标查询辅助方法 (`pkg/prometheus/gpu.go`)
+- MonitorService 集成 Prometheus 获取 GPU 利用率
+- DashboardService 集成 Prometheus 获取 GPU 趋势
+- 支持多种 GPU exporter 指标格式 (DCGM, nvidia_gpu_exporter, nvidia_smi)
 
-**实现步骤**:
-1. 部署 Prometheus + node_exporter + nvidia_gpu_exporter
-2. 配置 Prometheus 抓取 GPU 指标
-3. 在后端添加 Prometheus 客户端查询接口
-4. 实现 `GetGPUTrend` 从 Prometheus 查询历史数据
+**Prometheus 地址**: `192.168.10.210:19090`
 
-**依赖**:
-- Prometheus Server
-- nvidia_gpu_exporter (GPU 指标采集)
-- `github.com/prometheus/client_golang` - Prometheus Go 客户端
-
-**配置示例** (prometheus.yml):
-```yaml
-scrape_configs:
-  - job_name: 'gpu_nodes'
-    static_configs:
-      - targets: ['node1:9835', 'node2:9835']
-```
+**修改文件**:
+- `pkg/prometheus/client.go` (新建)
+- `pkg/prometheus/gpu.go` (新建)
+- `internal/service/ops/monitor_service.go`
+- `internal/router/router.go`
 
 ---
 
-## 2. Agent 通信 (P0)
+## 2. Agent 通信 (P0) ✅ 已完成
 
-### 2.1 任务进程管理
+### 2.1 任务进程管理 ✅ 已完成
 
-**位置**: `internal/service/task/task_service.go:31,58`
+**位置**: `internal/service/task/task_service.go:33-45`
 
-**当前状态**: 仅更新数据库状态，未实际停止进程
+**完成时间**: 2026-02-05
 
-**未完成原因**:
-- Agent 服务尚未完全实现
-- 需要设计 Agent 通信协议
-- 进程管理涉及系统级操作，需要谨慎设计
+**实现内容**:
+- `TaskService.StopTask()` 调用 `AgentService.StopProcess()` 停止进程
+- `TaskService.StopTaskWithAuth()` 带权限校验的停止任务方法
+- 支持 HTTP 和 gRPC 双协议通信
 
-**实现步骤**:
-1. 定义 Agent gRPC/HTTP API 接口
-2. 实现 `AgentService.StopTask(hostID, taskID)` 方法
-3. Agent 端实现进程查找和终止逻辑
-4. 添加超时和重试机制
-
-**依赖**:
-- Agent 服务 (`internal/service/ops/agent_service.go`)
-- gRPC 或 HTTP 客户端
-
-**代码示例**:
-```go
-func (s *TaskService) StopTask(ctx context.Context, taskID uint) error {
-    task, err := s.taskDao.FindByID(ctx, taskID)
-    if err != nil {
-        return err
-    }
-
-    // 调用 Agent 停止进程
-    if err := s.agentService.StopProcess(ctx, task.HostID, task.ProcessID); err != nil {
-        return fmt.Errorf("failed to stop process: %w", err)
-    }
-
-    // 更新数据库状态
-    return s.taskDao.UpdateStatus(ctx, taskID, "stopped")
-}
-```
+**修改文件**:
+- `internal/service/task/task_service.go`
+- `internal/service/ops/agent_service.go`
+- `internal/agent/http_client.go`
+- `internal/agent/grpc_client.go`
 
 ---
 
-### 2.2 SSH 重置
+### 2.2 SSH 重置 ✅ 已完成
 
-**位置**: `internal/service/allocation/allocation_service.go:82`
+**位置**: `internal/service/allocation/allocation_service.go:91-95`
 
-**当前状态**: 注释掉的 TODO
+**完成时间**: 2026-02-05
 
-**未完成原因**:
-- 需要 Agent 支持 SSH 密钥重置
-- 需要异步任务队列避免阻塞
-- 安全性考虑需要仔细设计
+**实现内容**:
+- `AgentService.ResetSSH()` 方法实现
+- `AllocationService.AllocateMachine()` 中异步调用 ResetSSH
+- HTTP 和 gRPC 客户端都实现了 ResetSSH 方法
 
-**实现步骤**:
-1. Agent 实现 SSH 密钥重置接口
-2. 后端调用 Agent API 触发重置
-3. 使用消息队列实现异步处理
-4. 添加重置状态回调
-
-**依赖**:
-- Agent SSH 管理模块
-- 消息队列 (Redis/RabbitMQ)
+**修改文件**:
+- `internal/service/ops/agent_service.go`
+- `internal/service/allocation/allocation_service.go`
+- `internal/agent/http_client.go`
+- `internal/agent/grpc_client.go`
 
 ---
 
-### 2.3 机器回收清理流程
+### 2.3 机器回收清理流程 ✅ 已完成
 
-**位置**: `internal/service/allocation/allocation_service.go:140`
+**位置**: `internal/service/allocation/allocation_service.go:152-157`
 
-**当前状态**: TODO 标记，未实现
+**完成时间**: 2026-02-05
 
-**未完成原因**:
-- 清理流程涉及多个步骤
-- 需要异步执行避免阻塞
-- 需要确保清理的完整性和安全性
+**实现内容**:
+- `AgentService.CleanupMachine()` 方法实现
+- `AllocationService.ReclaimMachine()` 中异步调用 CleanupMachine
+- 清理类型包括: process, data, ssh, docker
+- HTTP 和 gRPC 客户端都实现了 CleanupMachine 方法
 
-**实现步骤**:
-1. 定义清理任务结构
-2. 实现清理步骤：
-   - 终止所有用户进程
-   - 删除用户数据
-   - 重置 SSH 密钥
-   - 清理临时文件
-3. 使用工作队列异步执行
-4. 清理完成后更新机器状态为 `idle`
+**修改文件**:
+- `internal/service/ops/agent_service.go`
+- `internal/service/allocation/allocation_service.go`
+- `internal/agent/http_client.go`
+- `internal/agent/grpc_client.go`
 
-**依赖**:
-- Agent 清理接口
-- 异步任务队列
+### Agent 客户端架构
+
+**实现内容**:
+- `internal/agent/client.go` - 定义 Client 接口
+- `internal/agent/http_client.go` - HTTP 客户端完整实现
+- `internal/agent/grpc_client.go` - gRPC 客户端完整实现
+- `api/proto/agent/agent.proto` - Protocol Buffers 定义
+- 支持双协议 (HTTP/gRPC)，通过配置切换
+- 支持 TLS 加密通信
 
 ---
 

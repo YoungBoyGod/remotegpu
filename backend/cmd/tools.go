@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"time"
 
 	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/auth"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/cobra"
 )
 
@@ -31,6 +33,49 @@ var genPassCmd = &cobra.Command{
 		}
 		fmt.Printf("Password: %s\n", password)
 		fmt.Printf("Hash:     %s\n", hash)
+	},
+}
+
+var (
+	resetPassUser string
+	resetPassNew  string
+)
+
+var resetPassCmd = &cobra.Command{
+	Use:   "reset-pass",
+	Short: "重置用户密码 (生成哈希并更新数据库)",
+	Long: `重置指定用户的密码。
+示例:
+  remotegpu tools reset-pass -u admin -p newpassword123
+  remotegpu tools reset-pass --user john --password secret`,
+	Run: func(cmd *cobra.Command, args []string) {
+		// 先生成密码哈希
+		hash, err := auth.HashPassword(resetPassNew)
+		if err != nil {
+			log.Fatalf("生成密码哈希失败: %v", err)
+		}
+		fmt.Printf("Password: %s\n", resetPassNew)
+		fmt.Printf("Hash:     %s\n", hash)
+
+		// 初始化数据库连接
+		initDBOrDie()
+		db := database.GetDB()
+		customerDao := dao.NewCustomerDao(db)
+
+		// 查找用户
+		customer, err := customerDao.FindByUsername(context.Background(), resetPassUser)
+		if err != nil {
+			log.Fatalf("用户 %s 不存在: %v", resetPassUser, err)
+		}
+
+		// 更新密码
+		if err := db.Model(&entity.Customer{}).
+			Where("id = ?", customer.ID).
+			Update("password_hash", hash).Error; err != nil {
+			log.Fatalf("更新密码失败: %v", err)
+		}
+
+		fmt.Printf("\n用户 %s (ID: %d) 密码已重置成功!\n", resetPassUser, customer.ID)
 	},
 }
 
@@ -74,11 +119,42 @@ var migrateCmd = &cobra.Command{
 			&entity.AuditLog{},
 			&entity.AlertRule{},
 			&entity.ActiveAlert{},
+			&entity.MachineEnrollment{},
 		)
 		if err != nil {
 			log.Fatalf("迁移失败: %v", err)
 		}
 		fmt.Println("数据库迁移完成！")
+	},
+}
+
+var redisCheckCmd = &cobra.Command{
+	Use:   "redis-check",
+	Short: "检查 Redis 连接状态",
+	Run: func(cmd *cobra.Command, args []string) {
+		if err := config.LoadConfig(configPath); err != nil {
+			log.Fatalf("加载配置失败: %v", err)
+		}
+
+		redisCfg := config.GlobalConfig.Redis
+		addr := fmt.Sprintf("%s:%d", redisCfg.Host, redisCfg.Port)
+		client := redis.NewClient(&redis.Options{
+			Addr:         addr,
+			Password:     redisCfg.Password,
+			DB:           redisCfg.DB,
+			DialTimeout:  5 * time.Second,
+			ReadTimeout:  3 * time.Second,
+			WriteTimeout: 3 * time.Second,
+		})
+		defer client.Close()
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := client.Ping(ctx).Err(); err != nil {
+			log.Fatalf("Redis 连接失败 (%s): %v", addr, err)
+		}
+
+		fmt.Printf("Redis OK: %s (db=%d)\n", addr, redisCfg.DB)
 	},
 }
 
@@ -168,8 +244,16 @@ var resetAdminCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(toolsCmd)
 	toolsCmd.AddCommand(genPassCmd)
+	toolsCmd.AddCommand(resetPassCmd)
 	toolsCmd.AddCommand(resetDbCmd)
-	toolsCmd.AddCommand(migrateCmd) // Corrected line
+	toolsCmd.AddCommand(migrateCmd)
+	toolsCmd.AddCommand(redisCheckCmd)
+
+	// reset-pass 命令标志
+	resetPassCmd.Flags().StringVarP(&resetPassUser, "user", "u", "", "用户名 (必填)")
+	resetPassCmd.Flags().StringVarP(&resetPassNew, "password", "p", "", "新密码 (必填)")
+	resetPassCmd.MarkFlagRequired("user")
+	resetPassCmd.MarkFlagRequired("password")
 
 	rootCmd.AddCommand(adminCmd)
 	adminCmd.AddCommand(createAdminCmd)

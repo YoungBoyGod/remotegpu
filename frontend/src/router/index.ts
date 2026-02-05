@@ -62,6 +62,12 @@ const router = createRouter({
           component: () => import('@/views/admin/MachineAddView.vue'),
           meta: { title: '添加机器' },
         },
+        {
+          path: 'machines/:id',
+          name: 'admin-machines-detail',
+          component: () => import('@/views/admin/MachineDetailView.vue'),
+          meta: { title: '机器详情' },
+        },
         // 客户管理
         {
           path: 'customers/list',
@@ -87,6 +93,31 @@ const router = createRouter({
           name: 'admin-allocations-quick',
           component: () => import('@/views/admin/QuickAllocateView.vue'),
           meta: { title: '快速分配' },
+        },
+        // 运维管理
+        {
+          path: 'images',
+          name: 'admin-images',
+          component: () => import('@/views/admin/ImageListView.vue'),
+          meta: { title: '镜像管理' },
+        },
+        {
+          path: 'monitoring',
+          name: 'admin-monitoring',
+          component: () => import('@/views/admin/MonitoringView.vue'),
+          meta: { title: '监控中心' },
+        },
+        {
+          path: 'alerts',
+          name: 'admin-alerts',
+          component: () => import('@/views/admin/AlertListView.vue'),
+          meta: { title: '告警中心' },
+        },
+        {
+          path: 'audit',
+          name: 'admin-audit',
+          component: () => import('@/views/admin/AuditLogView.vue'),
+          meta: { title: '审计日志' },
         },
         {
           path: ':pathMatch(.*)*',
@@ -118,6 +149,37 @@ const router = createRouter({
           name: 'customer-machines-list',
           component: () => import('@/views/customer/MachineListView.vue'),
           meta: { title: '机器列表' },
+        },
+        {
+          path: 'machines/enroll',
+          name: 'customer-machines-enroll',
+          component: () => import('@/views/customer/MachineEnrollView.vue'),
+          meta: { title: '添加机器' },
+        },
+        {
+          path: 'machines/enrollments',
+          name: 'customer-machines-enrollments',
+          component: () => import('@/views/customer/MachineEnrollmentListView.vue'),
+          meta: { title: '添加进度' },
+        },
+        // 资源管理
+        {
+          path: 'ssh-keys',
+          name: 'customer-ssh-keys',
+          component: () => import('@/views/customer/SSHKeyView.vue'),
+          meta: { title: 'SSH 密钥' },
+        },
+        {
+          path: 'tasks',
+          name: 'customer-tasks',
+          component: () => import('@/views/customer/TaskListView.vue'),
+          meta: { title: '任务管理' },
+        },
+        {
+          path: 'datasets',
+          name: 'customer-datasets',
+          component: () => import('@/views/customer/DatasetListView.vue'),
+          meta: { title: '数据集管理' },
         },
         {
           path: ':pathMatch(.*)*',

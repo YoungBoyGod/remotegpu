@@ -81,11 +81,24 @@ paths:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
         '401':
-          description: 认证失败
+          description: 认证失败（业务错误码：2003=密码错误，2006=账号禁用）
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                invalid_password:
+                  summary: 密码错误
+                  value:
+                    code: 2003
+                    msg: 密码错误
+                    data: null
+                account_disabled:
+                  summary: 账号禁用
+                  value:
+                    code: 2006
+                    msg: 账号已禁用
+                    data: null
 
   /auth/refresh:
     post:
@@ -305,6 +318,32 @@ paths:
                   failed_count:
                     type: integer
 
+  /admin/machines/{id}/collect:
+    post:
+      tags:
+        - Admin - Machines
+      summary: 采集机器硬件信息
+      description: 触发 Agent 采集并更新硬件信息
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: 采集成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Machine'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
   /admin/machines/{id}/allocate:
     post:
       tags:
@@ -515,6 +554,81 @@ paths:
                     type: array
                     items:
                       $ref: '#/components/schemas/Machine'
+    post:
+      tags:
+        - Customer - Machines
+      summary: 添加机器
+      description: 提交连接信息创建添加任务
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMachineEnrollmentRequest'
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MachineEnrollment'
+        '400':
+          description: 请求参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /customer/machines/enrollments:
+    get:
+      tags:
+        - Customer - Machines
+      summary: 获取添加任务列表
+      description: 获取当前客户的机器添加任务
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/MachineEnrollment'
+                  total:
+                    type: integer
+                  page:
+                    type: integer
+                  page_size:
+                    type: integer
+
+  /customer/machines/enrollments/{id}:
+    get:
+      tags:
+        - Customer - Machines
+      summary: 获取添加任务详情
+      description: 获取指定任务详情
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MachineEnrollment'
+        '404':
+          description: 任务不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /customer/machines/{id}/connection:
     get:
@@ -868,10 +982,15 @@ components:
       properties:
         code:
           type: integer
-          description: 错误码
-        message:
+          description: 错误码（例如：2003=密码错误，2006=账号禁用）
+          example: 2003
+        msg:
           type: string
           description: 错误信息
+          example: 密码错误
+        data:
+          nullable: true
+          description: 可选错误数据
 
     Machine:
       type: object
@@ -887,6 +1006,8 @@ components:
         status:
           type: string
           enum: [available, allocated, maintenance]
+        needs_collect:
+          type: boolean
         cpu_cores:
           type: integer
         memory_gb:
@@ -896,6 +1017,38 @@ components:
         gpu_count:
           type: integer
         created_at:
+          type: string
+          format: date-time
+
+    MachineEnrollment:
+      type: object
+      properties:
+        id:
+          type: integer
+        customer_id:
+          type: integer
+        name:
+          type: string
+        hostname:
+          type: string
+        region:
+          type: string
+        address:
+          type: string
+        ssh_port:
+          type: integer
+        ssh_username:
+          type: string
+        status:
+          type: string
+        error_message:
+          type: string
+        host_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
           type: string
           format: date-time
 
@@ -1056,24 +1209,53 @@ components:
     CreateMachineRequest:
       type: object
       required:
-        - host_id
-        - hostname
-        - ip
+        - name
+        - region
+        - ssh_port
+        - ssh_username
       properties:
-        host_id:
+        name:
           type: string
         hostname:
           type: string
-        ip:
+        region:
           type: string
-        cpu_cores:
-          type: integer
-        memory_gb:
-          type: integer
-        gpu_model:
+        ip_address:
           type: string
-        gpu_count:
+        public_ip:
+          type: string
+        ssh_port:
           type: integer
+        ssh_username:
+          type: string
+        ssh_password:
+          type: string
+        ssh_key:
+          type: string
+
+    CreateMachineEnrollmentRequest:
+      type: object
+      required:
+        - region
+        - ssh_port
+        - ssh_username
+      properties:
+        name:
+          type: string
+        hostname:
+          type: string
+        region:
+          type: string
+        ip_address:
+          type: string
+        ssh_port:
+          type: integer
+        ssh_username:
+          type: string
+        ssh_password:
+          type: string
+        ssh_key:
+          type: string
 
     CreateTrainingTaskRequest:
       type: object

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMachineList, deleteMachine, setMachineMaintenance } from '@/api/admin'
+import { getMachineList, deleteMachine, setMachineMaintenance, collectMachineSpec, allocateMachine, getCustomerList } from '@/api/admin'
 import type { Machine } from '@/types/machine'
+import type { Customer } from '@/types/customer'
 import type { PageRequest } from '@/types/common'
 import DataTable from '@/components/common/DataTable.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
@@ -17,6 +18,22 @@ const pageRequest = ref<PageRequest>({
   pageSize: 10,
   filters: {}
 })
+
+// 分配弹窗相关
+const allocateDialogVisible = ref(false)
+const allocateLoading = ref(false)
+const currentMachine = ref<Machine | null>(null)
+const customers = ref<Customer[]>([])
+const allocateForm = ref({
+  customer_id: null as number | null,
+  duration_months: 1,
+  remark: ''
+})
+
+// 计算序号
+const getRowIndex = (index: number) => {
+  return (pageRequest.value.page - 1) * pageRequest.value.pageSize + index + 1
+}
 
 // 筛选条件
 const filters = ref({
@@ -101,6 +118,27 @@ const handleToggleMaintenance = async (machine: Machine) => {
   }
 }
 
+const handleCollectSpec = async (machine: Machine) => {
+  try {
+    await ElMessageBox.confirm(
+      `确认对机器 "${machine.name}" 进行硬件补采?`,
+      '补采确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    await collectMachineSpec(String(machine.id))
+    ElMessage.success('补采任务已触发')
+    loadMachines()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      console.error('补采硬件失败:', error)
+    }
+  }
+}
+
 const getStatusType = (status: string) => {
   const statusMap: Record<string, any> = {
     online: 'success',
@@ -117,6 +155,57 @@ const getStatusText = (status: string) => {
     maintenance: '维护中'
   }
   return statusMap[status] || status
+}
+
+const getCollectType = (needsCollect?: boolean) => (needsCollect ? 'warning' : 'success')
+const getCollectText = (needsCollect?: boolean) => (needsCollect ? '待采集' : '已采集')
+
+// 跳转到机器详情
+const handleViewDetail = (machine: Machine) => {
+  router.push(`/admin/machines/${machine.id}`)
+}
+
+// 打开分配弹窗
+const handleAllocate = async (machine: Machine) => {
+  currentMachine.value = machine
+  allocateForm.value = {
+    customer_id: null,
+    duration_months: 1,
+    remark: ''
+  }
+  allocateDialogVisible.value = true
+
+  // 加载客户列表
+  try {
+    const response = await getCustomerList({ page: 1, pageSize: 100 })
+    customers.value = response.data.list || []
+  } catch (error) {
+    console.error('加载客户列表失败:', error)
+  }
+}
+
+// 确认分配
+const handleConfirmAllocate = async () => {
+  if (!currentMachine.value || !allocateForm.value.customer_id) {
+    ElMessage.warning('请选择客户')
+    return
+  }
+
+  try {
+    allocateLoading.value = true
+    await allocateMachine(String(currentMachine.value.id), {
+      customer_id: allocateForm.value.customer_id,
+      duration_months: allocateForm.value.duration_months,
+      remark: allocateForm.value.remark
+    })
+    ElMessage.success('分配成功')
+    allocateDialogVisible.value = false
+    loadMachines()
+  } catch (error) {
+    console.error('分配失败:', error)
+  } finally {
+    allocateLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -165,12 +254,31 @@ onMounted(() => {
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
     >
-      <el-table-column prop="name" label="机器名称" min-width="150" />
-      <el-table-column prop="region" label="区域" width="120" />
+      <el-table-column label="序号" width="70" align="center">
+        <template #default="{ $index }">
+          {{ getRowIndex($index) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="id" label="ID" width="150" show-overflow-tooltip />
+      <el-table-column label="机器名称" min-width="150">
+        <template #default="{ row }">
+          <el-link type="primary" @click="handleViewDetail(row)">
+            {{ row.name || row.hostname || row.id }}
+          </el-link>
+        </template>
+      </el-table-column>
+      <el-table-column prop="region" label="区域" width="100" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)">
             {{ getStatusText(row.status) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="采集状态" width="120">
+        <template #default="{ row }">
+          <el-tag :type="getCollectType(row.needs_collect)">
+            {{ getCollectText(row.needs_collect) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -190,8 +298,26 @@ onMounted(() => {
           <el-tag v-else type="info">未分配</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column label="操作" width="250" fixed="right">
         <template #default="{ row }">
+          <el-button
+            v-if="!row.allocatedTo"
+            link
+            type="success"
+            size="small"
+            @click="handleAllocate(row)"
+          >
+            分配
+          </el-button>
+          <el-button
+            v-if="row.needs_collect"
+            link
+            type="warning"
+            size="small"
+            @click="handleCollectSpec(row)"
+          >
+            补采
+          </el-button>
           <el-button link type="primary" size="small" @click="handleToggleMaintenance(row)">
             {{ row.status === 'maintenance' ? '取消维护' : '设为维护' }}
           </el-button>
@@ -201,6 +327,57 @@ onMounted(() => {
         </template>
       </el-table-column>
     </DataTable>
+
+    <!-- 分配弹窗 -->
+    <el-dialog
+      v-model="allocateDialogVisible"
+      title="分配机器"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="allocateForm" label-width="100px">
+        <el-form-item label="机器">
+          <span>{{ currentMachine?.name || currentMachine?.id }}</span>
+        </el-form-item>
+        <el-form-item label="选择客户" required>
+          <el-select
+            v-model="allocateForm.customer_id"
+            placeholder="请选择客户"
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="customer in customers"
+              :key="customer.id"
+              :label="customer.company || customer.username"
+              :value="customer.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="租用时长">
+          <el-input-number
+            v-model="allocateForm.duration_months"
+            :min="1"
+            :max="36"
+          />
+          <span style="margin-left: 8px">个月</span>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="allocateForm.remark"
+            type="textarea"
+            :rows="2"
+            placeholder="可选备注"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="allocateDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="allocateLoading" @click="handleConfirmAllocate">
+          确认分配
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 

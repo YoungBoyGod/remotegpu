@@ -4,7 +4,6 @@ import (
 	"strconv"
 
 	"github.com/YoungBoyGod/remotegpu/internal/controller/v1/common"
-	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	"github.com/gin-gonic/gin"
 )

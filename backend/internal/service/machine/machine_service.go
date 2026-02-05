@@ -8,6 +8,7 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -30,8 +31,15 @@ func (s *MachineService) ListMachines(ctx context.Context, page, pageSize int, f
 	return s.machineDao.List(ctx, page, pageSize, filters)
 }
 
+func (s *MachineService) GetHost(ctx context.Context, id string) (*entity.Host, error) {
+	return s.machineDao.FindByID(ctx, id)
+}
+
 func (s *MachineService) CreateMachine(ctx context.Context, host *entity.Host) error {
 	// CodeX 2026-02-04: validate unique IP/hostname before create.
+	if host.ID == "" {
+		host.ID = deriveHostID(host)
+	}
 	if host.IPAddress != "" {
 		if _, err := s.machineDao.FindByIPAddress(ctx, host.IPAddress); err == nil {
 			return ErrHostDuplicateIP
@@ -47,6 +55,37 @@ func (s *MachineService) CreateMachine(ctx context.Context, host *entity.Host) e
 		}
 	}
 	return s.machineDao.Create(ctx, host)
+}
+
+func (s *MachineService) CollectHostSpec(ctx context.Context, host *entity.Host, info *SystemInfoSnapshot) error {
+	if host == nil || info == nil {
+		return fmt.Errorf("missing host or system info")
+	}
+	if info.Hostname != "" {
+		host.Hostname = info.Hostname
+	}
+	if host.Name == "" && info.Hostname != "" {
+		host.Name = info.Hostname
+	}
+	if info.CPUCores > 0 {
+		host.TotalCPU = info.CPUCores
+		host.CPUInfo = fmt.Sprintf("%d cores", info.CPUCores)
+	}
+	if info.MemoryTotalGB > 0 {
+		host.TotalMemoryGB = info.MemoryTotalGB
+	}
+	if info.DiskTotalGB > 0 {
+		host.TotalDiskGB = info.DiskTotalGB
+	}
+	if host.TotalCPU <= 0 || host.TotalMemoryGB <= 0 {
+		return fmt.Errorf("invalid collected spec")
+	}
+	if info.Collected {
+		host.Status = "idle"
+		host.HealthStatus = "healthy"
+	}
+	host.NeedsCollect = false
+	return s.machineDao.UpdateCollectFields(ctx, host)
 }
 
 func (s *MachineService) ImportMachines(ctx context.Context, hosts []entity.Host) error {
@@ -72,6 +111,9 @@ func (s *MachineService) ImportMachines(ctx context.Context, hosts []entity.Host
 	}
 
 	for _, host := range hosts {
+		if host.ID == "" {
+			host.ID = deriveHostID(&host)
+		}
 		key := dao.HostKey{IPAddress: host.IPAddress, Hostname: host.Hostname}
 		if _, ok := existing[key]; ok {
 			continue
@@ -114,6 +156,16 @@ func formatHostKey(host entity.Host) string {
 	return host.IPAddress
 }
 
+func deriveHostID(host *entity.Host) string {
+	if host.Hostname != "" {
+		return host.Hostname
+	}
+	if host.IPAddress != "" {
+		return host.IPAddress
+	}
+	return "host-" + uuid.NewString()
+}
+
 func (s *MachineService) GetConnectionInfo(ctx context.Context, hostID string) (map[string]interface{}, error) {
 	host, err := s.machineDao.FindByID(ctx, hostID)
 	if err != nil {
@@ -133,6 +185,17 @@ func (s *MachineService) GetConnectionInfo(ctx context.Context, hostID string) (
 	}, nil
 }
 
+func (s *MachineService) ListNeedCollect(ctx context.Context, limit int) ([]entity.Host, error) {
+	return s.machineDao.ListNeedCollect(ctx, limit)
+}
+
+func (s *MachineService) UpdateHostSpec(ctx context.Context, host *entity.Host) error {
+	if host == nil {
+		return fmt.Errorf("missing host")
+	}
+	return s.machineDao.UpdateCollectFields(ctx, host)
+}
+
 // Count 获取机器总数
 // @modified 2026-02-04
 func (s *MachineService) Count(ctx context.Context) (int64, error) {
@@ -144,4 +207,14 @@ func (s *MachineService) Count(ctx context.Context) (int64, error) {
 // @modified 2026-02-04
 func (s *MachineService) GetStatusStats(ctx context.Context) (map[string]int64, error) {
 	return s.machineDao.GetStatusStats(ctx)
+}
+
+// DeleteMachine 删除机器
+func (s *MachineService) DeleteMachine(ctx context.Context, hostID string) error {
+	return s.machineDao.Delete(ctx, hostID)
+}
+
+// UpdateStatus 更新机器状态
+func (s *MachineService) UpdateStatus(ctx context.Context, hostID string, status string) error {
+	return s.machineDao.UpdateStatus(ctx, hostID, status)
 }

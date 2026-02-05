@@ -2,31 +2,50 @@ package ops
 
 import (
 	"context"
+	"encoding/json"
+	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/internal/service/allocation"
 	"github.com/YoungBoyGod/remotegpu/internal/service/customer"
 	"github.com/YoungBoyGod/remotegpu/internal/service/machine"
+	"github.com/YoungBoyGod/remotegpu/pkg/cache"
+	"github.com/YoungBoyGod/remotegpu/pkg/prometheus"
 )
 
 type MonitorService struct {
 	machineService *machine.MachineService
+	cache          cache.Cache
+	promClient     *prometheus.Client
 }
 
-func NewMonitorService(ms *machine.MachineService) *MonitorService {
+func NewMonitorService(ms *machine.MachineService, c cache.Cache, prom *prometheus.Client) *MonitorService {
 	return &MonitorService{
 		machineService: ms,
+		cache:          c,
+		promClient:     prom,
 	}
 }
 
 // GetGlobalSnapshot 获取全局监控快照
 // @author Claude
-// @description 获取系统实时监控数据，包括机器状态统计
-// @reason 原实现返回Mock数据，现改为从MachineService获取真实数据
-// @modified 2026-02-04
-// TODO: 接入Redis缓存，设置采样频率（如30秒）避免频繁查询数据库
+// @description 获取系统实时监控数据，包括机器状态统计，支持 Redis 缓存
+// @modified 2026-02-05
 func (s *MonitorService) GetGlobalSnapshot(ctx context.Context) (map[string]interface{}, error) {
-	// 获取机器状态统计
+	const cacheKey = "monitor:snapshot"
+	const cacheTTL = 30 * time.Second
+
+	// 尝试从缓存读取
+	if s.cache != nil {
+		if cached, err := s.cache.Get(ctx, cacheKey); err == nil {
+			var result map[string]interface{}
+			if err := json.Unmarshal([]byte(cached), &result); err == nil {
+				return result, nil
+			}
+		}
+	}
+
+	// 缓存未命中，查询数据库
 	stats, err := s.machineService.GetStatusStats(ctx)
 	if err != nil {
 		return nil, err
@@ -39,36 +58,74 @@ func (s *MonitorService) GetGlobalSnapshot(ctx context.Context) (map[string]inte
 	}
 	onlineMachines := stats["idle"] + stats["allocated"]
 
-	return map[string]interface{}{
+	result := map[string]interface{}{
 		"total_machines":     totalMachines,
 		"online_machines":    onlineMachines,
 		"idle_machines":      stats["idle"],
 		"allocated_machines": stats["allocated"],
 		"offline_machines":   stats["offline"],
-		"avg_gpu_util":       0.0, // TODO: 从监控系统获取GPU利用率
-	}, nil
+		"avg_gpu_util":       s.getGPUUtilization(ctx),
+	}
+
+	// 写入缓存
+	if s.cache != nil {
+		if data, err := json.Marshal(result); err == nil {
+			_ = s.cache.Set(ctx, cacheKey, string(data), cacheTTL)
+		}
+	}
+
+	return result, nil
 }
 
 func (s *MonitorService) GetGPUTrend(ctx context.Context) ([]map[string]interface{}, error) {
-	// Mock trend data
+	if s.promClient != nil {
+		trend, err := s.promClient.GetGPUTrend(ctx, 24*time.Hour)
+		if err == nil && len(trend) > 0 {
+			result := make([]map[string]interface{}, len(trend))
+			for i, p := range trend {
+				result[i] = map[string]interface{}{
+					"time":  p.Time,
+					"value": p.Usage,
+				}
+			}
+			return result, nil
+		}
+	}
+	// 返回默认数据
 	return []map[string]interface{}{
-		{"time": "10:00", "value": 45},
-		{"time": "11:00", "value": 60},
-		{"time": "12:00", "value": 80},
+		{"time": "00:00", "value": 0},
+		{"time": "04:00", "value": 0},
+		{"time": "08:00", "value": 0},
+		{"time": "12:00", "value": 0},
+		{"time": "16:00", "value": 0},
+		{"time": "20:00", "value": 0},
 	}, nil
 }
 
-type DashboardService struct {
-	machineService *machine.MachineService
-	customerService *customer.CustomerService
-	allocationService *allocation.AllocationService
+// getGPUUtilization 从 Prometheus 获取 GPU 平均利用率
+func (s *MonitorService) getGPUUtilization(ctx context.Context) float64 {
+	if s.promClient != nil {
+		metrics, err := s.promClient.GetGPUUtilization(ctx)
+		if err == nil {
+			return metrics.AvgUtilization
+		}
+	}
+	return 0.0
 }
 
-func NewDashboardService(ms *machine.MachineService, cs *customer.CustomerService, as *allocation.AllocationService) *DashboardService {
+type DashboardService struct {
+	machineService    *machine.MachineService
+	customerService   *customer.CustomerService
+	allocationService *allocation.AllocationService
+	promClient        *prometheus.Client
+}
+
+func NewDashboardService(ms *machine.MachineService, cs *customer.CustomerService, as *allocation.AllocationService, prom *prometheus.Client) *DashboardService {
 	return &DashboardService{
-		machineService: ms,
-		customerService: cs,
+		machineService:    ms,
+		customerService:   cs,
 		allocationService: as,
+		promClient:        prom,
 	}
 }
 
@@ -106,18 +163,30 @@ func (s *DashboardService) GetAggregatedStats(ctx context.Context) (map[string]a
 
 
 // GetGPUTrend 获取 GPU 使用趋势数据
-// @description 返回最近时间段的 GPU 利用率趋势
-// @modified 2026-02-04
-// TODO: 接入真实监控数据源 (Prometheus/InfluxDB)
+// @description 返回最近时间段的 GPU 利用率趋势，从 Prometheus 获取
+// @modified 2026-02-05
 func (s *DashboardService) GetGPUTrend(ctx context.Context) ([]map[string]any, error) {
-	// TODO: 从监控系统获取真实数据
+	if s.promClient != nil {
+		trend, err := s.promClient.GetGPUTrend(ctx, 24*time.Hour)
+		if err == nil && len(trend) > 0 {
+			result := make([]map[string]any, len(trend))
+			for i, p := range trend {
+				result[i] = map[string]any{
+					"time":  p.Time,
+					"usage": p.Usage,
+				}
+			}
+			return result, nil
+		}
+	}
+	// 返回默认数据
 	return []map[string]any{
-		{"time": "00:00", "usage": 45},
-		{"time": "04:00", "usage": 30},
-		{"time": "08:00", "usage": 65},
-		{"time": "12:00", "usage": 80},
-		{"time": "16:00", "usage": 75},
-		{"time": "20:00", "usage": 60},
+		{"time": "00:00", "usage": 0},
+		{"time": "04:00", "usage": 0},
+		{"time": "08:00", "usage": 0},
+		{"time": "12:00", "usage": 0},
+		{"time": "16:00", "usage": 0},
+		{"time": "20:00", "usage": 0},
 	}, nil
 }
 

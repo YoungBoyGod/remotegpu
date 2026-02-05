@@ -9,8 +9,9 @@ import (
 
 	apiV1 "github.com/YoungBoyGod/remotegpu/api/v1"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
-	pkgAuth "github.com/YoungBoyGod/remotegpu/pkg/auth"
 	serviceAuth "github.com/YoungBoyGod/remotegpu/internal/service/auth"
+	pkgAuth "github.com/YoungBoyGod/remotegpu/pkg/auth"
+	"github.com/YoungBoyGod/remotegpu/pkg/errors"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -178,7 +179,7 @@ func TestHTTPLogin_InvalidPassword(t *testing.T) {
 	err = json.NewDecoder(resp.Body).Decode(&result)
 	require.NoError(t, err)
 
-	assert.Equal(t, 401, result.Code)
+	assert.Equal(t, errors.ErrorPasswordIncorrect, result.Code)
 }
 
 // ==================== HTTP Admin 登录测试 ====================

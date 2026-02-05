@@ -1,0 +1,12 @@
+### 管理员登录
+# @name login
+POST {{host}}/api/v1/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "admin123"
+}
+
+### 保存 token
+# @token = {{login.response.body.data.token}}

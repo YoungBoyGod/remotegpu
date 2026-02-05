@@ -2,32 +2,223 @@ package allocation
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"fmt"
 	"time"
 
+	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/internal/service/audit"
+	"github.com/YoungBoyGod/remotegpu/pkg/cache"
 	"github.com/YoungBoyGod/remotegpu/pkg/errors"
+	"github.com/YoungBoyGod/remotegpu/pkg/logger"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
+
+// AgentClient Agent 客户端接口（避免循环依赖）
+type AgentClient interface {
+	ResetSSH(ctx context.Context, hostID string) error
+	CleanupMachine(ctx context.Context, hostID string) error
+}
+
+const (
+	machineActionQueueKey   = "machine:action:queue"
+	machineActionRetryKey   = "machine:action:retry"
+	machineActionPayloadKey = "machine:action:payload"
+)
+
+const (
+	machineActionResetSSH = "reset_ssh"
+	machineActionCleanup  = "cleanup"
+)
+
+type machineActionPayload struct {
+	Action string `json:"action"`
+	HostID string `json:"host_id"`
+}
 
 type AllocationService struct {
 	db            *gorm.DB
 	allocationDao *dao.AllocationDao
 	machineDao    *dao.MachineDao
 	auditService  *audit.AuditService
+	agentClient   AgentClient
+	redisClient   *redis.Client
+	actionRetries int
+	actionDelay   time.Duration
 }
 
-func NewAllocationService(db *gorm.DB, auditSvc *audit.AuditService) *AllocationService {
+func NewAllocationService(db *gorm.DB, auditSvc *audit.AuditService, agentClient AgentClient) *AllocationService {
+	actionRetries := 3
+	actionDelay := 10 * time.Second
+	if config.GlobalConfig != nil {
+		if config.GlobalConfig.MachineAction.MaxRetries >= 0 {
+			actionRetries = config.GlobalConfig.MachineAction.MaxRetries
+		}
+		if config.GlobalConfig.MachineAction.RetryDelay > 0 {
+			actionDelay = time.Duration(config.GlobalConfig.MachineAction.RetryDelay) * time.Second
+		}
+	}
 	return &AllocationService{
 		db:            db,
 		allocationDao: dao.NewAllocationDao(db),
 		machineDao:    dao.NewMachineDao(db),
 		auditService:  auditSvc,
+		agentClient:   agentClient,
+		redisClient:   cache.GetRedis(),
+		actionRetries: actionRetries,
+		actionDelay:   actionDelay,
 	}
+}
+
+func (s *AllocationService) StartWorker(ctx context.Context) {
+	if s.redisClient == nil {
+		logger.GetLogger().Warn("Machine action queue disabled: redis client not initialized")
+		return
+	}
+	go s.runWorker(ctx)
+}
+
+func (s *AllocationService) enqueueAction(ctx context.Context, payload machineActionPayload) error {
+	if s.redisClient == nil {
+		return fmt.Errorf("redis client not initialized")
+	}
+	data, err := json.Marshal(payload)
+	if err != nil {
+		return err
+	}
+	return s.redisClient.RPush(ctx, machineActionQueueKey, string(data)).Err()
+}
+
+func (s *AllocationService) runWorker(ctx context.Context) {
+	s.requeueRetries(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		result, err := s.redisClient.BLPop(ctx, 5*time.Second, machineActionQueueKey).Result()
+		if err != nil {
+			if stderrors.Is(err, redis.Nil) {
+				continue
+			}
+			logger.GetLogger().Warn(fmt.Sprintf("Machine action queue error: %v", err))
+			continue
+		}
+		if len(result) < 2 {
+			continue
+		}
+
+		var payload machineActionPayload
+		if err := json.Unmarshal([]byte(result[1]), &payload); err != nil {
+			logger.GetLogger().Warn(fmt.Sprintf("Invalid machine action payload: %v", err))
+			continue
+		}
+		if payload.Action == "" || payload.HostID == "" {
+			logger.GetLogger().Warn("Invalid machine action payload: missing action or host")
+			continue
+		}
+
+		if s.agentClient == nil {
+			logger.GetLogger().Warn("Machine action skipped: agent client not initialized")
+			continue
+		}
+
+		if err := s.executeAction(ctx, payload); err != nil {
+			s.handleActionFailure(ctx, payload, err)
+			continue
+		}
+		s.clearActionRetry(ctx, payload)
+	}
+}
+
+func (s *AllocationService) requeueRetries(ctx context.Context) {
+	if s.redisClient == nil {
+		return
+	}
+	payloads, err := s.redisClient.HGetAll(ctx, machineActionPayloadKey).Result()
+	if err != nil {
+		logger.GetLogger().Warn(fmt.Sprintf("Failed to requeue machine actions: %v", err))
+		return
+	}
+	for _, payload := range payloads {
+		if err := s.redisClient.RPush(ctx, machineActionQueueKey, payload).Err(); err != nil {
+			logger.GetLogger().Warn(fmt.Sprintf("Failed to requeue machine action: %v", err))
+		}
+	}
+}
+
+func (s *AllocationService) executeAction(ctx context.Context, payload machineActionPayload) error {
+	switch payload.Action {
+	case machineActionResetSSH:
+		return s.agentClient.ResetSSH(ctx, payload.HostID)
+	case machineActionCleanup:
+		return s.agentClient.CleanupMachine(ctx, payload.HostID)
+	default:
+		return fmt.Errorf("unknown machine action: %s", payload.Action)
+	}
+}
+
+func (s *AllocationService) handleActionFailure(ctx context.Context, payload machineActionPayload, err error) {
+	if s.redisClient == nil {
+		logger.GetLogger().Warn(fmt.Sprintf("Machine action failed: %v", err))
+		return
+	}
+	if s.actionRetries <= 0 {
+		_ = s.redisClient.HDel(ctx, machineActionRetryKey, s.retryKey(payload)).Err()
+		_ = s.redisClient.HDel(ctx, machineActionPayloadKey, s.retryKey(payload)).Err()
+		logger.GetLogger().Warn(fmt.Sprintf("Machine action failed: %v", err))
+		return
+	}
+
+	key := s.retryKey(payload)
+	retryCount, retryErr := s.redisClient.HIncrBy(ctx, machineActionRetryKey, key, 1).Result()
+	if retryErr != nil {
+		logger.GetLogger().Warn(fmt.Sprintf("Machine action retry error: %v", retryErr))
+		return
+	}
+
+	if retryCount > int64(s.actionRetries) {
+		_ = s.redisClient.HDel(ctx, machineActionRetryKey, key).Err()
+		_ = s.redisClient.HDel(ctx, machineActionPayloadKey, key).Err()
+		logger.GetLogger().Warn(fmt.Sprintf("Machine action exceeded retries: %v", err))
+		return
+	}
+
+	if data, marshalErr := json.Marshal(payload); marshalErr == nil {
+		_ = s.redisClient.HSet(ctx, machineActionPayloadKey, key, string(data)).Err()
+	}
+	s.scheduleRetry(payload)
+}
+
+func (s *AllocationService) scheduleRetry(payload machineActionPayload) {
+	go func() {
+		<-time.After(s.actionDelay)
+		retryCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.enqueueAction(retryCtx, payload); err != nil {
+			logger.GetLogger().Warn(fmt.Sprintf("Failed to requeue machine action: %v", err))
+		}
+	}()
+}
+
+func (s *AllocationService) clearActionRetry(ctx context.Context, payload machineActionPayload) {
+	if s.redisClient == nil {
+		return
+	}
+	key := s.retryKey(payload)
+	_ = s.redisClient.HDel(ctx, machineActionRetryKey, key).Err()
+	_ = s.redisClient.HDel(ctx, machineActionPayloadKey, key).Err()
+}
+
+func (s *AllocationService) retryKey(payload machineActionPayload) string {
+	return fmt.Sprintf("%s:%s", payload.Action, payload.HostID)
 }
 
 func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint, hostID string, durationMonths int, remark string) (*entity.Allocation, error) {
@@ -79,8 +270,14 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 		return nil, err
 	}
 
-	// TODO: 异步触发 Agent 重置 SSH
-	// go s.agentService.ResetMachine(hostID)
+	// 异步触发 Agent 重置 SSH
+	if s.agentClient != nil {
+		enqueueCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := s.enqueueAction(enqueueCtx, machineActionPayload{Action: machineActionResetSSH, HostID: hostID}); err != nil {
+			logger.GetLogger().Warn(fmt.Sprintf("Failed to enqueue reset ssh: %v", err))
+		}
+		cancel()
+	}
 
 	return allocation, nil
 }
@@ -137,7 +334,14 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 		200,
 	)
 
-	// TODO: 触发异步清理流程（重置SSH、清理用户数据等）
+	// 5. 异步触发清理流程（重置SSH、清理用户数据等）
+	if s.agentClient != nil {
+		enqueueCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		if err := s.enqueueAction(enqueueCtx, machineActionPayload{Action: machineActionCleanup, HostID: hostID}); err != nil {
+			logger.GetLogger().Warn(fmt.Sprintf("Failed to enqueue cleanup: %v", err))
+		}
+		cancel()
+	}
 
 	return nil
 }

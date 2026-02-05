@@ -21,7 +21,11 @@ func (d *MachineDao) Create(ctx context.Context, host *entity.Host) error {
 
 func (d *MachineDao) FindByID(ctx context.Context, id string) (*entity.Host, error) {
 	var host entity.Host
-	if err := d.db.WithContext(ctx).Preload("GPUs").First(&host, "id = ?", id).Error; err != nil {
+	if err := d.db.WithContext(ctx).
+		Preload("GPUs").
+		Preload("Allocations").
+		Preload("Allocations.Customer").
+		First(&host, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &host, nil
@@ -103,6 +107,20 @@ func (d *MachineDao) UpdateStatus(ctx context.Context, id string, status string)
 	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", id).Update("status", status).Error
 }
 
+func (d *MachineDao) UpdateCollectFields(ctx context.Context, host *entity.Host) error {
+	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", host.ID).Updates(map[string]interface{}{
+		"hostname":        host.Hostname,
+		"name":            host.Name,
+		"cpu_info":        host.CPUInfo,
+		"total_cpu":       host.TotalCPU,
+		"total_memory_gb": host.TotalMemoryGB,
+		"total_disk_gb":   host.TotalDiskGB,
+		"needs_collect":   host.NeedsCollect,
+		"status":          host.Status,
+		"health_status":   host.HealthStatus,
+	}).Error
+}
+
 func (d *MachineDao) Count(ctx context.Context) (int64, error) {
 	var count int64
 	err := d.db.WithContext(ctx).Model(&entity.Host{}).Count(&count).Error
@@ -144,4 +162,21 @@ func (d *MachineDao) GetStatusStats(ctx context.Context) (map[string]int64, erro
 		stats[r.Status] = r.Count
 	}
 	return stats, nil
+}
+
+func (d *MachineDao) ListNeedCollect(ctx context.Context, limit int) ([]entity.Host, error) {
+	var hosts []entity.Host
+	query := d.db.WithContext(ctx).Model(&entity.Host{}).Where("needs_collect = ?", true).Order("created_at asc")
+	if limit > 0 {
+		query = query.Limit(limit)
+	}
+	if err := query.Find(&hosts).Error; err != nil {
+		return nil, err
+	}
+	return hosts, nil
+}
+
+// Delete 删除机器
+func (d *MachineDao) Delete(ctx context.Context, id string) error {
+	return d.db.WithContext(ctx).Delete(&entity.Host{}, "id = ?", id).Error
 }

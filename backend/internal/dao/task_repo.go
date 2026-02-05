@@ -40,6 +40,10 @@ func (d *TaskDao) UpdateStatus(ctx context.Context, id string, status string) er
 	return d.db.WithContext(ctx).Model(&entity.Task{}).Where("id = ?", id).Update("status", status).Error
 }
 
+func (d *TaskDao) UpdateErrorMsg(ctx context.Context, id string, msg string) error {
+	return d.db.WithContext(ctx).Model(&entity.Task{}).Where("id = ?", id).Update("error_msg", msg).Error
+}
+
 // FindByID 根据ID查询任务
 // @author Claude
 // @description 根据任务ID查询任务详情，用于权限校验和任务详情展示

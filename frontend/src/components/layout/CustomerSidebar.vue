@@ -28,6 +28,8 @@ const menuItems = ref<MenuItem[]>([
     icon: '💻',
     children: [
       { id: 'machine-list', title: '机器列表', path: '/customer/machines/list', icon: '📋' },
+      { id: 'machine-add', title: '添加机器', path: '/customer/machines/enroll', icon: '➕' },
+      { id: 'machine-enrollments', title: '添加进度', path: '/customer/machines/enrollments', icon: '⏳' },
       { id: 'quick-connect', title: '快速连接', path: '/customer/machines/connect', icon: '🔗' },
       { id: 'connect-history', title: '连接历史', path: '/customer/machines/history', icon: '🕐' }
     ]

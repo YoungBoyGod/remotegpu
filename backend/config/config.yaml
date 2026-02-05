@@ -147,3 +147,12 @@ agent:
   retry_count: 3        # 重试次数
   retry_delay: 2        # 重试间隔(秒)
   tls_enabled: false    # 是否启用 TLS
+
+machine_enrollment:
+  max_retries: 3 # CodeX 2026-02-05: 0 表示禁用重试
+  retry_delay: 10
+  skip_collect: true
+
+machine_action:
+  max_retries: 3 # CodeX 2026-02-05: 0 表示禁用重试
+  retry_delay: 10

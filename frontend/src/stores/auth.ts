@@ -16,14 +16,14 @@ export const useAuthStore = defineStore('auth', () => {
   // 登录
   const login = async (credentials: LoginRequest) => {
     const response = await loginApi(credentials)
-    const { accessToken: newAccessToken, refreshToken: newRefreshToken, user: userInfo } = response.data
+    const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data
 
     accessToken.value = newAccessToken
     refreshToken.value = newRefreshToken
-    user.value = userInfo
-
     localStorage.setItem('accessToken', newAccessToken)
     localStorage.setItem('refreshToken', newRefreshToken)
+
+    await fetchProfile()
 
     return response
   }
@@ -50,10 +50,15 @@ export const useAuthStore = defineStore('auth', () => {
     }
 
     const response = await refreshTokenApi(refreshToken.value)
-    const { accessToken: newAccessToken, expiresIn } = response.data
+    const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data
 
     accessToken.value = newAccessToken
     localStorage.setItem('accessToken', newAccessToken)
+
+    if (newRefreshToken) {
+      refreshToken.value = newRefreshToken
+      localStorage.setItem('refreshToken', newRefreshToken)
+    }
 
     return response
   }

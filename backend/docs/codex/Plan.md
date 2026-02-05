@@ -1,4 +1,4 @@
-# CodeX Plan（2026-02-04）
+# CodeX Plan（2026-02-05）
 
 ## 项目总览
 
@@ -21,6 +21,10 @@
 
 - 待完成（M5）
   - 镜像同步接入 Harbor API
+  - 远程访问服务（VNC/RDP/Guacamole）
+  - 任务启动写入 `process_id`（供停止任务使用）
+
+- 已完成（M5）
   - 分配后异步动作（重置 SSH / 清理）
   - 任务停止对接 Agent API
 

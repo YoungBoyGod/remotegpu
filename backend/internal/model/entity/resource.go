@@ -12,10 +12,13 @@ type Host struct {
 	Region   string `gorm:"type:varchar(64);default:'default'" json:"region"`
 
 	// Network
-	IPAddress string `gorm:"type:varchar(64);not null" json:"ip_address"` // Internal IP
-	PublicIP  string `gorm:"type:varchar(64)" json:"public_ip"`           // External IP
-	SSHPort   int    `gorm:"default:22" json:"ssh_port"`
-	AgentPort int    `gorm:"default:8080" json:"agent_port"`
+	IPAddress   string `gorm:"type:varchar(64);not null" json:"ip_address"` // Internal IP
+	PublicIP    string `gorm:"type:varchar(64)" json:"public_ip"`           // External IP
+	SSHPort     int    `gorm:"default:22" json:"ssh_port"`
+	AgentPort   int    `gorm:"default:8080" json:"agent_port"`
+	SSHUsername string `gorm:"type:varchar(128)" json:"ssh_username"`
+	SSHPassword string `gorm:"type:text" json:"-"`
+	SSHKey      string `gorm:"type:text" json:"-"`
 
 	// Specs
 	OSType        string `gorm:"type:varchar(20);default:'linux'" json:"os_type"`
@@ -29,6 +32,7 @@ type Host struct {
 	Status         string `gorm:"type:varchar(20);default:'offline'" json:"status"` // offline, idle, allocated, maintenance
 	HealthStatus   string `gorm:"type:varchar(20);default:'unknown'" json:"health_status"`
 	DeploymentMode string `gorm:"type:varchar(20);default:'traditional'" json:"deployment_mode"`
+	NeedsCollect   bool   `gorm:"default:false" json:"needs_collect"`
 
 	LastHeartbeat *time.Time `json:"last_heartbeat"`
 	CreatedAt     time.Time  `json:"created_at"`

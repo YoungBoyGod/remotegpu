@@ -5,7 +5,6 @@ import (
 
 	apiV1 "github.com/YoungBoyGod/remotegpu/api/v1"
 	"github.com/YoungBoyGod/remotegpu/internal/controller/v1/common"
-	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	serviceAuth "github.com/YoungBoyGod/remotegpu/internal/service/auth"
 	"github.com/YoungBoyGod/remotegpu/pkg/errors"
 	"github.com/gin-gonic/gin"

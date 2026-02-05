@@ -1,12 +1,15 @@
 package router
 
 import (
+	"context"
+
 	"github.com/gin-gonic/gin"
 
 	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
 	"github.com/YoungBoyGod/remotegpu/pkg/cache"
 	"github.com/YoungBoyGod/remotegpu/pkg/database"
+	"github.com/YoungBoyGod/remotegpu/pkg/prometheus"
 	"github.com/YoungBoyGod/remotegpu/pkg/storage"
 
 	// 服务层
@@ -30,6 +33,25 @@ import (
 	ctrlOps "github.com/YoungBoyGod/remotegpu/internal/controller/v1/ops"
 	ctrlTask "github.com/YoungBoyGod/remotegpu/internal/controller/v1/task"
 )
+
+// agentAdapter 适配器，将 AgentService 转换为 AgentSystemInfoProvider 接口
+type agentAdapter struct {
+	svc *serviceOps.AgentService
+}
+
+func (a *agentAdapter) GetSystemInfo(ctx context.Context, hostID, address string) (*serviceMachine.SystemInfoSnapshot, error) {
+	info, err := a.svc.GetSystemInfo(ctx, hostID, address)
+	if err != nil {
+		return nil, err
+	}
+	return &serviceMachine.SystemInfoSnapshot{
+		Hostname:      info.Hostname,
+		CPUCores:      info.CPUCores,
+		MemoryTotalGB: info.MemoryTotalGB,
+		DiskTotalGB:   info.DiskTotalGB,
+		Collected:     info.Collected,
+	}, nil
+}
 
 // InitRouter 初始化路由
 func InitRouter(r *gin.Engine) {
@@ -60,23 +82,33 @@ func InitRouter(r *gin.Engine) {
 	authSvc := serviceAuth.NewAuthService(db, cache.GetCache())
 	machineSvc := serviceMachine.NewMachineService(db)
 	auditSvc := serviceAudit.NewAuditService(db)
-	allocSvc := serviceAllocation.NewAllocationService(db, auditSvc)
+	agentSvc := serviceOps.NewAgentService(db, &config.GlobalConfig.Agent)
+	allocSvc := serviceAllocation.NewAllocationService(db, auditSvc, agentSvc)
+	allocSvc.StartWorker(context.Background())
 	custSvc := serviceCustomer.NewCustomerService(db)
 	opsSvc := serviceOps.NewOpsService(db)
-	agentSvc := serviceOps.NewAgentService(db, &config.GlobalConfig.Agent)
 	taskSvc := serviceTask.NewTaskService(db, agentSvc)
 	datasetSvc := serviceDataset.NewDatasetService(db)
-	monitorSvc := serviceOps.NewMonitorService(machineSvc)
+
+	// Prometheus 客户端
+	promClient := prometheus.NewClient(&prometheus.Config{
+		Enabled:  config.GlobalConfig.Prometheus.Enabled,
+		Endpoint: config.GlobalConfig.Prometheus.Endpoint,
+	})
+
+	monitorSvc := serviceOps.NewMonitorService(machineSvc, cache.GetCache(), promClient)
 	storageSvc := serviceStorage.NewStorageService(storageMgr)
 	sshKeySvc := serviceSSHKey.NewSSHKeyService(db)
 	imageSvc := serviceImage.NewImageService(db)
+	enrollmentSvc := serviceMachine.NewMachineEnrollmentService(db, machineSvc, &agentAdapter{svc: agentSvc})
+	enrollmentSvc.StartWorker(context.Background())
 
-	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc)
+	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc, promClient)
 
 	// --- 控制器层初始化 ---
 	authController := ctrlAuth.NewAuthController(authSvc)
 	dashboardController := ctrlOps.NewDashboardController(dashboardSvc)
-	machineController := ctrlMachine.NewMachineController(machineSvc, allocSvc)
+	machineController := ctrlMachine.NewMachineController(machineSvc, allocSvc, agentSvc)
 	customerController := ctrlCustomer.NewCustomerController(custSvc)
 	monitorController := ctrlOps.NewMonitorController(monitorSvc)
 	alertController := ctrlOps.NewAlertController(opsSvc)
@@ -85,6 +117,7 @@ func InitRouter(r *gin.Engine) {
 	taskController := ctrlTask.NewTaskController(taskSvc)
 	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc, allocSvc)
 	sshKeyController := ctrlCustomer.NewSSHKeyController(sshKeySvc)
+	enrollmentController := ctrlCustomer.NewMachineEnrollmentController(enrollmentSvc)
 	auditController := ctrlOps.NewAuditController(auditSvc)
 	imageController := ctrlOps.NewImageController(imageSvc)
 
@@ -117,10 +150,14 @@ func InitRouter(r *gin.Engine) {
 
 			// 机器管理
 			adminGroup.GET("/machines", machineController.List)
+			adminGroup.GET("/machines/:id", machineController.Detail)
 			adminGroup.POST("/machines", machineController.Create)
 			adminGroup.POST("/machines/import", machineController.Import)
+			adminGroup.DELETE("/machines/:id", machineController.Delete)
+			adminGroup.POST("/machines/:id/collect", machineController.CollectSpec)
 			adminGroup.POST("/machines/:id/allocate", machineController.Allocate)
 			adminGroup.POST("/machines/:id/reclaim", machineController.Reclaim)
+			adminGroup.POST("/machines/:id/maintenance", machineController.SetMaintenance)
 
 			// 客户管理
 			adminGroup.GET("/customers", customerController.List)
@@ -146,6 +183,7 @@ func InitRouter(r *gin.Engine) {
 		{
 			// 机器管理
 			custGroup.GET("/machines", myMachineController.List)
+			custGroup.POST("/machines", enrollmentController.Create)
 			custGroup.GET("/machines/:id/connection", myMachineController.GetConnection)
 			custGroup.POST("/machines/:id/ssh-reset", myMachineController.ResetSSH)
 
@@ -163,6 +201,11 @@ func InitRouter(r *gin.Engine) {
 			custGroup.GET("/keys", sshKeyController.List)
 			custGroup.POST("/keys", sshKeyController.Create)
 			custGroup.DELETE("/keys/:id", sshKeyController.Delete)
+
+			// 用户添加机器
+			custGroup.POST("/machines/enroll", enrollmentController.Create)
+			custGroup.GET("/machines/enrollments", enrollmentController.List)
+			custGroup.GET("/machines/enrollments/:id", enrollmentController.Detail)
 		}
 	}
 }

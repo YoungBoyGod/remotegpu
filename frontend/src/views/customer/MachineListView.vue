@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { getMyMachines, getMachineMonitoring } from '@/api/customer'
 import type { Machine } from '@/types/machine'
 import type { PageRequest } from '@/types/common'
@@ -8,6 +9,7 @@ import DataTable from '@/components/common/DataTable.vue'
 const loading = ref(false)
 const machines = ref<Machine[]>([])
 const total = ref(0)
+const router = useRouter()
 const pageRequest = ref<PageRequest>({
   page: 1,
   pageSize: 10
@@ -54,6 +56,14 @@ const getStatusText = (status: string) => {
   return statusMap[status] || status
 }
 
+const navigateToEnroll = () => {
+  router.push('/customer/machines/enroll')
+}
+
+const navigateToEnrollments = () => {
+  router.push('/customer/machines/enrollments')
+}
+
 onMounted(() => {
   loadMachines()
 })
@@ -63,6 +73,10 @@ onMounted(() => {
   <div class="machine-list">
     <div class="page-header">
       <h2 class="page-title">我的机器</h2>
+      <div class="page-actions">
+        <el-button @click="navigateToEnrollments">添加进度</el-button>
+        <el-button type="primary" @click="navigateToEnroll">添加机器</el-button>
+      </div>
     </div>
 
     <!-- 数据表格 -->
@@ -136,5 +150,10 @@ onMounted(() => {
   font-weight: 600;
   color: #303133;
   margin: 0;
+}
+
+.page-actions {
+  display: flex;
+  gap: 12px;
 }
 </style>

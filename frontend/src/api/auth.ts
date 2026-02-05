@@ -17,7 +17,12 @@ export interface LoginResponse {
   accessToken: string
   refreshToken: string
   expiresIn: number
-  user: UserInfo
+}
+
+interface BackendLoginResponse {
+  access_token: string
+  refresh_token: string
+  expires_in: number
 }
 
 /**
@@ -25,6 +30,7 @@ export interface LoginResponse {
  */
 export interface RefreshTokenResponse {
   accessToken: string
+  refreshToken: string
   expiresIn: number
 }
 
@@ -48,47 +54,61 @@ export interface ConfirmPasswordResetRequest {
  * 用户登录
  */
 export function login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-  return request.post('/api/auth/login', data)
+  return request.post<ApiResponse<BackendLoginResponse>>('/auth/login', data).then((res) => ({
+    ...res,
+    data: {
+      accessToken: res.data.access_token,
+      refreshToken: res.data.refresh_token,
+      expiresIn: res.data.expires_in,
+    },
+  }))
 }
 
 /**
  * 用户登出
  */
 export function logout(): Promise<ApiResponse<void>> {
-  return request.post('/api/auth/logout')
+  return request.post('/auth/logout')
 }
 
 /**
  * 刷新访问令牌
  */
 export function refreshToken(refreshToken: string): Promise<ApiResponse<RefreshTokenResponse>> {
-  return request.post('/api/auth/refresh', { refreshToken })
+  return request.post<ApiResponse<BackendLoginResponse>>('/auth/refresh', { refresh_token: refreshToken }).then((res) => ({
+    ...res,
+    data: {
+      accessToken: res.data.access_token,
+      refreshToken: res.data.refresh_token,
+      expiresIn: res.data.expires_in,
+    },
+  }))
 }
 
 /**
  * 获取当前用户信息
  */
 export function getCurrentUser(): Promise<ApiResponse<UserInfo>> {
-  return request.get('/api/auth/profile')
+  return request.get('/auth/profile')
 }
 
 /**
  * 请求密码重置
  */
 export function requestPasswordReset(data: ResetPasswordRequest): Promise<ApiResponse<void>> {
-  return request.post('/api/auth/password-reset/request', data)
+  return request.post('/auth/password-reset/request', data)
 }
 
 /**
  * 提交新密码
  */
 export function confirmPasswordReset(data: ConfirmPasswordResetRequest): Promise<ApiResponse<void>> {
-  return request.post('/api/auth/password-reset/confirm', data)
+  return request.post('/auth/password-reset/confirm', data)
 }
 
 /**
  * 验证Token有效性
  */
 export function validateToken(): Promise<ApiResponse<{ valid: boolean }>> {
-  return request.get('/api/auth/validate')
+  return request.get('/auth/validate')
 }

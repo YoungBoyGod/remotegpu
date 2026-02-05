@@ -9,25 +9,27 @@ import (
 
 // Config 全局配置
 type Config struct {
-	Server     ServerConfig     `yaml:"server"`
-	Database   DatabaseConfig   `yaml:"database"`
-	Redis      RedisConfig      `yaml:"redis"`
-	JWT        JWTConfig        `yaml:"jwt"`
-	Log        LogConfig        `yaml:"log"`
-	Storage    StorageConfig    `yaml:"storage"`
-	Mail       MailConfig       `yaml:"mail"`
-	Harbor     HarborConfig     `yaml:"harbor"`
-	Etcd       EtcdConfig       `yaml:"etcd"`
-	Prometheus PrometheusConfig `yaml:"prometheus"`
-	Jumpserver JumpserverConfig `yaml:"jumpserver"`
-	Nginx      NginxConfig      `yaml:"nginx"`
-	UptimeKuma UptimeKumaConfig `yaml:"uptime_kuma"`
-	Guacamole  GuacamoleConfig  `yaml:"guacamole"`
-	K8s        K8sConfig        `yaml:"k8s"`
-	HotReload  HotReloadConfig  `yaml:"hot_reload"`
-	Graceful   GracefulConfig   `yaml:"graceful"`
-	Swagger    SwaggerConfig    `yaml:"swagger"`
-	Agent      AgentConfig      `yaml:"agent"`
+	Server        ServerConfig        `yaml:"server"`
+	Database      DatabaseConfig      `yaml:"database"`
+	Redis         RedisConfig         `yaml:"redis"`
+	JWT           JWTConfig           `yaml:"jwt"`
+	Log           LogConfig           `yaml:"log"`
+	Storage       StorageConfig       `yaml:"storage"`
+	Mail          MailConfig          `yaml:"mail"`
+	Harbor        HarborConfig        `yaml:"harbor"`
+	Etcd          EtcdConfig          `yaml:"etcd"`
+	Prometheus    PrometheusConfig    `yaml:"prometheus"`
+	Jumpserver    JumpserverConfig    `yaml:"jumpserver"`
+	Nginx         NginxConfig         `yaml:"nginx"`
+	UptimeKuma    UptimeKumaConfig    `yaml:"uptime_kuma"`
+	Guacamole     GuacamoleConfig     `yaml:"guacamole"`
+	K8s           K8sConfig           `yaml:"k8s"`
+	HotReload     HotReloadConfig     `yaml:"hot_reload"`
+	Graceful      GracefulConfig      `yaml:"graceful"`
+	Swagger       SwaggerConfig       `yaml:"swagger"`
+	Agent         AgentConfig         `yaml:"agent"`
+	Enrollment    EnrollmentConfig    `yaml:"machine_enrollment"`
+	MachineAction MachineActionConfig `yaml:"machine_action"`
 }
 
 // ServerConfig 服务器配置
@@ -98,8 +100,8 @@ type MailConfig struct {
 	Port     int    `yaml:"port"`
 	User     string `yaml:"user"`
 	Password string `yaml:"password"`
-	From     string `yaml:"from"`     // 发件人名称
-	UseSSL   bool   `yaml:"use_ssl"`  // 是否使用 SSL/TLS
+	From     string `yaml:"from"`    // 发件人名称
+	UseSSL   bool   `yaml:"use_ssl"` // 是否使用 SSL/TLS
 }
 
 // HarborConfig Harbor 镜像仓库配置
@@ -195,17 +197,30 @@ type SwaggerConfig struct {
 
 // AgentConfig Agent 通信配置
 type AgentConfig struct {
-	Enabled     bool   `yaml:"enabled"`      // 是否启用 Agent 通信
-	Protocol    string `yaml:"protocol"`     // 通信协议: grpc, http
-	Port        int    `yaml:"port"`         // Agent 默认端口
-	GRPCPort    int    `yaml:"grpc_port"`    // gRPC 端口
-	HTTPPort    int    `yaml:"http_port"`    // HTTP 端口
-	Timeout     int    `yaml:"timeout"`      // 请求超时时间(秒)
-	RetryCount  int    `yaml:"retry_count"`  // 重试次数
-	RetryDelay  int    `yaml:"retry_delay"`  // 重试间隔(秒)
-	TLSEnabled  bool   `yaml:"tls_enabled"`  // 是否启用 TLS
-	TLSCertFile string `yaml:"tls_cert"`     // TLS 证书文件
-	TLSKeyFile  string `yaml:"tls_key"`      // TLS 密钥文件
+	Enabled     bool   `yaml:"enabled"`     // 是否启用 Agent 通信
+	Protocol    string `yaml:"protocol"`    // 通信协议: grpc, http
+	Port        int    `yaml:"port"`        // Agent 默认端口
+	GRPCPort    int    `yaml:"grpc_port"`   // gRPC 端口
+	HTTPPort    int    `yaml:"http_port"`   // HTTP 端口
+	Timeout     int    `yaml:"timeout"`     // 请求超时时间(秒)
+	RetryCount  int    `yaml:"retry_count"` // 重试次数
+	RetryDelay  int    `yaml:"retry_delay"` // 重试间隔(秒)
+	TLSEnabled  bool   `yaml:"tls_enabled"` // 是否启用 TLS
+	TLSCertFile string `yaml:"tls_cert"`    // TLS 证书文件
+	TLSKeyFile  string `yaml:"tls_key"`     // TLS 密钥文件
+}
+
+// EnrollmentConfig 用户添加机器队列配置
+type EnrollmentConfig struct {
+	MaxRetries  int  `yaml:"max_retries"`  // 最大重试次数
+	RetryDelay  int  `yaml:"retry_delay"`  // 重试延迟(秒)
+	SkipCollect bool `yaml:"skip_collect"` // 跳过采集直接入库
+}
+
+// MachineActionConfig 机器动作队列配置
+type MachineActionConfig struct {
+	MaxRetries int `yaml:"max_retries"` // 最大重试次数
+	RetryDelay int `yaml:"retry_delay"` // 重试延迟(秒)
 }
 
 var GlobalConfig *Config

@@ -3,7 +3,7 @@ package volume_test
 import (
 	"testing"
 
-	"github.com/YoungBoyGod/remotegpu/pkg/volume"
+	"github.com/YoungBoyGod/remotegpu/pkg/infra/volume"
 )
 
 // 示例: 创建 NFS 卷配置

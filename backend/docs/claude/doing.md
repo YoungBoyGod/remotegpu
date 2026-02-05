@@ -7,29 +7,7 @@
 
 ## 正在进行
 
-### Agent 通信模块实现
-- **开始时间**: 2026-02-05
-- **优先级**: P0
-- **状态**: 进行中
-- **当前步骤**: 集成到 TaskService 和 AllocationService
-- **已完成**:
-  - 配置结构 (AgentConfig)
-  - 类型定义 (types.go)
-  - 客户端接口 (client.go)
-  - HTTP 客户端 (http_client.go)
-  - gRPC 客户端占位 (grpc_client.go)
-  - Proto 定义 (agent.proto)
-  - AgentService 更新
-  - TaskService 集成
-- **待完成**:
-  - AllocationService 集成
-  - 生成 proto Go 代码
-  - 完善 gRPC 实现
-- **涉及文件**:
-  - `internal/agent/*`
-  - `api/proto/agent.proto`
-  - `config/config.go`
-  - `internal/service/ops/agent_service.go`
+暂无进行中的任务。
 
 ---
 
@@ -37,8 +15,31 @@
 
 | 时间 | 任务 | 结果 |
 |------|------|------|
+| 2026-02-05 | Agent 通信模块实现 | ✅ 完成 |
 | 2026-02-05 | 创建项目管理文件 | ✅ 完成 |
 | 2026-02-04 | 整理 TODO 清单 | ✅ 完成 |
+
+### Agent 通信模块实现详情
+- **完成时间**: 2026-02-05
+- **完成内容**:
+  - 配置结构 (AgentConfig)
+  - 类型定义 (types.go)
+  - 客户端接口 (client.go)
+  - HTTP 客户端 (http_client.go)
+  - gRPC 客户端 (grpc_client.go)
+  - Proto 定义 (agent.proto)
+  - Proto Go 代码生成
+  - AgentService 更新 (含 CleanupMachine 方法)
+  - TaskService 集成
+  - AllocationService 集成 (ResetSSH/CleanupMachine)
+- **涉及文件**:
+  - `internal/agent/*`
+  - `api/proto/agent.proto`
+  - `api/proto/agent/*.pb.go`
+  - `config/config.go`
+  - `internal/service/ops/agent_service.go`
+  - `internal/service/allocation/allocation_service.go`
+  - `internal/router/router.go`
 
 ---
 
