@@ -12,6 +12,36 @@ import (
 	"github.com/YoungBoyGod/remotegpu-agent/internal/models"
 )
 
+const maxOutputSize = 1 << 20 // 1MB
+
+// limitedWriter 限制写入大小的 Writer
+type limitedWriter struct {
+	buf     bytes.Buffer
+	limit   int
+	dropped bool
+}
+
+func (w *limitedWriter) Write(p []byte) (int, error) {
+	if w.buf.Len() >= w.limit {
+		w.dropped = true
+		return len(p), nil // 丢弃但不报错，避免中断进程
+	}
+	remaining := w.limit - w.buf.Len()
+	if len(p) > remaining {
+		w.dropped = true
+		p = p[:remaining]
+	}
+	return w.buf.Write(p)
+}
+
+func (w *limitedWriter) String() string {
+	s := w.buf.String()
+	if w.dropped {
+		s += "\n...[truncated, output exceeded 1MB limit]"
+	}
+	return s
+}
+
 // Executor 任务执行器
 type Executor struct {
 	mu         sync.Mutex
@@ -76,9 +106,10 @@ func (e *Executor) Execute(task *models.Task) {
 	// 设置进程组，便于杀死子进程
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	stdout := &limitedWriter{limit: maxOutputSize}
+	stderr := &limitedWriter{limit: maxOutputSize}
+	cmd.Stdout = stdout
+	cmd.Stderr = stderr
 
 	// 记录运行中的任务
 	e.mu.Lock()

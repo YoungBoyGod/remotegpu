@@ -190,9 +190,9 @@ func (s *SQLiteStore) Delete(id string) error {
 	return err
 }
 
-// ListUnsynced 获取未同步的任务
+// ListUnsynced 获取未同步的已完成任务
 func (s *SQLiteStore) ListUnsynced() ([]*models.Task, error) {
-	rows, err := s.db.Query(`SELECT * FROM local_tasks WHERE synced = 0`)
+	rows, err := s.db.Query(`SELECT * FROM local_tasks WHERE synced = 0 AND status IN ('completed', 'failed')`)
 	if err != nil {
 		return nil, err
 	}

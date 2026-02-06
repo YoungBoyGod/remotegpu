@@ -1,7 +1,7 @@
 package poller
 
 import (
-	"log"
+	"log/slog"
 	"sync"
 	"time"
 
@@ -79,7 +79,7 @@ func (p *Poller) pollLoop() {
 func (p *Poller) poll() {
 	tasks, err := p.client.ClaimTasks(p.batchSize)
 	if err != nil {
-		log.Printf("claim tasks error: %v", err)
+		slog.Error("claim tasks failed", "error", err)
 		return
 	}
 
