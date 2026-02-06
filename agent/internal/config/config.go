@@ -14,9 +14,10 @@ type Config struct {
 	DBPath     string `yaml:"db_path"`
 	MaxWorkers int    `yaml:"max_workers"`
 
-	Server ServerConfig `yaml:"server"`
-	Poll   PollConfig   `yaml:"poll"`
-	Limits LimitsConfig `yaml:"limits"`
+	Server   ServerConfig   `yaml:"server"`
+	Poll     PollConfig     `yaml:"poll"`
+	Limits   LimitsConfig   `yaml:"limits"`
+	Security SecurityConfig `yaml:"security"`
 }
 
 // ServerConfig Server 连接配置
@@ -37,6 +38,12 @@ type PollConfig struct {
 // LimitsConfig 限制配置
 type LimitsConfig struct {
 	MaxOutputSize int `yaml:"max_output_size"`
+}
+
+// SecurityConfig 安全配置
+type SecurityConfig struct {
+	AllowedCommands []string `yaml:"allowed_commands"`
+	BlockedPatterns []string `yaml:"blocked_patterns"`
 }
 
 // DefaultConfig 返回默认配置

@@ -45,6 +45,11 @@ func (s *Scheduler) SetClient(c *client.ServerClient) {
 	s.client = c
 }
 
+// GetExecutor 返回执行器（供外部设置 validator 等）
+func (s *Scheduler) GetExecutor() *executor.Executor {
+	return s.executor
+}
+
 // Start 启动调度器
 func (s *Scheduler) Start() error {
 	// 恢复未完成的任务
@@ -137,8 +142,35 @@ func (s *Scheduler) tryExecute() {
 			return
 		}
 
+		// 检查任务依赖是否满足
+		if !s.dependenciesMet(task) {
+			// 依赖未满足，延迟后重新入队
+			time.AfterFunc(2*time.Second, func() {
+				s.queue.Push(task)
+			})
+			continue
+		}
+
 		go s.runTask(task)
 	}
+}
+
+// dependenciesMet 检查任务的所有依赖是否已完成
+func (s *Scheduler) dependenciesMet(task *models.Task) bool {
+	if len(task.DependsOn) == 0 {
+		return true
+	}
+	for _, depID := range task.DependsOn {
+		dep, err := s.store.Get(depID)
+		if err != nil {
+			// 依赖任务不在本地存储中，视为未满足
+			return false
+		}
+		if dep.Status != models.TaskStatusCompleted {
+			return false
+		}
+	}
+	return true
 }
 
 // runTask 执行单个任务（包含状态同步）
@@ -200,18 +232,24 @@ func (s *Scheduler) runTask(task *models.Task) {
 	}
 }
 
-// renewLoop 租约续约循环
+// renewLoop 租约续约 + 进度上报循环
 func (s *Scheduler) renewLoop(task *models.Task, stop <-chan struct{}) {
-	ticker := time.NewTicker(60 * time.Second)
-	defer ticker.Stop()
+	renewTicker := time.NewTicker(60 * time.Second)
+	progressTicker := time.NewTicker(30 * time.Second)
+	defer renewTicker.Stop()
+	defer progressTicker.Stop()
 
 	for {
 		select {
 		case <-stop:
 			return
-		case <-ticker.C:
+		case <-renewTicker.C:
 			if err := s.client.RenewLease(task.ID, task.AttemptID); err != nil {
 				slog.Error("renew lease error", "task_id", task.ID, "error", err)
+			}
+		case <-progressTicker.C:
+			if err := s.client.ReportProgress(task.ID, task.AttemptID, 0, "running"); err != nil {
+				slog.Debug("report progress error", "task_id", task.ID, "error", err)
 			}
 		}
 	}
@@ -234,7 +272,43 @@ func (s *Scheduler) Submit(task *models.Task) error {
 	}
 
 	s.queue.Push(task)
+
+	// 抢占检查：新任务优先级比当前运行中最低优先级任务高 3 级以上时触发抢占
+	s.tryPreempt(task)
+
 	return nil
+}
+
+// tryPreempt 尝试抢占低优先级任务
+func (s *Scheduler) tryPreempt(newTask *models.Task) {
+	lowest := s.executor.LowestPriorityRunning()
+	if lowest == nil {
+		return
+	}
+	// 优先级数字越小越高，差值 >= 3 才抢占
+	if lowest.Priority-newTask.Priority >= 3 {
+		slog.Info("preempting task",
+			"preempted_id", lowest.ID,
+			"preempted_priority", lowest.Priority,
+			"new_id", newTask.ID,
+			"new_priority", newTask.Priority,
+		)
+		s.executor.Cancel(lowest.ID)
+		// 被抢占的任务标记为 preempted，稍后重新入队
+		lowest.Status = models.TaskStatusPreempted
+		lowest.Error = "preempted by higher priority task " + newTask.ID
+		s.store.Save(lowest)
+		time.AfterFunc(1*time.Second, func() {
+			lowest.Status = models.TaskStatusPending
+			lowest.Error = ""
+			lowest.ExitCode = 0
+			lowest.Stdout = ""
+			lowest.Stderr = ""
+			s.store.Save(lowest)
+			s.queue.Push(lowest)
+			slog.Info("preempted task re-queued", "task_id", lowest.ID)
+		})
+	}
 }
 
 // Stop 停止调度器

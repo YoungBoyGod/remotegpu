@@ -25,16 +25,16 @@ const (
 	TaskTypeScript TaskType = "script"
 )
 
-// Task 任务模型
+// Task 任务模型（按设计文档 2.1 节定义）
 type Task struct {
-	ID      string     `json:"id"`
-	Name    string     `json:"name"`
-	Type    TaskType   `json:"type"`
-	Command string     `json:"command"`
-	Args    []string   `json:"args"`
-	WorkDir string     `json:"workdir"`
+	ID      string            `json:"id"`
+	Name    string            `json:"name"`
+	Type    TaskType          `json:"type"`
+	Command string            `json:"command"`
+	Args    []string          `json:"args"`
+	WorkDir string            `json:"workdir"`
 	Env     map[string]string `json:"env"`
-	Timeout int        `json:"timeout"`
+	Timeout int               `json:"timeout"`
 
 	// 优先级和重试
 	Priority   int `json:"priority"`

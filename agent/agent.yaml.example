@@ -1,0 +1,55 @@
+# RemoteGPU Agent 配置文件示例
+# 将此文件复制为 agent.yaml 放在二进制同目录或 /etc/remotegpu-agent/ 下
+# 所有配置项均可通过环境变量覆盖
+
+# Agent 监听端口 (环境变量: AGENT_PORT)
+port: 8090
+
+# SQLite 数据库路径 (环境变量: AGENT_DB_PATH)
+db_path: /var/lib/remotegpu-agent/tasks.db
+
+# 最大并发执行任务数 (环境变量: AGENT_MAX_WORKERS)
+max_workers: 4
+
+# Server 连接配置
+server:
+  # 后端 Server 地址 (环境变量: SERVER_URL)
+  url: "http://server:8080"
+  # Agent 唯一标识 (环境变量: AGENT_ID)
+  agent_id: "agent-001"
+  # 绑定的机器 ID (环境变量: MACHINE_ID)
+  machine_id: "machine-001"
+  # 认证 Token (环境变量: AGENT_TOKEN)
+  token: ""
+  # 请求超时
+  timeout: 30s
+
+# 轮询配置
+poll:
+  # 轮询间隔
+  interval: 5s
+  # 每次拉取任务数量
+  batch_size: 10
+
+# 资源限制
+limits:
+  # 单任务 stdout/stderr 最大捕获大小 (字节)
+  max_output_size: 1048576  # 1MB
+
+# 安全配置
+security:
+  # 命令白名单：仅允许执行列表中的命令（为空则不限制）
+  allowed_commands:
+    - "python"
+    - "python3"
+    - "bash"
+    - "sh"
+    - "nvidia-smi"
+    - "docker"
+
+  # 命令黑名单：禁止执行包含这些模式的命令
+  blocked_patterns:
+    - "rm -rf /"
+    - "mkfs"
+    - "dd if="
+    - "> /dev/sd"

@@ -18,6 +18,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu-agent/internal/models"
 	"github.com/YoungBoyGod/remotegpu-agent/internal/poller"
 	"github.com/YoungBoyGod/remotegpu-agent/internal/scheduler"
+	"github.com/YoungBoyGod/remotegpu-agent/internal/security"
 	"github.com/YoungBoyGod/remotegpu-agent/internal/syncer"
 	"github.com/gin-gonic/gin"
 )
@@ -36,6 +37,13 @@ func main() {
 	sched, err := scheduler.NewScheduler(cfg.DBPath, cfg.MaxWorkers)
 	if err != nil {
 		log.Fatalf("create scheduler error: %v", err)
+	}
+
+	// 设置命令白名单校验器
+	if len(cfg.Security.AllowedCommands) > 0 || len(cfg.Security.BlockedPatterns) > 0 {
+		v := security.NewValidator(cfg.Security.AllowedCommands, cfg.Security.BlockedPatterns)
+		sched.GetExecutor().SetValidator(v)
+		slog.Info("command validator enabled")
 	}
 
 	// 启动调度器

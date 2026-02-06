@@ -172,6 +172,40 @@ func (c *ServerClient) RenewLease(taskID, attemptID string) error {
 	return nil
 }
 
+// ReportProgress 上报任务进度
+func (c *ServerClient) ReportProgress(taskID, attemptID string, percent int, message string) error {
+	reqBody := map[string]interface{}{
+		"agent_id":   c.agentID,
+		"attempt_id": attemptID,
+		"percent":    percent,
+		"message":    message,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+	url := fmt.Sprintf("%s/api/v1/agent/tasks/%s/progress", c.baseURL, taskID)
+	resp, err := c.doPost(url, body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+
+	if result.Code != 0 {
+		return fmt.Errorf("report progress failed: %s", result.Message)
+	}
+	return nil
+}
+
 // ReportComplete 上报任务完成
 func (c *ServerClient) ReportComplete(task *models.Task) error {
 	reqBody := map[string]interface{}{

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/YoungBoyGod/remotegpu-agent/internal/models"
+	"github.com/YoungBoyGod/remotegpu-agent/internal/security"
 )
 
 const maxOutputSize = 1 << 20 // 1MB
@@ -47,6 +48,7 @@ type Executor struct {
 	mu         sync.Mutex
 	running    map[string]*runningTask
 	maxWorkers int
+	validator  *security.Validator
 }
 
 type runningTask struct {
@@ -63,6 +65,11 @@ func NewExecutor(maxWorkers int) *Executor {
 	}
 }
 
+// SetValidator 设置命令校验器
+func (e *Executor) SetValidator(v *security.Validator) {
+	e.validator = v
+}
+
 // RunningCount 返回正在运行的任务数
 func (e *Executor) RunningCount() int {
 	e.mu.Lock()
@@ -77,6 +84,17 @@ func (e *Executor) CanAccept() bool {
 
 // Execute 执行任务
 func (e *Executor) Execute(task *models.Task) {
+	// 命令白名单校验
+	if e.validator != nil && e.validator.Enabled() {
+		if err := e.validator.Validate(task.Command, task.Args); err != nil {
+			task.Status = models.TaskStatusFailed
+			task.Error = "command rejected: " + err.Error()
+			task.ExitCode = -1
+			task.EndedAt = time.Now()
+			return
+		}
+	}
+
 	timeout := task.Timeout
 	if timeout <= 0 {
 		timeout = 3600
@@ -174,4 +192,18 @@ func (e *Executor) Cancel(taskID string) bool {
 	}()
 
 	return true
+}
+
+// LowestPriorityRunning 返回正在运行的最低优先级任务（数字最大）
+func (e *Executor) LowestPriorityRunning() *models.Task {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+
+	var lowest *models.Task
+	for _, rt := range e.running {
+		if lowest == nil || rt.task.Priority > lowest.Priority {
+			lowest = rt.task
+		}
+	}
+	return lowest
 }
