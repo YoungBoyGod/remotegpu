@@ -50,9 +50,14 @@ const handleSubmit = async () => {
     if (!payload.ip_address && payload.hostname) {
       payload.ip_address = payload.hostname
     }
-    await addMachine(payload)
+    const response = await addMachine(payload)
     ElMessage.success('添加机器成功')
-    router.push('/admin/machines/list')
+    const createdId = response.data?.id
+    if (createdId) {
+      router.push(`/admin/machines/${createdId}`)
+    } else {
+      router.push('/admin/machines/list')
+    }
   } catch (error: any) {
     if (error !== false) {
       console.error('添加机器失败:', error)

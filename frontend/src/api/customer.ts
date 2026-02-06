@@ -1,6 +1,7 @@
 import request from '@/utils/request'
 import type { ApiResponse, PageRequest, PageResponse } from '@/types/common'
 import type { Machine } from '@/types/machine'
+import type { Task, TaskLogResponse, TaskResultResponse } from '@/types/task'
 
 // ==================== 我的机器 ====================
 
@@ -14,14 +15,14 @@ export function getMyMachines(params?: PageRequest): Promise<ApiResponse<PageRes
 /**
  * 获取机器连接信息
  */
-export function getMachineConnection(id: number): Promise<ApiResponse<any>> {
+export function getMachineConnection(id: string | number): Promise<ApiResponse<any>> {
   return request.get(`/customer/machines/${id}/connection`)
 }
 
 /**
  * 重置SSH连接
  */
-export function resetSSH(id: number): Promise<ApiResponse<void>> {
+export function resetSSH(id: string | number): Promise<ApiResponse<void>> {
   return request.post(`/customer/machines/${id}/ssh-reset`)
 }
 
@@ -71,22 +72,72 @@ export function getMachineEnrollment(id: number): Promise<ApiResponse<MachineEnr
 /**
  * 获取任务列表
  */
-export function getTasks(params: PageRequest): Promise<ApiResponse<PageResponse<any>>> {
+export function getTasks(params: PageRequest & { status?: string; keyword?: string; host_id?: string }): Promise<ApiResponse<PageResponse<Task>>> {
   return request.get('/customer/tasks', { params })
 }
 
 /**
  * 创建训练任务
  */
-export function createTrainingTask(data: any): Promise<ApiResponse<any>> {
+export interface CreateTrainingTaskPayload {
+  name: string
+  host_id: string
+  command: string
+  image_id?: number
+  env_vars?: Record<string, string>
+}
+
+export function createTrainingTask(data: CreateTrainingTaskPayload): Promise<ApiResponse<Task>> {
   return request.post('/customer/tasks/training', data)
 }
 
 /**
  * 停止任务
  */
-export function stopTask(id: number): Promise<ApiResponse<void>> {
+export function stopTask(id: string): Promise<ApiResponse<void>> {
   return request.post(`/customer/tasks/${id}/stop`)
+}
+
+/**
+ * 获取任务详情
+ */
+export function getTaskDetail(id: string): Promise<ApiResponse<Task>> {
+  return request.get(`/customer/tasks/${id}`)
+}
+
+/**
+ * 取消任务
+ */
+export function cancelTask(id: string): Promise<ApiResponse<void>> {
+  return request.post(`/customer/tasks/${id}/cancel`)
+}
+
+/**
+ * 重试任务
+ */
+export function retryTask(id: string): Promise<ApiResponse<void>> {
+  return request.post(`/customer/tasks/${id}/retry`)
+}
+
+/**
+ * 获取任务日志
+ */
+export function getTaskLogs(id: string): Promise<ApiResponse<TaskLogResponse>> {
+  return request.get(`/customer/tasks/${id}/logs`)
+}
+
+/**
+ * 获取任务结果元信息
+ */
+export function getTaskResult(id: string): Promise<ApiResponse<TaskResultResponse>> {
+  return request.get(`/customer/tasks/${id}/result`)
+}
+
+/**
+ * 下载任务结果
+ */
+export function downloadTaskResult(id: string): Promise<Blob> {
+  return request.get(`/customer/tasks/${id}/result`, { responseType: 'blob' })
 }
 
 // ==================== 数据集管理 ====================

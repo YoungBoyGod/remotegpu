@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getCustomerList, deleteCustomer, toggleCustomerStatus } from '@/api/admin'
+import { getCustomerList, disableCustomer } from '@/api/admin'
 import type { Customer } from '@/types/customer'
 import type { PageRequest } from '@/types/common'
 import DataTable from '@/components/common/DataTable.vue'
@@ -66,43 +66,34 @@ const handleViewDetail = (customer: Customer) => {
   router.push(`/admin/customers/${customer.id}`)
 }
 
-const handleDelete = async (customer: Customer) => {
+const handleDisable = async (customer: Customer) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除客户 "${customer.name}" 吗?`,
-      '删除确认',
+      `确定要禁用客户 "${getCustomerName(customer)}" 吗?`,
+      '禁用确认',
       {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
-    await deleteCustomer(customer.id)
-    ElMessage.success('删除成功')
+    await disableCustomer(customer.id)
+    ElMessage.success('已禁用')
     loadCustomers()
   } catch (error: any) {
     if (error !== 'cancel') {
-      console.error('删除客户失败:', error)
+      console.error('禁用客户失败:', error)
     }
-  }
-}
-
-const handleToggleStatus = async (customer: Customer) => {
-  try {
-    const newStatus = customer.status !== 'active'
-    await toggleCustomerStatus(customer.id, newStatus)
-    ElMessage.success(newStatus ? '已启用' : '已禁用')
-    loadCustomers()
-  } catch (error) {
-    console.error('切换状态失败:', error)
   }
 }
 
 const getStatusType = (status: string) => {
   const statusMap: Record<string, any> = {
     active: 'success',
-    inactive: 'info',
-    suspended: 'danger'
+    pending: 'info',
+    disabled: 'warning',
+    suspended: 'danger',
+    deleted: 'danger'
   }
   return statusMap[status] || 'info'
 }
@@ -110,10 +101,31 @@ const getStatusType = (status: string) => {
 const getStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
     active: '正常',
-    inactive: '未激活',
-    suspended: '已停用'
+    pending: '未激活',
+    disabled: '已禁用',
+    suspended: '已停用',
+    deleted: '已删除'
   }
   return statusMap[status] || status
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
+}
+
+const getCustomerName = (customer: Customer) => {
+  return customer.company_code || customer.company || customer.display_name || customer.username || customer.name || '-'
+}
+
+const getContactName = (customer: Customer) => {
+  return customer.full_name || customer.display_name || customer.contactPerson || customer.username || '-'
+}
+
+const getRowIndex = (index: number) => {
+  return (pageRequest.value.page - 1) * pageRequest.value.pageSize + index + 1
 }
 
 onMounted(() => {
@@ -125,6 +137,7 @@ onMounted(() => {
   <div class="customer-list">
     <div class="page-header">
       <h2 class="page-title">客户列表</h2>
+      <el-button type="primary" @click="router.push('/admin/customers/add')">添加客户</el-button>
     </div>
 
     <!-- 筛选栏 -->
@@ -138,7 +151,7 @@ onMounted(() => {
           </el-select>
         </el-form-item>
         <el-form-item label="关键词">
-          <el-input v-model="filters.keyword" placeholder="客户名称/联系人" clearable style="width: 200px" />
+          <el-input v-model="filters.keyword" placeholder="公司代号/用户名" clearable style="width: 200px" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="handleSearch">搜索</el-button>
@@ -158,10 +171,19 @@ onMounted(() => {
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
     >
-      <el-table-column prop="name" label="客户名称" min-width="150" />
-      <el-table-column prop="contactPerson" label="联系人" width="120" />
-      <el-table-column prop="contactEmail" label="联系邮箱" min-width="180" />
-      <el-table-column prop="contactPhone" label="联系电话" width="130" />
+      <el-table-column type="index" label="序号" width="70" :index="getRowIndex" />
+      <el-table-column label="公司代号" min-width="160">
+        <template #default="{ row }">
+          {{ getCustomerName(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="联系人" width="140">
+        <template #default="{ row }">
+          {{ getContactName(row) }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="email" label="联系邮箱" min-width="200" />
+      <el-table-column prop="phone" label="联系电话" width="140" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)">
@@ -174,17 +196,18 @@ onMounted(() => {
           {{ row.allocatedMachines || 0 }}
         </template>
       </el-table-column>
-      <el-table-column prop="createdAt" label="创建时间" width="180" />
+      <el-table-column label="创建时间" width="180">
+        <template #default="{ row }">
+          {{ formatDateTime(row.created_at || row.createdAt) }}
+        </template>
+      </el-table-column>
       <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
           <el-button link type="primary" size="small" @click="handleViewDetail(row)">
             详情
           </el-button>
-          <el-button link type="warning" size="small" @click="handleToggleStatus(row)">
-            {{ row.status === 'active' ? '禁用' : '启用' }}
-          </el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">
-            删除
+          <el-button v-if="row.status === 'active'" link type="warning" size="small" @click="handleDisable(row)">
+            禁用
           </el-button>
         </template>
       </el-table-column>

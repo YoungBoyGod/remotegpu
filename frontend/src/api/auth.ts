@@ -17,12 +17,14 @@ export interface LoginResponse {
   accessToken: string
   refreshToken: string
   expiresIn: number
+  mustChangePassword: boolean
 }
 
 interface BackendLoginResponse {
   access_token: string
   refresh_token: string
   expires_in: number
+  must_change_password: boolean
 }
 
 /**
@@ -32,6 +34,7 @@ export interface RefreshTokenResponse {
   accessToken: string
   refreshToken: string
   expiresIn: number
+  mustChangePassword: boolean
 }
 
 /**
@@ -60,6 +63,7 @@ export function login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
       accessToken: res.data.access_token,
       refreshToken: res.data.refresh_token,
       expiresIn: res.data.expires_in,
+      mustChangePassword: res.data.must_change_password,
     },
   }))
 }
@@ -81,8 +85,18 @@ export function refreshToken(refreshToken: string): Promise<ApiResponse<RefreshT
       accessToken: res.data.access_token,
       refreshToken: res.data.refresh_token,
       expiresIn: res.data.expires_in,
+      mustChangePassword: res.data.must_change_password,
     },
   }))
+}
+
+export interface ChangePasswordRequest {
+  old_password: string
+  new_password: string
+}
+
+export function changePassword(data: ChangePasswordRequest): Promise<ApiResponse<void>> {
+  return request.post('/auth/password/change', data)
 }
 
 /**

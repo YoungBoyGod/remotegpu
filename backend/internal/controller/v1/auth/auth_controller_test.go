@@ -56,6 +56,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		password_hash TEXT NOT NULL,
 		display_name TEXT,
 		full_name TEXT,
+		company_code TEXT,
 		company TEXT,
 		phone TEXT,
 		avatar_url TEXT,
@@ -67,7 +68,8 @@ func setupTestEnv(t *testing.T) *testEnv {
 		phone_verified INTEGER DEFAULT 0,
 		balance REAL DEFAULT 0,
 		currency TEXT DEFAULT 'CNY',
-		last_login_at DATETIME
+		last_login_at DATETIME,
+		must_change_password INTEGER DEFAULT 0
 	)`).Error
 	require.NoError(t, err)
 
@@ -116,6 +118,7 @@ func setupTestEnv(t *testing.T) *testEnv {
 		authGroup.POST("/refresh", controller.Refresh)
 		authGroup.POST("/logout", controller.Logout)
 		authGroup.GET("/profile", testAuthMiddleware(), controller.GetProfile)
+		authGroup.POST("/password/change", testAuthMiddleware(), controller.ChangePassword)
 	}
 
 	return &testEnv{
@@ -299,6 +302,62 @@ func TestGetProfile_InvalidToken(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, 401, resp.Code)
+}
+
+// ==================== ChangePassword 测试 ====================
+
+func TestChangePassword_Success(t *testing.T) {
+	env := setupTestEnv(t)
+
+	_ = env.db.Model(&entity.Customer{}).Where("id = ?", 1).Update("must_change_password", true).Error
+
+	token, _ := pkgAuth.GenerateToken(1, "testuser", "customer_owner")
+	reqBody := apiV1.ChangePasswordRequest{
+		OldPassword: "Test123456",
+		NewPassword: "NewPass123",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password/change", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	env.router.ServeHTTP(w, req)
+
+	var resp testResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, 0, resp.Code)
+
+	var customer entity.Customer
+	err = env.db.First(&customer, 1).Error
+	require.NoError(t, err)
+	assert.False(t, customer.MustChangePassword)
+	assert.True(t, pkgAuth.CheckPasswordHash("NewPass123", customer.PasswordHash))
+}
+
+func TestChangePassword_InvalidOldPassword(t *testing.T) {
+	env := setupTestEnv(t)
+
+	token, _ := pkgAuth.GenerateToken(1, "testuser", "customer_owner")
+	reqBody := apiV1.ChangePasswordRequest{
+		OldPassword: "wrongpassword",
+		NewPassword: "NewPass123",
+	}
+	body, _ := json.Marshal(reqBody)
+
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/password/change", bytes.NewBuffer(body))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	w := httptest.NewRecorder()
+
+	env.router.ServeHTTP(w, req)
+
+	var resp testResponse
+	err := json.Unmarshal(w.Body.Bytes(), &resp)
+	require.NoError(t, err)
+	assert.Equal(t, errors.ErrorPasswordIncorrect, resp.Code)
 }
 
 // ==================== Logout 测试 ====================

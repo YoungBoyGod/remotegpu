@@ -16,6 +16,7 @@ type Customer struct {
 	// Profile
 	DisplayName string `gorm:"type:varchar(128)" json:"display_name"`
 	FullName    string `gorm:"type:varchar(256)" json:"full_name"`
+	CompanyCode string `gorm:"type:varchar(64)" json:"company_code"`
 	Company     string `gorm:"type:varchar(256)" json:"company"`
 	Phone       string `gorm:"type:varchar(32)" json:"phone"`
 	AvatarURL   string `gorm:"type:varchar(512)" json:"avatar_url"`
@@ -26,9 +27,10 @@ type Customer struct {
 	AccountType string `gorm:"type:varchar(32);default:'individual'" json:"account_type"`   // individual, enterprise
 
 	// Status
-	Status        string `gorm:"type:varchar(32);default:'active'" json:"status"` // active, suspended, deleted
-	EmailVerified bool   `gorm:"default:false" json:"email_verified"`
-	PhoneVerified bool   `gorm:"default:false" json:"phone_verified"`
+	Status             string `gorm:"type:varchar(32);default:'active'" json:"status"` // active, suspended, deleted
+	EmailVerified      bool   `gorm:"default:false" json:"email_verified"`
+	PhoneVerified      bool   `gorm:"default:false" json:"phone_verified"`
+	MustChangePassword bool   `gorm:"default:false" json:"must_change_password"`
 
 	// Billing
 	Balance  float64 `gorm:"type:decimal(10,4);default:0.00" json:"balance"`
@@ -49,23 +51,23 @@ func (Customer) TableName() string {
 
 // SSHKey SSH密钥实体，表示客户添加的 SSH 公钥
 type SSHKey struct {
-	ID         uint      `gorm:"primarykey" json:"id"`
-	CustomerID uint      `gorm:"not null;index" json:"customer_id"`
-	Name       string    `gorm:"type:varchar(64);not null" json:"name"`
+	ID          uint      `gorm:"primarykey" json:"id"`
+	CustomerID  uint      `gorm:"not null;index" json:"customer_id"`
+	Name        string    `gorm:"type:varchar(64);not null" json:"name"`
 	Fingerprint string    `gorm:"type:varchar(128)" json:"fingerprint"`
-	PublicKey  string    `gorm:"type:text;not null" json:"public_key"`
-	CreatedAt  time.Time `json:"created_at"`
+	PublicKey   string    `gorm:"type:text;not null" json:"public_key"`
+	CreatedAt   time.Time `json:"created_at"`
 }
 
 // Workspace 工作空间实体，表示资源的逻辑分组（团队）
 type Workspace struct {
-	ID        uint      `gorm:"primarykey" json:"id"`
-	UUID      string    `gorm:"type:uuid;default:uuid_generate_v4();uniqueIndex;not null" json:"uuid"`
-	OwnerID   uint      `gorm:"not null" json:"owner_id"`
-	Name      string    `gorm:"type:varchar(128);not null" json:"name"`
-	Description string  `gorm:"type:text" json:"description"`
-	Type      string    `gorm:"type:varchar(32);default:'personal'" json:"type"` // personal, team
-	Status    string    `gorm:"type:varchar(32);default:'active'" json:"status"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	ID          uint      `gorm:"primarykey" json:"id"`
+	UUID        string    `gorm:"type:uuid;default:uuid_generate_v4();uniqueIndex;not null" json:"uuid"`
+	OwnerID     uint      `gorm:"not null" json:"owner_id"`
+	Name        string    `gorm:"type:varchar(128);not null" json:"name"`
+	Description string    `gorm:"type:text" json:"description"`
+	Type        string    `gorm:"type:varchar(32);default:'personal'" json:"type"` // personal, team
+	Status      string    `gorm:"type:varchar(32);default:'active'" json:"status"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }

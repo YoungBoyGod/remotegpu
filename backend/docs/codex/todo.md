@@ -85,3 +85,13 @@
   2. 增加 GPU 与存储挂载配置。
   3. 对接任务生命周期（创建/停止/清理）。
 - 依赖：Docker API 权限、nvidia-container-toolkit（GPU）。
+
+## 9. Agent 任务恢复租约校验
+
+- 位置：`/home/luo/code/remotegpu/agent/internal/scheduler/scheduler.go` (`recover`)
+- 原因：当前仅恢复 pending 任务，未校验 assigned/running 任务的租约有效性。
+- 实现建议：
+  1. 启动时加载 assigned/running 任务。
+  2. 通过 Server 校验 attempt_id/lease_expires_at。
+  3. 过期则停止进程并标记 failed；有效则继续执行并续约。
+- 依赖：Server 提供任务租约校验或状态查询接口。

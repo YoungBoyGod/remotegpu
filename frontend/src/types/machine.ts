@@ -63,6 +63,8 @@ export interface Machine {
   ssh_port?: number
   ssh_username?: string
   agent_port?: number
+  start_time?: string
+  end_time?: string
   os_type?: string
   os_version?: string
   cpu_info?: string

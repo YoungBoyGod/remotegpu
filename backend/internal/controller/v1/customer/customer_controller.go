@@ -45,11 +45,24 @@ func (c *CustomerController) Create(ctx *gin.Context) {
 		c.Error(ctx, 400, err.Error())
 		return
 	}
+	mustChangePassword := false
+	if req.Password == "" {
+		req.Password = "ChangeME_123"
+		mustChangePassword = true
+	} else if req.Password == "ChangeME_123" {
+		mustChangePassword = true
+	}
 
 	customer := &entity.Customer{
-		Username: req.Username,
-		Email:    req.Email,
-		Role:     req.Role,
+		Username:           req.Username,
+		Email:              req.Email,
+		Role:               req.Role,
+		DisplayName:        req.DisplayName,
+		FullName:           req.FullName,
+		CompanyCode:        req.CompanyCode,
+		Company:            req.Company,
+		Phone:              req.Phone,
+		MustChangePassword: mustChangePassword,
 	}
 	if customer.Role == "" {
 		customer.Role = "customer_owner"

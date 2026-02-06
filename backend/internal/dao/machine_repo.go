@@ -2,6 +2,7 @@ package dao
 
 import (
 	"context"
+	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"gorm.io/gorm"
@@ -174,6 +175,16 @@ func (d *MachineDao) ListNeedCollect(ctx context.Context, limit int) ([]entity.H
 		return nil, err
 	}
 	return hosts, nil
+}
+
+// UpdateHeartbeat 更新机器心跳时间和状态
+func (d *MachineDao) UpdateHeartbeat(ctx context.Context, id string, status string) error {
+	now := time.Now()
+	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"last_heartbeat": now,
+			"status":         status,
+		}).Error
 }
 
 // Delete 删除机器

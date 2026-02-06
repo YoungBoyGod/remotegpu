@@ -15,6 +15,12 @@ const router = createRouter({
       meta: { requiresAuth: false },
     },
     {
+      path: '/change-password',
+      name: 'change-password',
+      component: () => import('@/views/ChangePasswordView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/forgot-password',
       name: 'forgot-password',
       component: () => import('@/views/ForgotPasswordView.vue'),
@@ -76,6 +82,12 @@ const router = createRouter({
           meta: { title: '客户列表' },
         },
         {
+          path: 'customers/add',
+          name: 'admin-customers-add',
+          component: () => import('@/views/admin/CustomerAddView.vue'),
+          meta: { title: '添加客户' },
+        },
+        {
           path: 'customers/:id',
           name: 'admin-customers-detail',
           component: () => import('@/views/admin/CustomerDetailView.vue'),
@@ -87,6 +99,12 @@ const router = createRouter({
           name: 'admin-allocations-list',
           component: () => import('@/views/admin/AllocationListView.vue'),
           meta: { title: '分配记录' },
+        },
+        {
+          path: 'allocations/assign',
+          name: 'admin-allocations-assign',
+          component: () => import('@/views/admin/MachineAllocateView.vue'),
+          meta: { title: '机器分配' },
         },
         {
           path: 'allocations/quick',
@@ -114,10 +132,23 @@ const router = createRouter({
           meta: { title: '告警中心' },
         },
         {
+          path: 'tasks/list',
+          name: 'admin-tasks-list',
+          component: () => import('@/views/admin/TaskListView.vue'),
+          meta: { title: '任务管理' },
+        },
+        {
           path: 'audit',
           name: 'admin-audit',
           component: () => import('@/views/admin/AuditLogView.vue'),
           meta: { title: '审计日志' },
+        },
+        // 系统设置
+        {
+          path: 'settings/platform',
+          name: 'admin-settings-platform',
+          component: () => import('@/views/admin/PlatformSettingsView.vue'),
+          meta: { title: '平台配置' },
         },
         {
           path: ':pathMatch(.*)*',
@@ -151,6 +182,12 @@ const router = createRouter({
           meta: { title: '机器列表' },
         },
         {
+          path: 'machines/:id',
+          name: 'customer-machines-detail',
+          component: () => import('@/views/customer/MachineDetailView.vue'),
+          meta: { title: '机器详情' },
+        },
+        {
           path: 'machines/enroll',
           name: 'customer-machines-enroll',
           component: () => import('@/views/customer/MachineEnrollView.vue'),
@@ -174,6 +211,30 @@ const router = createRouter({
           name: 'customer-tasks',
           component: () => import('@/views/customer/TaskListView.vue'),
           meta: { title: '任务管理' },
+        },
+        {
+          path: 'tasks/training',
+          name: 'customer-tasks-training',
+          component: () => import('@/views/customer/TaskListView.vue'),
+          meta: { title: '训练任务' },
+        },
+        {
+          path: 'tasks/inference',
+          name: 'customer-tasks-inference',
+          component: () => import('@/views/customer/TaskListView.vue'),
+          meta: { title: '推理任务' },
+        },
+        {
+          path: 'tasks/queue',
+          name: 'customer-tasks-queue',
+          component: () => import('@/views/customer/TaskListView.vue'),
+          meta: { title: '任务队列' },
+        },
+        {
+          path: 'tasks/history',
+          name: 'customer-tasks-history',
+          component: () => import('@/views/customer/TaskListView.vue'),
+          meta: { title: '历史记录' },
         },
         {
           path: 'datasets',
@@ -220,13 +281,30 @@ router.beforeEach(async (to, from, next) => {
     }
   }
 
+  const mustChangePassword = authStore.user?.must_change_password
+
+  // 强制改密：除改密页外全部重定向
+  if (authStore.isAuthenticated && mustChangePassword && to.path !== '/change-password') {
+    next('/change-password')
+    return
+  }
+
   // 已登录用户访问登录页，根据角色重定向到对应的首页
   if (to.path === '/login' && authStore.isAuthenticated) {
+    if (mustChangePassword) {
+      next('/change-password')
+      return
+    }
     if (authStore.user?.role === 'admin') {
       next('/admin/dashboard')
     } else {
       next('/customer/dashboard')
     }
+    return
+  }
+
+  if (to.path === '/change-password' && authStore.isAuthenticated && !mustChangePassword) {
+    next('/')
     return
   }
 

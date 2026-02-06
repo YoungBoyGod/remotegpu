@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 // AgentClient Agent 客户端接口（避免循环依赖）
@@ -233,13 +234,19 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 		machineDao := dao.NewMachineDao(tx)
 		allocationDao := dao.NewAllocationDao(tx)
 
-		// 1. 检查机器状态 (如果可能应加锁，此处仅检查状态)
-		host, err := machineDao.FindByID(ctx, hostID)
+		// 1. 检查机器状态并加行级锁 (SELECT ... FOR UPDATE)
+		// 修复并发安全问题：防止同一台机器被同时分配给多个客户
+		var host entity.Host
+		err := tx.WithContext(ctx).Clauses(clause.Locking{Strength: "UPDATE"}).
+			Where("id = ?", hostID).First(&host).Error
 		if err != nil {
-			return errors.Wrap(errors.ErrorHostNotFound, err)
+			if stderrors.Is(err, gorm.ErrRecordNotFound) {
+				return errors.New(errors.ErrorHostNotFound, "machine not found")
+			}
+			return errors.Wrap(errors.ErrorDatabase, err)
 		}
-		if host.Status != "idle" && host.Status != "online" { // 假设 'online' 表示空闲/可用
-			return errors.New(errors.ErrorMachineNotAvailable, "machine is not available for allocation")
+		if host.Status != "idle" && host.Status != "online" {
+			return errors.New(errors.ErrorMachineNotAvailable, "machine is not available for allocation, current status: "+host.Status)
 		}
 
 		// 2. 更新机器状态
@@ -290,7 +297,18 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) error {
 	var allocID string
 
-	err := s.db.Transaction(func(tx *gorm.DB) error {
+	// 0. 检查是否有运行中的任务（修复 P0 问题）
+	taskDao := dao.NewTaskDao(s.db)
+	runningCount, err := taskDao.CountRunningTasksByMachineID(ctx, hostID)
+	if err != nil {
+		return errors.Wrap(errors.ErrorDatabase, err)
+	}
+	if runningCount > 0 {
+		return errors.New(errors.ErrorMachineHasRunningTasks,
+			fmt.Sprintf("cannot reclaim machine: %d task(s) still running or assigned", runningCount))
+	}
+
+	err = s.db.Transaction(func(tx *gorm.DB) error {
 		machineDao := dao.NewMachineDao(tx)
 		allocationDao := dao.NewAllocationDao(tx)
 

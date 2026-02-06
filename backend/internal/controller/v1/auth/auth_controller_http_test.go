@@ -49,6 +49,7 @@ func setupHTTPTestEnv(t *testing.T) *httpTestEnv {
 		password_hash TEXT NOT NULL,
 		display_name TEXT,
 		full_name TEXT,
+		company_code TEXT,
 		company TEXT,
 		phone TEXT,
 		avatar_url TEXT,
@@ -60,7 +61,8 @@ func setupHTTPTestEnv(t *testing.T) *httpTestEnv {
 		phone_verified INTEGER DEFAULT 0,
 		balance REAL DEFAULT 0,
 		currency TEXT DEFAULT 'CNY',
-		last_login_at DATETIME
+		last_login_at DATETIME,
+		must_change_password INTEGER DEFAULT 0
 	)`).Error
 	require.NoError(t, err)
 
@@ -109,6 +111,7 @@ func setupHTTPTestEnv(t *testing.T) *httpTestEnv {
 		authGroup.POST("/refresh", controller.Refresh)
 		authGroup.POST("/logout", controller.Logout)
 		authGroup.GET("/profile", testAuthMiddleware(), controller.GetProfile)
+		authGroup.POST("/password/change", testAuthMiddleware(), controller.ChangePassword)
 	}
 
 	// 启动真实 HTTP 服务器

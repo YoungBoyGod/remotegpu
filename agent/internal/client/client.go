@@ -206,6 +206,38 @@ func (c *ServerClient) ReportProgress(taskID, attemptID string, percent int, mes
 	return nil
 }
 
+// Heartbeat 上报心跳
+func (c *ServerClient) Heartbeat() error {
+	reqBody := map[string]string{
+		"agent_id":   c.agentID,
+		"machine_id": c.machineID,
+	}
+
+	body, err := json.Marshal(reqBody)
+	if err != nil {
+		return fmt.Errorf("marshal request: %w", err)
+	}
+	url := fmt.Sprintf("%s/api/v1/agent/heartbeat", c.baseURL)
+	resp, err := c.doPost(url, body)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	var result struct {
+		Code    int    `json:"code"`
+		Message string `json:"message"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return fmt.Errorf("decode response: %w", err)
+	}
+
+	if result.Code != 0 {
+		return fmt.Errorf("heartbeat failed: %s", result.Message)
+	}
+	return nil
+}
+
 // ReportComplete 上报任务完成
 func (c *ServerClient) ReportComplete(task *models.Task) error {
 	reqBody := map[string]interface{}{

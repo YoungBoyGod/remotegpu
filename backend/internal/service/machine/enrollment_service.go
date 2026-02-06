@@ -13,6 +13,7 @@ import (
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/cache"
+	"github.com/YoungBoyGod/remotegpu/pkg/crypto"
 	"github.com/YoungBoyGod/remotegpu/pkg/logger"
 	"github.com/redis/go-redis/v9"
 	"golang.org/x/crypto/ssh"
@@ -391,7 +392,12 @@ func (s *MachineEnrollmentService) collectSpec(ctx context.Context, enrollment *
 func (s *MachineEnrollmentService) connectSSH(enrollment *entity.MachineEnrollment) (*ssh.Client, error) {
 	authMethods := []ssh.AuthMethod{}
 	if enrollment.SSHPassword != "" {
-		authMethods = append(authMethods, ssh.Password(enrollment.SSHPassword))
+		// 修复 P0 安全问题：解密 SSH 密码
+		decryptedPassword, err := crypto.DecryptAES256GCM(enrollment.SSHPassword)
+		if err != nil {
+			return nil, fmt.Errorf("failed to decrypt SSH password: %w", err)
+		}
+		authMethods = append(authMethods, ssh.Password(decryptedPassword))
 	}
 	if enrollment.SSHKey != "" {
 		signer, err := ssh.ParsePrivateKey([]byte(enrollment.SSHKey))

@@ -3,24 +3,31 @@
  */
 
 // 客户状态
-export type CustomerStatus = 'active' | 'disabled' | 'pending'
+export type CustomerStatus = 'active' | 'disabled' | 'pending' | 'suspended' | 'deleted'
 
 // 客户信息
 export interface Customer {
   id: number
-  name: string
-  company: string
-  email: string
-  phone: string
-  contactPerson: string  // 联系人
-  contactEmail: string  // 联系邮箱
-  contactPhone: string  // 联系电话
+  username?: string
+  display_name?: string
+  full_name?: string
+  company_code?: string
+  company?: string
+  email?: string
+  phone?: string
   status: CustomerStatus
-  tenantId: number
-  allocatedMachines: number  // 分配的机器数量
-  storageUsed: number  // 已用存储（GB）
-  storageQuota: number  // 存储配额（GB）
-  createdAt: string
+  created_at?: string
+  last_login_at?: string
+
+  name?: string
+  contactPerson?: string  // 联系人
+  contactEmail?: string  // 联系邮箱
+  contactPhone?: string  // 联系电话
+  tenantId?: number
+  allocatedMachines?: number  // 分配的机器数量
+  storageUsed?: number  // 已用存储（GB）
+  storageQuota?: number  // 存储配额（GB）
+  createdAt?: string
   lastLoginAt?: string
 }
 
@@ -52,11 +59,11 @@ export interface CustomerDetail extends Customer {
 
 // 添加客户表单
 export interface AddCustomerForm {
-  name: string
+  username: string
+  company_code: string
   company: string
   email: string
-  phone: string
-  storageQuota: number
+  phone?: string
   password: string
 }
 

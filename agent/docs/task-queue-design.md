@@ -492,6 +492,27 @@ local_queue:
 
 ### 7.1 编排模式
 
+#### MVP 用户输入（简化）
+
+- 用户只需提供目标机器（ID 或 IP 列表）与任务基本信息。
+- `repeat_count` 默认为 `1`，用于简单循环次数控制。
+
+示例：
+```yaml
+task:
+  name: "stability-test"
+  type: "shell"
+  command: "bash"
+  args: ["-c", "./stress_test.sh"]
+  timeout: 3600
+  priority: 3
+  repeat_count: 1
+
+  targets:
+    machine_ids: ["machine-001", "machine-002"]
+    ips: []
+```
+
 #### 单任务配置示例
 ```yaml
 task:
@@ -542,6 +563,11 @@ task:
 **方案 B：模板 + 重复生成子任务**
 - Server 端按模板生成 N 个子任务（可串行或并行）。
 - 优点：每次执行可单独追踪与重试；可控制并发。
+- 失败策略：超过 `max_failures` 后终止本次 repeat，按 `backoff_sec` 执行退避重试。
+- 熔断策略：连续失败达到 `circuit_breaker_threshold` 时停止触发新任务并发出告警。
+- 恢复策略：进入熔断后必须人工恢复（运维或管理员确认后解除熔断）。
+  - 建议接口：`POST /api/v1/task-groups/:id/repeat/reset` 或 `POST /api/v1/tasks/repeat/reset`
+  - 要求：记录操作者、原因与时间（审计日志）
 
 示例：
 ```yaml
@@ -549,6 +575,9 @@ repeat:
   count: 100
   parallel: 5
   interval_sec: 10
+  max_failures: 5
+  backoff_sec: 30
+  circuit_breaker_threshold: 3
   template:
     name: "stability-test"
     type: "shell"
@@ -633,6 +662,41 @@ blocked_patterns:
 - 单任务 CPU 限制
 - 并发任务数限制
 - 输出大小限制（防止日志爆炸）
+
+#### 日志限制与保留
+
+建议配置：
+```yaml
+log:
+  max_size_mb: 100
+  retain_count: 7
+  local_dir: "/var/log/remotegpu-agent"
+```
+
+- `max_size_mb`：单文件最大大小，超过后滚动切分
+- `retain_count`：保留最近 N 个日志文件
+- `local_dir`：本地日志目录
+
+#### Webhook 通知（用户可配置）
+
+仅用于任务完成/失败提醒，内容最小化为任务 ID 与执行结果。
+
+配置示例：
+```yaml
+webhook:
+  url: "https://example.com/webhook"
+```
+
+回调示例：
+```json
+{
+  "task_id": "task-001",
+  "status": "completed"
+}
+```
+
+说明：
+- `url` 由用户填写，用于接收通知。
 
 ### 8.4 执行隔离
 

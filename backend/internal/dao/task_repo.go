@@ -161,3 +161,17 @@ func (d *TaskDao) CompleteTask(ctx context.Context, id, agentID, attemptID strin
 	}
 	return result.Error
 }
+
+// CountRunningTasksByMachineID 统计指定机器上运行中的任务数量
+// @author Claude
+// @description 用于机器回收前检查是否有运行中的任务
+// @param machineID 机器ID
+// @return 运行中任务数量、错误
+// @modified 2026-02-06
+func (d *TaskDao) CountRunningTasksByMachineID(ctx context.Context, machineID string) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&entity.Task{}).
+		Where("machine_id = ? AND status IN ?", machineID, []string{"running", "assigned"}).
+		Count(&count).Error
+	return count, err
+}

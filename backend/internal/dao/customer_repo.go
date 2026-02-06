@@ -34,7 +34,7 @@ func (d *CustomerDao) List(ctx context.Context, page, pageSize int) ([]entity.Cu
 		return nil, 0, err
 	}
 
-	if err := db.Offset((page - 1) * pageSize).Limit(pageSize).Find(&customers).Error; err != nil {
+	if err := db.Order("created_at asc").Offset((page - 1) * pageSize).Limit(pageSize).Find(&customers).Error; err != nil {
 		return nil, 0, err
 	}
 

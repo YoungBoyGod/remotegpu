@@ -3,6 +3,7 @@ package task
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
@@ -92,9 +93,36 @@ func (s *TaskService) stopTaskProcess(ctx context.Context, task *entity.Task) er
 		_ = s.taskDao.UpdateErrorMsg(ctx, task.ID, err.Error())
 		return err
 	}
-	if err := s.agentService.StopProcess(ctx, task.HostID, task.ProcessID); err != nil {
+
+	// 修复 P0 问题：添加超时控制，防止 Agent 无响应时请求挂起
+	stopCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	if err := s.agentService.StopProcess(stopCtx, task.HostID, task.ProcessID); err != nil {
 		_ = s.taskDao.UpdateErrorMsg(ctx, task.ID, err.Error())
 		return err
 	}
 	return nil
+}
+
+// === Agent 专用 API ===
+
+// ClaimTasks Agent 认领任务
+func (s *TaskService) ClaimTasks(ctx context.Context, machineID, agentID string, limit int) ([]entity.Task, error) {
+	return s.taskDao.ClaimTasks(ctx, machineID, agentID, limit)
+}
+
+// StartTask 标记任务开始
+func (s *TaskService) StartTask(ctx context.Context, id, agentID, attemptID string) error {
+	return s.taskDao.StartTask(ctx, id, agentID, attemptID)
+}
+
+// RenewLease 续约租约
+func (s *TaskService) RenewLease(ctx context.Context, id, agentID, attemptID string, extendSec int) error {
+	return s.taskDao.RenewLease(ctx, id, agentID, attemptID, extendSec)
+}
+
+// CompleteTask 完成任务
+func (s *TaskService) CompleteTask(ctx context.Context, id, agentID, attemptID string, exitCode int, errMsg string) error {
+	return s.taskDao.CompleteTask(ctx, id, agentID, attemptID, exitCode, errMsg)
 }

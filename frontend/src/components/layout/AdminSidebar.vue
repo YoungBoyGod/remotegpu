@@ -51,8 +51,7 @@ const menuItems = ref<MenuItem[]>([
     title: '客户管理',
     icon: User,
     children: [
-      { id: 'customer-list', title: '客户列表', path: '/admin/customers/list' },
-      { id: 'add-customer', title: '添加客户', path: '/admin/customers/add' }
+      { id: 'customer-list', title: '客户列表', path: '/admin/customers/list' }
     ]
   },
   {
@@ -61,6 +60,7 @@ const menuItems = ref<MenuItem[]>([
     icon: Connection,
     children: [
       { id: 'allocation-list', title: '分配记录', path: '/admin/allocations/list' },
+      { id: 'machine-allocate', title: '机器分配', path: '/admin/allocations/assign' },
       { id: 'quick-allocate', title: '快速分配', path: '/admin/allocations/quick' }
     ]
   },

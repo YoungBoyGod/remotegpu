@@ -48,6 +48,21 @@
   - Agent 本地队列 YAML 示例：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
   - 任务配置 YAML 示例（单任务/DAG）：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
   - 循环任务支持策略与示例：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - 循环任务失败重试参数补充：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - 循环任务熔断与告警策略：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - 循环任务熔断改为人工恢复：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - 循环任务人工恢复接口建议与审计要求：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - MVP 简化输入模型与 repeat_count 默认值：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - 日志大小/保留/本地目录配置建议：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - Webhook 通知简化为任务ID+结果：`/home/luo/code/remotegpu/agent/docs/task-queue-design.md`
+  - Agent-Server 通信 Review 文档：`/home/luo/code/remotegpu/agent/docs/CodeX_agent_server_comm_review.md`
+  - Agent 与 Server 通信对接：`/home/luo/code/remotegpu/agent/cmd/main.go`, `/home/luo/code/remotegpu/agent/internal/scheduler/scheduler.go`, `/home/luo/code/remotegpu/agent/internal/client/client.go`
+  - 未完成任务补充（Agent 租约恢复）：`docs/codex/todo.md`
+  - 客户列表展示信息补齐：`../frontend/src/views/admin/CustomerListView.vue`, `../frontend/src/types/customer.ts`
+  - 客户添加页面与字段对齐：`../frontend/src/views/admin/CustomerAddView.vue`, `../frontend/src/router/index.ts`, `../frontend/src/views/admin/CustomerListView.vue`, `../frontend/src/types/customer.ts`, `api/v1/customer.go`, `internal/controller/v1/customer/customer_controller.go`
+  - 客户添加页面方案文档：`docs/CodeX_客户添加页面方案.md`
+  - 客户添加默认密码与字段简化：`../frontend/src/views/admin/CustomerAddView.vue`, `../frontend/src/types/customer.ts`, `api/v1/customer.go`, `internal/controller/v1/customer/customer_controller.go`, `docs/CodeX_客户添加页面方案.md`
+  - 客户列表禁用操作对齐现有接口：`../frontend/src/views/admin/CustomerListView.vue`
 
 - 规划与待办更新
   - 计划状态调整：`docs/codex/Plan.md`
@@ -194,3 +209,44 @@
   - 采集更新写入 DB：`internal/service/machine/machine_service.go`, `internal/dao/machine_repo.go`
   - OpenAPI 补充补采与添加任务接口：`docs/openapi.yaml`
   - 前端补采按钮与标记展示：`frontend/src/views/admin/MachineListView.vue`, `frontend/src/api/admin.ts`, `frontend/src/types/machine.ts`
+
+## 2026-02-06
+
+- 首次登录强制改密方案更新
+  - 方案补充与实施清单：`docs/CodeX_首次登录改密方案.md`
+  - 前端需求补充强制改密规则：`docs/codex/frontend_requirements.md`
+
+- 后端强制改密闭环
+  - Customer 增加 `must_change_password` 字段：`internal/model/entity/customer.go`
+  - SQL 迁移新增字段：`sql/16_add_customer_must_change_password.sql`
+  - 登录/刷新返回改密标记：`api/v1/auth.go`, `internal/service/auth/auth_service.go`, `internal/controller/v1/auth/auth_controller.go`
+  - 新增改密接口与路由：`api/v1/auth.go`, `internal/controller/v1/auth/auth_controller.go`, `internal/router/router.go`
+  - 创建客户默认密码触发改密标记：`internal/controller/v1/customer/customer_controller.go`
+  - 改密测试补充：`internal/controller/v1/auth/auth_controller_test.go`, `internal/controller/v1/auth/auth_controller_http_test.go`
+
+- 前端强制改密体验
+  - 新增改密页：`../frontend/src/views/ChangePasswordView.vue`
+  - 路由守卫强制改密：`../frontend/src/router/index.ts`
+  - 登录/刷新返回值适配：`../frontend/src/api/auth.ts`
+  - 用户资料类型补充：`../frontend/src/types/common.ts`
+
+- OpenAPI 文档同步
+  - 登录/刷新/改密接口更新：`docs/openapi.yaml`
+
+- 客户公司代号
+  - Customer 增加 `company_code` 字段与迁移：`internal/model/entity/customer.go`, `sql/17_add_customer_company_code.sql`
+  - 创建客户请求补充 `company_code`：`api/v1/customer.go`, `internal/controller/v1/customer/customer_controller.go`
+  - 前端表单与列表显示代号：`../frontend/src/views/admin/CustomerAddView.vue`, `../frontend/src/views/admin/CustomerListView.vue`, `../frontend/src/types/customer.ts`
+  - OpenAPI 与前端需求同步：`docs/openapi.yaml`, `docs/codex/frontend_requirements.md`
+
+- 客户电话改为可选
+  - 添加客户表单去除电话必填校验：`../frontend/src/views/admin/CustomerAddView.vue`, `../frontend/src/types/customer.ts`
+
+- 客户侧边栏移除“添加客户”
+  - 管理端左侧栏仅保留客户列表入口：`../frontend/src/components/layout/AdminSidebar.vue`
+
+- 客户列表序号
+  - 客户列表新增序号列并按分页全局排序：`../frontend/src/views/admin/CustomerListView.vue`
+
+- 客户列表排序
+  - 默认按添加顺序排序（created_at asc）：`internal/dao/customer_repo.go`

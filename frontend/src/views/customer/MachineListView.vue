@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMyMachines, getMachineMonitoring } from '@/api/customer'
+import { getMyMachines } from '@/api/customer'
 import type { Machine } from '@/types/machine'
 import type { PageRequest } from '@/types/common'
 import DataTable from '@/components/common/DataTable.vue'
@@ -64,6 +64,10 @@ const navigateToEnrollments = () => {
   router.push('/customer/machines/enrollments')
 }
 
+const handleViewDetail = (machine: Machine) => {
+  router.push(`/customer/machines/${machine.id}`)
+}
+
 onMounted(() => {
   loadMachines()
 })
@@ -90,7 +94,13 @@ onMounted(() => {
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
     >
-      <el-table-column prop="name" label="机器名称" min-width="150" />
+      <el-table-column label="机器名称" min-width="150">
+        <template #default="{ row }">
+          <el-link type="primary" @click="handleViewDetail(row)">
+            {{ row.name || row.hostname || row.id }}
+          </el-link>
+        </template>
+      </el-table-column>
       <el-table-column prop="region" label="区域" width="120" />
       <el-table-column label="状态" width="100">
         <template #default="{ row }">

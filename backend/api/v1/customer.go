@@ -2,8 +2,13 @@ package v1
 
 // CreateCustomerRequest 创建客户请求
 type CreateCustomerRequest struct {
-	Username string `json:"username" binding:"required"`
-	Email    string `json:"email" binding:"required,email"`
-	Password string `json:"password" binding:"required,min=6"`
-	Role     string `json:"role"`
+	Username    string `json:"username" binding:"required"`
+	Email       string `json:"email" binding:"required,email"`
+	CompanyCode string `json:"company_code" binding:"required"`
+	Password    string `json:"password" binding:"omitempty,min=6"`
+	Role        string `json:"role"`
+	DisplayName string `json:"display_name"`
+	FullName    string `json:"full_name"`
+	Company     string `json:"company"`
+	Phone       string `json:"phone"`
 }

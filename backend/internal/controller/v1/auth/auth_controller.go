@@ -39,7 +39,7 @@ func (c *AuthController) Login(ctx *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, expiresIn, err := c.authService.Login(ctx, req.Username, req.Password)
+	accessToken, refreshToken, expiresIn, mustChangePassword, err := c.authService.Login(ctx, req.Username, req.Password)
 	if err != nil {
 		if appErr := errors.GetAppError(err); appErr != nil {
 			c.Error(ctx, appErr.Code, appErr.Message)
@@ -50,9 +50,10 @@ func (c *AuthController) Login(ctx *gin.Context) {
 	}
 
 	c.Success(ctx, apiV1.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    expiresIn,
+		AccessToken:        accessToken,
+		RefreshToken:       refreshToken,
+		ExpiresIn:          expiresIn,
+		MustChangePassword: mustChangePassword,
 	})
 }
 
@@ -74,7 +75,7 @@ func (c *AuthController) Refresh(ctx *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, expiresIn, err := c.authService.RefreshToken(ctx, req.RefreshToken)
+	accessToken, refreshToken, expiresIn, mustChangePassword, err := c.authService.RefreshToken(ctx, req.RefreshToken)
 	if err != nil {
 		if appErr := errors.GetAppError(err); appErr != nil {
 			c.Error(ctx, appErr.Code, appErr.Message)
@@ -85,9 +86,10 @@ func (c *AuthController) Refresh(ctx *gin.Context) {
 	}
 
 	c.Success(ctx, apiV1.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    expiresIn,
+		AccessToken:        accessToken,
+		RefreshToken:       refreshToken,
+		ExpiresIn:          expiresIn,
+		MustChangePassword: mustChangePassword,
 	})
 }
 
@@ -150,7 +152,7 @@ func (c *AuthController) AdminLogin(ctx *gin.Context) {
 		return
 	}
 
-	accessToken, refreshToken, expiresIn, err := c.authService.AdminLogin(ctx, req.Username, req.Password)
+	accessToken, refreshToken, expiresIn, mustChangePassword, err := c.authService.AdminLogin(ctx, req.Username, req.Password)
 	if err != nil {
 		if appErr := errors.GetAppError(err); appErr != nil {
 			c.Error(ctx, appErr.Code, appErr.Message)
@@ -161,8 +163,46 @@ func (c *AuthController) AdminLogin(ctx *gin.Context) {
 	}
 
 	c.Success(ctx, apiV1.LoginResponse{
-		AccessToken:  accessToken,
-		RefreshToken: refreshToken,
-		ExpiresIn:    expiresIn,
+		AccessToken:        accessToken,
+		RefreshToken:       refreshToken,
+		ExpiresIn:          expiresIn,
+		MustChangePassword: mustChangePassword,
 	})
+}
+
+// ChangePassword 修改密码
+// @Summary 修改密码
+// @Description 使用旧密码修改为新密码
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body v1.ChangePasswordRequest true "修改密码请求"
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Router /auth/password/change [post]
+func (c *AuthController) ChangePassword(ctx *gin.Context) {
+	var req apiV1.ChangePasswordRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, "Invalid request parameters")
+		return
+	}
+
+	userID := ctx.GetUint("userID")
+	if userID == 0 {
+		c.Error(ctx, 401, "Unauthorized")
+		return
+	}
+
+	if err := c.authService.ChangePassword(ctx, userID, req.OldPassword, req.NewPassword); err != nil {
+		if appErr := errors.GetAppError(err); appErr != nil {
+			c.Error(ctx, appErr.Code, appErr.Message)
+			return
+		}
+		c.Error(ctx, 500, "Failed to change password")
+		return
+	}
+
+	c.Success(ctx, gin.H{"message": "ok"})
 }

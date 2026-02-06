@@ -39,6 +39,7 @@ export interface UserInfo {
   tenantId?: number
   tenantName?: string
   avatar?: string
+  must_change_password?: boolean
 }
 
 // 登录响应

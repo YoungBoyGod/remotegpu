@@ -48,19 +48,19 @@ func (s *AuthService) storeRefreshToken(ctx context.Context, refreshToken string
 	return s.cache.Set(ctx, key, userID, refreshTokenTTL)
 }
 
-func (s *AuthService) Login(ctx context.Context, username, password string) (string, string, int64, error) {
+func (s *AuthService) Login(ctx context.Context, username, password string) (string, string, int64, bool, error) {
 	customer, err := s.customerDao.FindByUsername(ctx, username)
 	if err != nil {
-		return "", "", 0, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
+		return "", "", 0, false, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
 	}
 
 	if !auth.CheckPasswordHash(password, customer.PasswordHash) {
-		return "", "", 0, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
+		return "", "", 0, false, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
 	}
 
 	// 验证账号状态
 	if customer.Status != "active" {
-		return "", "", 0, errors.New(errors.ErrorUserDisabled, "")
+		return "", "", 0, false, errors.New(errors.ErrorUserDisabled, "")
 	}
 
 	// 更新最后登录时间
@@ -70,21 +70,21 @@ func (s *AuthService) Login(ctx context.Context, username, password string) (str
 	// 生成 Token
 	accessToken, err := auth.GenerateToken(customer.ID, customer.Username, customer.Role)
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
 	// 生成刷新 Token
 	refreshToken, err := auth.GenerateRefreshToken()
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
 	// 存储刷新 Token
 	if err := s.storeRefreshToken(ctx, refreshToken, customer.ID); err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
-	return accessToken, refreshToken, 3600, nil // 1小时过期
+	return accessToken, refreshToken, 3600, customer.MustChangePassword, nil // 1小时过期
 }
 
 func (s *AuthService) GetProfile(ctx context.Context, userID uint) (*entity.Customer, error) {
@@ -92,25 +92,25 @@ func (s *AuthService) GetProfile(ctx context.Context, userID uint) (*entity.Cust
 }
 
 // AdminLogin Admin 专用登录，验证角色
-func (s *AuthService) AdminLogin(ctx context.Context, username, password string) (string, string, int64, error) {
+func (s *AuthService) AdminLogin(ctx context.Context, username, password string) (string, string, int64, bool, error) {
 	customer, err := s.customerDao.FindByUsername(ctx, username)
 	if err != nil {
-		return "", "", 0, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
+		return "", "", 0, false, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
 	}
 
 	// 验证密码
 	if !auth.CheckPasswordHash(password, customer.PasswordHash) {
-		return "", "", 0, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
+		return "", "", 0, false, errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
 	}
 
 	// 验证是否是 admin 角色
 	if customer.Role != "admin" {
-		return "", "", 0, errors.New(errors.ErrorForbidden, "permission denied: admin role required")
+		return "", "", 0, false, errors.New(errors.ErrorForbidden, "permission denied: admin role required")
 	}
 
 	// 验证账号状态
 	if customer.Status != "active" {
-		return "", "", 0, errors.New(errors.ErrorUserDisabled, "account is disabled")
+		return "", "", 0, false, errors.New(errors.ErrorUserDisabled, "account is disabled")
 	}
 
 	// 更新最后登录时间
@@ -120,69 +120,90 @@ func (s *AuthService) AdminLogin(ctx context.Context, username, password string)
 	// 生成 Token
 	accessToken, err := auth.GenerateToken(customer.ID, customer.Username, customer.Role)
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
 	// 生成刷新 Token
 	refreshToken, err := auth.GenerateRefreshToken()
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
 	// 存储刷新 Token
 	if err := s.storeRefreshToken(ctx, refreshToken, customer.ID); err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
-	return accessToken, refreshToken, 3600, nil
+	return accessToken, refreshToken, 3600, customer.MustChangePassword, nil
 }
 
 // RefreshToken 使用刷新令牌获取新的访问令牌
-func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (string, string, int64, error) {
+func (s *AuthService) RefreshToken(ctx context.Context, refreshToken string) (string, string, int64, bool, error) {
 	if s.cache == nil {
-		return "", "", 0, errors.New(errors.ErrorServerError, "cache service not available")
+		return "", "", 0, false, errors.New(errors.ErrorServerError, "cache service not available")
 	}
 
 	// 1. Check if token exists
 	key := refreshTokenPrefix + refreshToken
 	userIDStr, err := s.cache.Get(ctx, key)
 	if err != nil || userIDStr == "" {
-		return "", "", 0, errors.New(errors.ErrorTokenInvalid, "invalid or expired refresh token")
+		return "", "", 0, false, errors.New(errors.ErrorTokenInvalid, "invalid or expired refresh token")
 	}
 
 	// 2. Parse UserID
 	userID, err := strconv.ParseUint(userIDStr, 10, 64)
 	if err != nil {
-		return "", "", 0, errors.New(errors.ErrorTokenInvalid, "invalid token data")
+		return "", "", 0, false, errors.New(errors.ErrorTokenInvalid, "invalid token data")
 	}
 
 	// 3. Get User (check status)
 	customer, err := s.customerDao.FindByID(ctx, uint(userID))
 	if err != nil {
-		return "", "", 0, errors.New(errors.ErrorUserNotFound, "user not found")
+		return "", "", 0, false, errors.New(errors.ErrorUserNotFound, "user not found")
 	}
 	if customer.Status != "active" {
-		return "", "", 0, errors.New(errors.ErrorUserDisabled, "account is disabled")
+		return "", "", 0, false, errors.New(errors.ErrorUserDisabled, "account is disabled")
 	}
 
 	// 4. Generate new tokens
 	newAccessToken, err := auth.GenerateToken(customer.ID, customer.Username, customer.Role)
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 	newRefreshToken, err := auth.GenerateRefreshToken()
 	if err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
 	// 5. Rotate tokens (delete old, save new)
 	_ = s.cache.Delete(ctx, key)
 
 	if err := s.storeRefreshToken(ctx, newRefreshToken, customer.ID); err != nil {
-		return "", "", 0, err
+		return "", "", 0, false, err
 	}
 
-	return newAccessToken, newRefreshToken, 3600, nil
+	return newAccessToken, newRefreshToken, 3600, customer.MustChangePassword, nil
+}
+
+func (s *AuthService) ChangePassword(ctx context.Context, userID uint, oldPassword, newPassword string) error {
+	customer, err := s.customerDao.FindByID(ctx, userID)
+	if err != nil {
+		return errors.New(errors.ErrorUserNotFound, "user not found")
+	}
+
+	if !auth.CheckPasswordHash(oldPassword, customer.PasswordHash) {
+		return errors.New(errors.ErrorPasswordIncorrect, "invalid credentials")
+	}
+
+	newHash, err := auth.HashPassword(newPassword)
+	if err != nil {
+		return errors.WrapWithMessage(errors.ErrorServerError, "failed to hash password", err)
+	}
+
+	return s.db.WithContext(ctx).Model(&entity.Customer{}).Where("id = ?", userID).Updates(map[string]interface{}{
+		"password_hash":        newHash,
+		"must_change_password": false,
+	}).Error
 }
 
 // Logout 登出，将 token 加入 Redis 黑名单

@@ -1,0 +1,2 @@
+ALTER TABLE customers
+    ADD COLUMN IF NOT EXISTS company_code VARCHAR(64);

@@ -8,6 +8,7 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
+	"github.com/YoungBoyGod/remotegpu/pkg/crypto"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
@@ -54,6 +55,16 @@ func (s *MachineService) CreateMachine(ctx context.Context, host *entity.Host) e
 			return err
 		}
 	}
+
+	// 修复 P0 安全问题：加密 SSH 密码
+	if host.SSHPassword != "" {
+		encrypted, err := crypto.EncryptAES256GCM(host.SSHPassword)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt SSH password: %w", err)
+		}
+		host.SSHPassword = encrypted
+	}
+
 	return s.machineDao.Create(ctx, host)
 }
 
@@ -118,6 +129,16 @@ func (s *MachineService) ImportMachines(ctx context.Context, hosts []entity.Host
 		if _, ok := existing[key]; ok {
 			continue
 		}
+
+		// 修复 P0 安全问题：加密 SSH 密码
+		if host.SSHPassword != "" {
+			encrypted, err := crypto.EncryptAES256GCM(host.SSHPassword)
+			if err != nil {
+				return fmt.Errorf("failed to encrypt SSH password for host %s: %w", formatHostKey(host), err)
+			}
+			host.SSHPassword = encrypted
+		}
+
 		if err := s.machineDao.Create(ctx, &host); err != nil {
 			if errors.Is(err, gorm.ErrDuplicatedKey) {
 				continue
@@ -217,4 +238,18 @@ func (s *MachineService) DeleteMachine(ctx context.Context, hostID string) error
 // UpdateStatus 更新机器状态
 func (s *MachineService) UpdateStatus(ctx context.Context, hostID string, status string) error {
 	return s.machineDao.UpdateStatus(ctx, hostID, status)
+}
+
+// Heartbeat 处理 Agent 心跳上报，更新心跳时间并将非 allocated 状态的机器标记为 online
+func (s *MachineService) Heartbeat(ctx context.Context, hostID string) error {
+	host, err := s.machineDao.FindByID(ctx, hostID)
+	if err != nil {
+		return err
+	}
+	// 已分配的机器保持 allocated 状态不变
+	status := host.Status
+	if status != "allocated" {
+		status = "online"
+	}
+	return s.machineDao.UpdateHeartbeat(ctx, hostID, status)
 }

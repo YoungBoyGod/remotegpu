@@ -23,6 +23,7 @@ import (
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	serviceSSHKey "github.com/YoungBoyGod/remotegpu/internal/service/sshkey"
 	serviceStorage "github.com/YoungBoyGod/remotegpu/internal/service/storage"
+	serviceSystemConfig "github.com/YoungBoyGod/remotegpu/internal/service/system_config"
 	serviceTask "github.com/YoungBoyGod/remotegpu/internal/service/task"
 
 	// 控制器层
@@ -31,7 +32,10 @@ import (
 	ctrlDataset "github.com/YoungBoyGod/remotegpu/internal/controller/v1/dataset"
 	ctrlMachine "github.com/YoungBoyGod/remotegpu/internal/controller/v1/machine"
 	ctrlOps "github.com/YoungBoyGod/remotegpu/internal/controller/v1/ops"
+	ctrlSystemConfig "github.com/YoungBoyGod/remotegpu/internal/controller/v1/system_config"
 	ctrlTask "github.com/YoungBoyGod/remotegpu/internal/controller/v1/task"
+
+	ctrlAgent "github.com/YoungBoyGod/remotegpu/internal/controller/v1/agent"
 )
 
 // agentAdapter 适配器，将 AgentService 转换为 AgentSystemInfoProvider 接口
@@ -103,6 +107,7 @@ func InitRouter(r *gin.Engine) {
 	enrollmentSvc := serviceMachine.NewMachineEnrollmentService(db, machineSvc, &agentAdapter{svc: agentSvc})
 	enrollmentSvc.StartWorker(context.Background())
 
+	systemConfigSvc := serviceSystemConfig.NewSystemConfigService(db)
 	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc, promClient)
 
 	// --- 控制器层初始化 ---
@@ -115,11 +120,14 @@ func InitRouter(r *gin.Engine) {
 
 	myMachineController := ctrlCustomer.NewMyMachineController(machineSvc, agentSvc, allocSvc)
 	taskController := ctrlTask.NewTaskController(taskSvc)
+	agentTaskController := ctrlTask.NewAgentTaskController(taskSvc)
+	agentHeartbeatController := ctrlAgent.NewHeartbeatController(machineSvc)
 	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc, allocSvc)
 	sshKeyController := ctrlCustomer.NewSSHKeyController(sshKeySvc)
 	enrollmentController := ctrlCustomer.NewMachineEnrollmentController(enrollmentSvc)
 	auditController := ctrlOps.NewAuditController(auditSvc)
 	imageController := ctrlOps.NewImageController(imageSvc)
+	systemConfigController := ctrlSystemConfig.NewSystemConfigController(systemConfigSvc)
 
 	// API v1 路由
 	apiV1 := r.Group("/api/v1")
@@ -137,6 +145,7 @@ func InitRouter(r *gin.Engine) {
 
 			// 受保护的个人资料
 			authGroup.GET("/profile", middleware.Auth(db), authController.GetProfile)
+			authGroup.POST("/password/change", middleware.Auth(db), authController.ChangePassword)
 		}
 
 		// 2. Admin Module (Protected + Role Check)
@@ -175,6 +184,10 @@ func InitRouter(r *gin.Engine) {
 			// 镜像管理
 			adminGroup.GET("/images", imageController.List)
 			adminGroup.POST("/images/sync", imageController.Sync)
+
+			// 系统配置
+			adminGroup.GET("/settings/configs", systemConfigController.GetConfigs)
+			adminGroup.PUT("/settings/configs", systemConfigController.UpdateConfigs)
 		}
 
 		// 3. Customer Module (Protected)
@@ -206,6 +219,16 @@ func InitRouter(r *gin.Engine) {
 			custGroup.POST("/machines/enroll", enrollmentController.Create)
 			custGroup.GET("/machines/enrollments", enrollmentController.List)
 			custGroup.GET("/machines/enrollments/:id", enrollmentController.Detail)
+		}
+
+		// 4. Agent Module (Agent 专用 API)
+		agentGroup := apiV1.Group("/agent")
+		{
+			agentGroup.POST("/heartbeat", agentHeartbeatController.Heartbeat)
+			agentGroup.POST("/tasks/claim", agentTaskController.ClaimTasks)
+			agentGroup.POST("/tasks/:id/start", agentTaskController.StartTask)
+			agentGroup.POST("/tasks/:id/lease/renew", agentTaskController.RenewLease)
+			agentGroup.POST("/tasks/:id/complete", agentTaskController.CompleteTask)
 		}
 	}
 }
