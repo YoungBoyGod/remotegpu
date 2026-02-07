@@ -9,6 +9,7 @@ import (
 
 	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
+	"github.com/YoungBoyGod/remotegpu/internal/middleware"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/internal/service/audit"
 	"github.com/YoungBoyGod/remotegpu/pkg/cache"
@@ -277,6 +278,9 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 		return nil, err
 	}
 
+	// 记录 Prometheus 指标
+	middleware.MachineAllocationsTotal.Inc()
+
 	// 异步触发 Agent 重置 SSH
 	if s.agentClient != nil {
 		enqueueCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -351,6 +355,9 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 		map[string]interface{}{"allocation_id": allocID, "reason": "admin_request"},
 		200,
 	)
+
+	// 记录 Prometheus 指标
+	middleware.MachineReclamationsTotal.Inc()
 
 	// 5. 异步触发清理流程（重置SSH、清理用户数据等）
 	if s.agentClient != nil {

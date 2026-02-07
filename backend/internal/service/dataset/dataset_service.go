@@ -30,7 +30,19 @@ func (s *DatasetService) GetDataset(ctx context.Context, id uint) (*entity.Datas
 	return s.datasetDao.FindByID(ctx, id)
 }
 
-// ValidateOwnership 验证数据集所有权
+// CompleteUpload 完成分片上传，更新数据集状态为 ready
+func (s *DatasetService) CompleteUpload(ctx context.Context, id uint, name string, size int64) error {
+	fields := map[string]interface{}{
+		"status": "ready",
+	}
+	if name != "" {
+		fields["name"] = name
+	}
+	if size > 0 {
+		fields["total_size"] = size
+	}
+	return s.datasetDao.UpdateFields(ctx, id, fields)
+}
 // @author Claude
 // @description 验证数据集是否属于指定用户
 // @modified 2026-02-04

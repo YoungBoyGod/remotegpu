@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
+	"github.com/YoungBoyGod/remotegpu/internal/middleware"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	"gorm.io/gorm"
@@ -29,7 +30,11 @@ func (s *TaskService) ListTasks(ctx context.Context, customerID uint, page, page
 
 func (s *TaskService) SubmitTask(ctx context.Context, task *entity.Task) error {
 	task.Status = "queued"
-	return s.taskDao.Create(ctx, task)
+	if err := s.taskDao.Create(ctx, task); err != nil {
+		return err
+	}
+	middleware.TasksCreatedTotal.Inc()
+	return nil
 }
 
 func (s *TaskService) StopTask(ctx context.Context, id string) error {
@@ -124,5 +129,9 @@ func (s *TaskService) RenewLease(ctx context.Context, id, agentID, attemptID str
 
 // CompleteTask 完成任务
 func (s *TaskService) CompleteTask(ctx context.Context, id, agentID, attemptID string, exitCode int, errMsg string) error {
-	return s.taskDao.CompleteTask(ctx, id, agentID, attemptID, exitCode, errMsg)
+	if err := s.taskDao.CompleteTask(ctx, id, agentID, attemptID, exitCode, errMsg); err != nil {
+		return err
+	}
+	middleware.TasksCompletedTotal.Inc()
+	return nil
 }

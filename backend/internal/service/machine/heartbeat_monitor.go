@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
+	"github.com/YoungBoyGod/remotegpu/internal/middleware"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/pkg/logger"
 	"gorm.io/gorm"
@@ -52,6 +53,12 @@ func (m *HeartbeatMonitor) Start(ctx context.Context) {
 
 // checkOfflineHosts 检查离线机器
 func (m *HeartbeatMonitor) checkOfflineHosts(ctx context.Context) {
+	// 更新在线机器数指标
+	onlineHosts, err := m.machineDao.ListOnline(ctx)
+	if err == nil {
+		middleware.MachinesOnline.Set(float64(len(onlineHosts)))
+	}
+
 	// 计算超时时间点
 	timeoutAt := time.Now().Add(-m.timeout)
 
@@ -63,7 +70,7 @@ func (m *HeartbeatMonitor) checkOfflineHosts(ctx context.Context) {
 		LastHeartbeat *time.Time
 	}
 
-	err := m.db.WithContext(ctx).
+	err = m.db.WithContext(ctx).
 		Model(&entity.Host{}).
 		Select("id, name, status, last_heartbeat").
 		Where("status IN ?", []string{"online", "idle"}).

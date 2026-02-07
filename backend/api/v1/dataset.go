@@ -7,6 +7,13 @@ type InitMultipartRequest struct {
 	MD5      string `json:"md5"`
 }
 
+// CompleteMultipartRequest 完成分片上传请求
+type CompleteMultipartRequest struct {
+	UploadID string `json:"upload_id" binding:"required"`
+	Name     string `json:"name" binding:"required"`
+	Size     int64  `json:"size"`
+}
+
 // MountRequest 挂载数据集请求
 type MountRequest struct {
 	MachineID  string `json:"machine_id" binding:"required"`

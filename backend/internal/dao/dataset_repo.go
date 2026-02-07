@@ -34,6 +34,11 @@ func (d *DatasetDao) ListByCustomerID(ctx context.Context, customerID uint, page
 	return datasets, total, nil
 }
 
+// UpdateFields 更新数据集指定字段
+func (d *DatasetDao) UpdateFields(ctx context.Context, id uint, fields map[string]interface{}) error {
+	return d.db.WithContext(ctx).Model(&entity.Dataset{}).Where("id = ?", id).Updates(fields).Error
+}
+
 // FindByID 根据ID查询数据集
 // @author Claude
 // @description 根据数据集ID查询详情，用于权限校验

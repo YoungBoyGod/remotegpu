@@ -77,6 +77,30 @@ func (c *TaskController) CreateTraining(ctx *gin.Context) {
 	c.Success(ctx, task)
 }
 
+// Detail 获取任务详情
+func (c *TaskController) Detail(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	id := ctx.Param("id")
+	task, err := c.taskService.GetTask(ctx, id)
+	if err != nil {
+		c.Error(ctx, 404, "任务不存在")
+		return
+	}
+
+	// 校验任务归属
+	if task.CustomerID != userID.(uint) {
+		c.Error(ctx, 403, "无权访问该任务")
+		return
+	}
+
+	c.Success(ctx, task)
+}
+
 // Stop 停止任务
 // @author Claude
 // @description 停止任务前校验任务是否属于当前用户，防止越权操作

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/YoungBoyGod/remotegpu/config"
 	"github.com/YoungBoyGod/remotegpu/internal/middleware"
@@ -61,6 +62,15 @@ func (a *agentAdapter) GetSystemInfo(ctx context.Context, hostID, address string
 // InitRouter 初始化路由
 func InitRouter(r *gin.Engine) {
 	db := database.GetDB()
+
+	// Prometheus metrics 中间件和端点
+	r.Use(middleware.PrometheusMetrics())
+	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+
+	// 注册数据库连接池指标
+	if sqlDB, err := db.DB(); err == nil {
+		middleware.RegisterDBMetrics(sqlDB)
+	}
 
 	// 设置Swagger文档
 	if err := middleware.SetupSwagger(r); err != nil {
@@ -227,12 +237,14 @@ func InitRouter(r *gin.Engine) {
 
 			// 任务管理
 			custGroup.GET("/tasks", taskController.List)
+			custGroup.GET("/tasks/:id", taskController.Detail)
 			custGroup.POST("/tasks/training", taskController.CreateTraining)
 			custGroup.POST("/tasks/:id/stop", taskController.Stop)
 
 			// 数据集管理
 			custGroup.GET("/datasets", datasetController.List)
 			custGroup.POST("/datasets/init-multipart", datasetController.InitUpload)
+			custGroup.POST("/datasets/:id/complete", datasetController.CompleteUpload)
 			custGroup.POST("/datasets/:id/mount", datasetController.Mount)
 
 			// SSH 密钥管理

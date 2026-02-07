@@ -78,6 +78,41 @@ func (c *DatasetController) InitUpload(ctx *gin.Context) {
 	})
 }
 
+// CompleteUpload 完成分片上传
+func (c *DatasetController) CompleteUpload(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	idStr := ctx.Param("id")
+	datasetID, _ := strconv.ParseUint(idStr, 10, 64)
+
+	// 验证数据集所有权
+	if err := c.datasetService.ValidateOwnership(ctx, uint(datasetID), userID.(uint)); err != nil {
+		if err.Error() == "无权限访问该资源" {
+			c.Error(ctx, 403, "无权限操作该数据集")
+			return
+		}
+		c.Error(ctx, 404, "数据集不存在")
+		return
+	}
+
+	var req apiV1.CompleteMultipartRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	if err := c.datasetService.CompleteUpload(ctx, uint(datasetID), req.Name, req.Size); err != nil {
+		c.Error(ctx, 500, "完成上传失败")
+		return
+	}
+
+	c.Success(ctx, gin.H{"message": "上传完成"})
+}
+
 // Mount 挂载数据集到机器
 // @author Claude
 // @description 挂载数据集前校验数据集是否属于当前用户
