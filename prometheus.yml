@@ -1,0 +1,34 @@
+# Prometheus 配置文件
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+# 告警管理器配置（可选）
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']
+
+# 抓取配置
+scrape_configs:
+  # Prometheus 自身监控
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # GPU 节点监控（需要在 GPU 机器上部署 nvidia_gpu_exporter）
+  # 部署后取消注释并修改 targets
+  # - job_name: 'gpu_nodes'
+  #   static_configs:
+  #     - targets:
+  #         - 'gpu-node-1:9835'
+  #         - 'gpu-node-2:9835'
+  #       labels:
+  #         group: 'gpu_servers'
+
+  # 主机监控（需要在机器上部署 node_exporter）
+  # - job_name: 'node_exporter'
+  #   static_configs:
+  #     - targets:
+  #         - 'host-1:9100'
+  #         - 'host-2:9100'

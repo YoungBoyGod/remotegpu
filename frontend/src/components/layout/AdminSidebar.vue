@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import {
   House,
@@ -29,7 +29,7 @@ const router = useRouter()
 const route = useRoute()
 
 // 菜单配置
-const menuItems = ref<MenuItem[]>([
+const menuItems: MenuItem[] = [
   {
     id: 'dashboard',
     title: '管理后台首页',
@@ -117,7 +117,7 @@ const menuItems = ref<MenuItem[]>([
       { id: 'log-manage', title: '日志管理', path: '/admin/settings/logs' }
     ]
   }
-])
+]
 
 // 展开的菜单项
 const expandedMenus = ref<string[]>(['machines'])

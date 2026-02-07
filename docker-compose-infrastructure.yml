@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  # Redis 缓存服务（P1 优先级）
+  redis:
+    image: redis:7-alpine
+    container_name: remotegpu-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+
+  # Prometheus 监控服务（P1 优先级）
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: remotegpu-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+
+  # Grafana 可视化（可选，方便查看监控数据）
+  grafana:
+    image: grafana/grafana:latest
+    container_name: remotegpu-grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin123
+      - GF_USERS_ALLOW_SIGN_UP=false
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+
+volumes:
+  redis-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  remotegpu-network:
+    driver: bridge
