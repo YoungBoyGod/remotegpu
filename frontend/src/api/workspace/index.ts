@@ -1,7 +1,7 @@
 /**
  * 工作空间模块 - API 接口
  */
-import request from '../common/request'
+import request from '@/utils/request'
 import type {
   WorkspaceInfo,
   CreateWorkspaceRequest,

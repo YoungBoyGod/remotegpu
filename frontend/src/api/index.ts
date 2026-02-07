@@ -25,4 +25,4 @@ export * as webhookApi from './webhook'
 
 // 导出公共模块
 export * from './common/types'
-export { default as request } from './common/request'
+export { default as request } from '@/utils/request'

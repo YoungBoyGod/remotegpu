@@ -1,7 +1,7 @@
 /**
  * 制品管理模块 - API 接口
  */
-import request from '../common/request'
+import request from '@/utils/request'
 import type { Artifact, ArtifactVersion, Repository } from './types'
 import type { PaginationParams, PaginationResponse, StatusResponse, IdResponse } from '../common/types'
 

@@ -3,7 +3,7 @@
  */
 
 // 机器状态
-export type MachineStatus = 'online' | 'offline' | 'maintenance'
+export type MachineStatus = 'idle' | 'allocated' | 'maintenance' | 'offline'
 
 // 分配状态
 export type AllocationStatus = 'allocated' | 'unallocated' | 'expiring'

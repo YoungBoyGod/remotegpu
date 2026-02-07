@@ -1,7 +1,7 @@
 /**
  * 问题单管理模块 - API 接口
  */
-import request from '../common/request'
+import request from '@/utils/request'
 import type { Issue, IssueComment, IssueAttachment } from './types'
 import type { PaginationParams, PaginationResponse, StatusResponse, IdResponse } from '../common/types'
 

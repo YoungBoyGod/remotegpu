@@ -162,7 +162,7 @@ const router = createRouter({
     {
       path: '/customer',
       component: CustomerLayout,
-      meta: { requiresAuth: true, requiresRole: ['customer_owner', 'customer_member'] },
+      meta: { requiresAuth: true, requiresRole: ['customer', 'customer_owner', 'customer_member'] },
       children: [
         {
           path: '',

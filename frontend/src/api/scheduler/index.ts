@@ -1,7 +1,7 @@
 /**
  * 资源调度模块 - API 接口
  */
-import request from '../common/request'
+import request from '@/utils/request'
 import type { SchedulerPolicy, ScheduleHistory, PortPool } from './types'
 import type { PaginationParams, PaginationResponse, StatusResponse } from '../common/types'
 

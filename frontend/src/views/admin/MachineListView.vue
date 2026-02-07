@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMachineList, deleteMachine, setMachineMaintenance, collectMachineSpec, allocateMachine, getCustomerList } from '@/api/admin'
+import { getMachineList, deleteMachine, setMachineMaintenance, collectMachineSpec, allocateMachine, reclaimMachine, getCustomerList } from '@/api/admin'
 import type { Machine } from '@/types/machine'
 import type { Customer } from '@/types/customer'
 import type { PageRequest } from '@/types/common'
@@ -97,7 +97,7 @@ const handleDelete = async (machine: Machine) => {
         type: 'warning'
       }
     )
-    await deleteMachine(machine.id)
+    await deleteMachine(String(machine.id))
     ElMessage.success('删除成功')
     loadMachines()
   } catch (error: any) {
@@ -110,7 +110,7 @@ const handleDelete = async (machine: Machine) => {
 const handleToggleMaintenance = async (machine: Machine) => {
   try {
     const newStatus = machine.status !== 'maintenance'
-    await setMachineMaintenance(machine.id, newStatus)
+    await setMachineMaintenance(String(machine.id), newStatus)
     ElMessage.success(newStatus ? '已设置为维护状态' : '已取消维护状态')
     loadMachines()
   } catch (error) {
@@ -140,8 +140,9 @@ const handleCollectSpec = async (machine: Machine) => {
 }
 
 const getStatusType = (status: string) => {
-  const statusMap: Record<string, any> = {
-    online: 'success',
+  const statusMap: Record<string, string> = {
+    idle: 'success',
+    allocated: 'primary',
     offline: 'danger',
     maintenance: 'warning'
   }
@@ -150,7 +151,8 @@ const getStatusType = (status: string) => {
 
 const getStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
-    online: '在线',
+    idle: '空闲',
+    allocated: '已分配',
     offline: '离线',
     maintenance: '维护中'
   }
@@ -208,6 +210,28 @@ const handleConfirmAllocate = async () => {
   }
 }
 
+// 回收机器
+const handleReclaim = async (machine: Machine) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要回收机器 "${machine.name || machine.id}" 吗？回收后客户将无法继续使用。`,
+      '回收确认',
+      {
+        confirmButtonText: '确定回收',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    await reclaimMachine(String(machine.id))
+    ElMessage.success('回收成功')
+    loadMachines()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.msg || '回收失败')
+    }
+  }
+}
+
 onMounted(() => {
   loadMachines()
 })
@@ -225,7 +249,8 @@ onMounted(() => {
       <el-form :inline="true" :model="filters">
         <el-form-item label="状态">
           <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 120px">
-            <el-option label="在线" value="online" />
+            <el-option label="空闲" value="idle" />
+            <el-option label="已分配" value="allocated" />
             <el-option label="离线" value="offline" />
             <el-option label="维护中" value="maintenance" />
           </el-select>
@@ -284,30 +309,42 @@ onMounted(() => {
       </el-table-column>
       <el-table-column label="GPU信息" min-width="200">
         <template #default="{ row }">
-          {{ row.gpuCount }}x {{ row.gpuModel }} ({{ row.gpuMemory }}GB)
+          <template v-if="row.gpus && row.gpus.length > 0">
+            {{ row.gpus.length }}x {{ row.gpus[0].name }} ({{ Math.round(row.gpus[0].memory_total_mb / 1024) }}GB)
+          </template>
+          <span v-else>-</span>
         </template>
       </el-table-column>
       <el-table-column label="CPU/内存" min-width="150">
         <template #default="{ row }">
-          {{ row.cpu }} / {{ row.memory }}GB
+          {{ row.total_cpu || '-' }} 核 / {{ row.total_memory_gb ? row.total_memory_gb + ' GB' : '-' }}
         </template>
       </el-table-column>
       <el-table-column label="分配状态" width="120">
         <template #default="{ row }">
-          <el-tag v-if="row.allocatedTo" type="warning">已分配</el-tag>
+          <el-tag v-if="row.status === 'allocated'" type="warning">已分配</el-tag>
           <el-tag v-else type="info">未分配</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button
-            v-if="!row.allocatedTo"
+            v-if="row.status !== 'allocated'"
             link
             type="success"
             size="small"
             @click="handleAllocate(row)"
           >
             分配
+          </el-button>
+          <el-button
+            v-if="row.status === 'allocated'"
+            link
+            type="danger"
+            size="small"
+            @click="handleReclaim(row)"
+          >
+            回收
           </el-button>
           <el-button
             v-if="row.needs_collect"

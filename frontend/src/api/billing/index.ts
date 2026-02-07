@@ -1,7 +1,7 @@
 /**
  * 计费管理模块 - API 接口
  */
-import request from '../common/request'
+import request from '@/utils/request'
 import type { BillingRecord, Account, Invoice, Payment } from './types'
 import type { PaginationParams, PaginationResponse, IdResponse } from '../common/types'
 

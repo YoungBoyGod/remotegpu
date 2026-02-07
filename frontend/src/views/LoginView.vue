@@ -49,7 +49,15 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
         ElMessage.success('登录成功')
         router.push('/')
       } catch (error: any) {
-        ElMessage.error(error?.msg || error.response?.data?.msg || '登录失败，请检查用户名和密码')
+        const code = error?.code ?? error?.response?.data?.code
+        const msg = error?.msg || error?.message || error?.response?.data?.msg
+        if (code === 2003) {
+          ElMessage.error('密码错误，请重试')
+        } else if (code === 2006) {
+          ElMessage.error('账号已禁用，请联系管理员')
+        } else {
+          ElMessage.error(msg || '登录失败，请检查用户名和密码')
+        }
       } finally {
         loading.value = false
       }

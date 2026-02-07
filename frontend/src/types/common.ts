@@ -27,8 +27,8 @@ export interface PageResponse<T> {
   pageSize: number
 }
 
-// 用户角色
-export type UserRole = 'admin' | 'customer_owner' | 'customer_member'
+// 用户角色（与后端 openapi.yaml 一致）
+export type UserRole = 'admin' | 'customer' | 'customer_owner' | 'customer_member'
 
 // 用户信息
 export interface UserInfo {

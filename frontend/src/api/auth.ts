@@ -57,7 +57,7 @@ export interface ConfirmPasswordResetRequest {
  * 用户登录
  */
 export function login(data: LoginRequest): Promise<ApiResponse<LoginResponse>> {
-  return request.post<ApiResponse<BackendLoginResponse>>('/auth/login', data).then((res) => ({
+  return (request.post('/auth/login', data) as Promise<ApiResponse<BackendLoginResponse>>).then((res) => ({
     ...res,
     data: {
       accessToken: res.data.access_token,
@@ -79,7 +79,7 @@ export function logout(): Promise<ApiResponse<void>> {
  * 刷新访问令牌
  */
 export function refreshToken(refreshToken: string): Promise<ApiResponse<RefreshTokenResponse>> {
-  return request.post<ApiResponse<BackendLoginResponse>>('/auth/refresh', { refresh_token: refreshToken }).then((res) => ({
+  return (request.post('/auth/refresh', { refresh_token: refreshToken }) as Promise<ApiResponse<BackendLoginResponse>>).then((res) => ({
     ...res,
     data: {
       accessToken: res.data.access_token,

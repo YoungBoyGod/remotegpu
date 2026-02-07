@@ -16,14 +16,22 @@ export const useAuthStore = defineStore('auth', () => {
   // 登录
   const login = async (credentials: LoginRequest) => {
     const response = await loginApi(credentials)
-    const { accessToken: newAccessToken, refreshToken: newRefreshToken } = response.data
+    const { accessToken: newAccessToken, refreshToken: newRefreshToken, mustChangePassword } = response.data
 
     accessToken.value = newAccessToken
     refreshToken.value = newRefreshToken
     localStorage.setItem('accessToken', newAccessToken)
     localStorage.setItem('refreshToken', newRefreshToken)
 
-    await fetchProfile()
+    // 先尝试获取完整用户信息
+    try {
+      await fetchProfile()
+    } catch {
+      // fetchProfile 失败时，用登录响应中的 mustChangePassword 构建最小用户信息
+      if (mustChangePassword) {
+        user.value = { must_change_password: true } as UserInfo
+      }
+    }
 
     return response
   }

@@ -3,15 +3,28 @@ import { ElMessage } from 'element-plus'
 import { useAuthStore } from '@/stores/auth'
 import router from '@/router'
 
+// Token 刷新并发控制
+let isRefreshing = false
+let refreshSubscribers: Array<(token: string) => void> = []
+
+const onRefreshed = (token: string) => {
+  refreshSubscribers.forEach((cb) => cb(token))
+  refreshSubscribers = []
+}
+
+const addRefreshSubscriber = (cb: (token: string) => void) => {
+  refreshSubscribers.push(cb)
+}
+
 /**
  * 创建axios实例
  */
 const service: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || '',
+  baseURL: import.meta.env.VITE_API_BASE_URL || '/api/v1',
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/json;charset=UTF-8'
-  }
+    'Content-Type': 'application/json;charset=UTF-8',
+  },
 })
 
 /**
@@ -53,9 +66,8 @@ service.interceptors.response.use(
 
     // 检查业务状态码
     if (data.code !== undefined && data.code !== 0 && data.code !== 200) {
-      const errorMessage = data.message || data.msg || '请求失败'
-      ElMessage.error(errorMessage)
-      return Promise.reject(new Error(errorMessage))
+      // 传递完整的 data 对象，让调用方决定如何处理错误
+      return Promise.reject(data)
     }
 
     return data
@@ -72,19 +84,33 @@ service.interceptors.response.use(
           if (authStore.refreshToken && !error.config._retry) {
             error.config._retry = true
 
+            if (isRefreshing) {
+              // 已有刷新请求在进行，排队等待
+              return new Promise((resolve) => {
+                addRefreshSubscriber((token: string) => {
+                  error.config.headers.Authorization = `Bearer ${token}`
+                  resolve(service(error.config))
+                })
+              })
+            }
+
+            isRefreshing = true
             try {
               await authStore.refreshAccessToken()
+              const newToken = authStore.accessToken!
+              onRefreshed(newToken)
               // 重试原请求
               return service(error.config)
             } catch (refreshError) {
-              // 刷新令牌失败,清除认证信息并跳转到登录页
+              refreshSubscribers = []
               await authStore.logout()
               router.push('/login')
               ElMessage.error('登录已过期,请重新登录')
               return Promise.reject(refreshError)
+            } finally {
+              isRefreshing = false
             }
           } else {
-            // 没有刷新令牌或重试失败
             await authStore.logout()
             router.push('/login')
             ElMessage.error('登录已过期,请重新登录')

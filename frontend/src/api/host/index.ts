@@ -1,7 +1,7 @@
 /**
  * Host Selection Module - API Functions
  */
-import request from '../common/request'
+import request from '@/utils/request'
 import type { Host, HostQueryParams, HostListResponse } from './types'
 import type { StatusResponse } from '../common/types'
 

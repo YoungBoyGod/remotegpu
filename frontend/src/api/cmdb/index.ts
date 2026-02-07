@@ -1,7 +1,7 @@
 /**
  * CMDB 设备管理模块 - API 接口
  */
-import request from '../common/request'
+import request from '@/utils/request'
 import type { Asset, Server, GPU, ChangeLog } from './types'
 import type { PaginationParams, PaginationResponse, StatusResponse } from '../common/types'
 
