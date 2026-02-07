@@ -64,6 +64,14 @@ func (s *MachineService) CreateMachine(ctx context.Context, host *entity.Host) e
 		}
 		host.SSHPassword = encrypted
 	}
+	// 加密 SSH Key
+	if host.SSHKey != "" {
+		encrypted, err := crypto.EncryptAES256GCM(host.SSHKey)
+		if err != nil {
+			return fmt.Errorf("failed to encrypt SSH key: %w", err)
+		}
+		host.SSHKey = encrypted
+	}
 
 	return s.machineDao.Create(ctx, host)
 }
@@ -130,13 +138,20 @@ func (s *MachineService) ImportMachines(ctx context.Context, hosts []entity.Host
 			continue
 		}
 
-		// 修复 P0 安全问题：加密 SSH 密码
+		// 修复 P0 安全问题：加密 SSH 密码和 SSH Key
 		if host.SSHPassword != "" {
 			encrypted, err := crypto.EncryptAES256GCM(host.SSHPassword)
 			if err != nil {
 				return fmt.Errorf("failed to encrypt SSH password for host %s: %w", formatHostKey(host), err)
 			}
 			host.SSHPassword = encrypted
+		}
+		if host.SSHKey != "" {
+			encrypted, err := crypto.EncryptAES256GCM(host.SSHKey)
+			if err != nil {
+				return fmt.Errorf("failed to encrypt SSH key for host %s: %w", formatHostKey(host), err)
+			}
+			host.SSHKey = encrypted
 		}
 
 		if err := s.machineDao.Create(ctx, &host); err != nil {
@@ -199,10 +214,27 @@ func (s *MachineService) GetConnectionInfo(ctx context.Context, hostID string) (
 		connectIP = host.IPAddress
 	}
 
+	username := host.SSHUsername
+	if username == "" {
+		username = "root"
+	}
+
+	// 解密 SSH 密码
+	password := ""
+	if host.SSHPassword != "" {
+		decrypted, err := crypto.DecryptAES256GCM(host.SSHPassword)
+		if err == nil {
+			password = decrypted
+		}
+	}
+
 	return map[string]interface{}{
-		"ssh_command": "ssh root@" + connectIP, // Simplified
-		"host":        connectIP,
-		"port":        host.SSHPort,
+		"ssh": map[string]interface{}{
+			"username": username,
+			"host":     connectIP,
+			"port":     host.SSHPort,
+			"password": password,
+		},
 	}, nil
 }
 
@@ -228,6 +260,31 @@ func (s *MachineService) Count(ctx context.Context) (int64, error) {
 // @modified 2026-02-04
 func (s *MachineService) GetStatusStats(ctx context.Context) (map[string]int64, error) {
 	return s.machineDao.GetStatusStats(ctx)
+}
+
+// UpdateMachine 更新机器信息
+func (s *MachineService) UpdateMachine(ctx context.Context, hostID string, fields map[string]interface{}) error {
+	// 如果更新了 SSH 密码，需要加密
+	if password, ok := fields["ssh_password"]; ok {
+		if pw, _ := password.(string); pw != "" {
+			encrypted, err := crypto.EncryptAES256GCM(pw)
+			if err != nil {
+				return fmt.Errorf("failed to encrypt SSH password: %w", err)
+			}
+			fields["ssh_password"] = encrypted
+		}
+	}
+	// 如果更新了 SSH Key，需要加密
+	if key, ok := fields["ssh_key"]; ok {
+		if k, _ := key.(string); k != "" {
+			encrypted, err := crypto.EncryptAES256GCM(k)
+			if err != nil {
+				return fmt.Errorf("failed to encrypt SSH key: %w", err)
+			}
+			fields["ssh_key"] = encrypted
+		}
+	}
+	return s.machineDao.UpdateFields(ctx, hostID, fields)
 }
 
 // DeleteMachine 删除机器

@@ -74,6 +74,18 @@ func (c *MyMachineController) List(ctx *gin.Context) {
 
 func (c *MyMachineController) GetConnection(ctx *gin.Context) {
 	hostID := ctx.Param("id")
+
+	// 验证机器是否属于当前用户
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+	if err := c.allocationService.ValidateHostOwnership(ctx, hostID, userID.(uint)); err != nil {
+		c.Error(ctx, 403, "无权访问该机器")
+		return
+	}
+
 	info, err := c.machineService.GetConnectionInfo(ctx, hostID)
 	if err != nil {
 		c.Error(ctx, 500, "Failed to get connection info")
@@ -84,6 +96,18 @@ func (c *MyMachineController) GetConnection(ctx *gin.Context) {
 
 func (c *MyMachineController) ResetSSH(ctx *gin.Context) {
 	hostID := ctx.Param("id")
+
+	// 验证机器是否属于当前用户
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+	if err := c.allocationService.ValidateHostOwnership(ctx, hostID, userID.(uint)); err != nil {
+		c.Error(ctx, 403, "无权访问该机器")
+		return
+	}
+
 	if err := c.agentService.ResetSSH(ctx, hostID); err != nil {
 		c.Error(ctx, 500, "Failed to reset SSH")
 		return

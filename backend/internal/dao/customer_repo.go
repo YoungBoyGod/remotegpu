@@ -55,6 +55,11 @@ func (d *CustomerDao) CountActive(ctx context.Context) (int64, error) {
 	return count, err
 }
 
+// UpdateFields 更新客户指定字段
+func (d *CustomerDao) UpdateFields(ctx context.Context, id uint, fields map[string]interface{}) error {
+	return d.db.WithContext(ctx).Model(&entity.Customer{}).Where("id = ?", id).Updates(fields).Error
+}
+
 // Count 统计客户总数
 // @modified 2026-02-04
 func (d *CustomerDao) Count(ctx context.Context) (int64, error) {

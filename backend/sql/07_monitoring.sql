@@ -2,46 +2,10 @@
 -- RemoteGPU 监控数据表
 -- ============================================
 -- 文件: 07_monitoring.sql
--- 说明: 创建主机监控、GPU监控、环境监控相关表
+-- 说明: 创建GPU监控、环境监控相关表
+-- 注意: host_metrics 表已移至 18_add_host_metrics.sql
 -- 执行顺序: 7
 -- ============================================
-
--- 主机监控数据表
-CREATE TABLE IF NOT EXISTS host_metrics (
-    id BIGSERIAL PRIMARY KEY,
-    host_id VARCHAR(64) NOT NULL,
-    cpu_usage_percent FLOAT,
-    cpu_load_1m FLOAT,
-    cpu_load_5m FLOAT,
-    cpu_load_15m FLOAT,
-    memory_used BIGINT,
-    memory_available BIGINT,
-    memory_usage_percent FLOAT,
-    disk_used BIGINT,
-    disk_available BIGINT,
-    disk_usage_percent FLOAT,
-    disk_io_read_bytes BIGINT,
-    disk_io_write_bytes BIGINT,
-    network_rx_bytes BIGINT,
-    network_tx_bytes BIGINT,
-    network_rx_packets BIGINT,
-    network_tx_packets BIGINT,
-    gpu_avg_utilization FLOAT,
-    gpu_avg_memory_used BIGINT,
-    gpu_avg_temperature FLOAT,
-    gpu_avg_power FLOAT,
-    collected_at TIMESTAMP DEFAULT NOW()
-);
-
--- 创建索引
-CREATE INDEX idx_host_metrics_host_time ON host_metrics(host_id, collected_at DESC);
-CREATE INDEX idx_host_metrics_collected_at ON host_metrics(collected_at DESC);
-
--- 添加注释
-COMMENT ON TABLE host_metrics IS '主机监控数据表（时序数据）';
-COMMENT ON COLUMN host_metrics.cpu_usage_percent IS 'CPU使用率(%)';
-COMMENT ON COLUMN host_metrics.memory_usage_percent IS '内存使用率(%)';
-COMMENT ON COLUMN host_metrics.disk_usage_percent IS '磁盘使用率(%)';
 
 -- GPU监控数据表
 CREATE TABLE IF NOT EXISTS gpu_metrics (

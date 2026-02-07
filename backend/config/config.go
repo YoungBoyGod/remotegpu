@@ -206,6 +206,7 @@ type SwaggerConfig struct {
 // AgentConfig Agent 通信配置
 type AgentConfig struct {
 	Enabled     bool   `yaml:"enabled"`     // 是否启用 Agent 通信
+	Token       string `yaml:"token"`       // Agent 认证 Token
 	Protocol    string `yaml:"protocol"`    // 通信协议: grpc, http
 	Port        int    `yaml:"port"`        // Agent 默认端口
 	GRPCPort    int    `yaml:"grpc_port"`   // gRPC 端口

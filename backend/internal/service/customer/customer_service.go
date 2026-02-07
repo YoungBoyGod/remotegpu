@@ -32,6 +32,14 @@ func (s *CustomerService) ListCustomers(ctx context.Context, page, pageSize int)
 	return s.customerDao.List(ctx, page, pageSize)
 }
 
+func (s *CustomerService) GetCustomer(ctx context.Context, id uint) (*entity.Customer, error) {
+	return s.customerDao.FindByID(ctx, id)
+}
+
+func (s *CustomerService) UpdateCustomer(ctx context.Context, id uint, fields map[string]interface{}) error {
+	return s.customerDao.UpdateFields(ctx, id, fields)
+}
+
 func (s *CustomerService) UpdateStatus(ctx context.Context, id uint, status string) error {
 	return s.customerDao.UpdateStatus(ctx, id, status)
 }

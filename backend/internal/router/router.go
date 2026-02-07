@@ -182,6 +182,7 @@ func InitRouter(r *gin.Engine) {
 			adminGroup.GET("/machines", machineController.List)
 			adminGroup.GET("/machines/:id", machineController.Detail)
 			adminGroup.POST("/machines", machineController.Create)
+			adminGroup.PUT("/machines/:id", machineController.Update)
 			adminGroup.POST("/machines/import", machineController.Import)
 			adminGroup.DELETE("/machines/:id", machineController.Delete)
 			adminGroup.POST("/machines/:id/collect", machineController.CollectSpec)
@@ -191,8 +192,11 @@ func InitRouter(r *gin.Engine) {
 
 			// 客户管理
 			adminGroup.GET("/customers", customerController.List)
+			adminGroup.GET("/customers/:id", customerController.Detail)
 			adminGroup.POST("/customers", customerController.Create)
+			adminGroup.PUT("/customers/:id", customerController.Update)
 			adminGroup.POST("/customers/:id/disable", customerController.Disable)
+			adminGroup.POST("/customers/:id/enable", customerController.Enable)
 
 			// 监控与运维
 			adminGroup.GET("/monitoring/realtime", monitorController.GetRealtime)
@@ -242,8 +246,9 @@ func InitRouter(r *gin.Engine) {
 			custGroup.GET("/machines/enrollments/:id", enrollmentController.Detail)
 		}
 
-		// 4. Agent Module (Agent 专用 API)
+		// 4. Agent Module (Agent 专用 API，需要 Agent Token 认证)
 		agentGroup := apiV1.Group("/agent")
+		agentGroup.Use(middleware.AgentAuth())
 		{
 			agentGroup.POST("/heartbeat", agentHeartbeatController.Heartbeat)
 			agentGroup.POST("/tasks/claim", agentTaskController.ClaimTasks)

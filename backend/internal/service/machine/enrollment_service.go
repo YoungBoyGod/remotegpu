@@ -108,6 +108,22 @@ func (s *MachineEnrollmentService) CreateEnrollment(ctx context.Context, custome
 	req.CustomerID = customerID
 	req.Status = "pending"
 
+	// 加密 SSH 凭据后再存储
+	if req.SSHPassword != "" {
+		encrypted, err := crypto.EncryptAES256GCM(req.SSHPassword)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt SSH password: %w", err)
+		}
+		req.SSHPassword = encrypted
+	}
+	if req.SSHKey != "" {
+		encrypted, err := crypto.EncryptAES256GCM(req.SSHKey)
+		if err != nil {
+			return nil, fmt.Errorf("failed to encrypt SSH key: %w", err)
+		}
+		req.SSHKey = encrypted
+	}
+
 	if err := s.enrollmentDao.Create(ctx, req); err != nil {
 		return nil, err
 	}
@@ -244,6 +260,11 @@ func (s *MachineEnrollmentService) processEnrollment(id uint) {
 		return
 	}
 
+	// 解密 enrollment 中的 SSH 凭据（存储时已加密），
+	// 传给 CreateMachine 时需要明文（CreateMachine 内部会再加密）
+	decryptedPassword, _ := crypto.DecryptAES256GCM(enrollment.SSHPassword)
+	decryptedKey, _ := crypto.DecryptAES256GCM(enrollment.SSHKey)
+
 	if s.skipCollect {
 		host := entity.Host{
 			Name:         enrollment.Name,
@@ -252,8 +273,8 @@ func (s *MachineEnrollmentService) processEnrollment(id uint) {
 			IPAddress:    enrollment.Address,
 			SSHPort:      enrollment.SSHPort,
 			SSHUsername:  enrollment.SSHUsername,
-			SSHPassword:  enrollment.SSHPassword,
-			SSHKey:       enrollment.SSHKey,
+			SSHPassword:  decryptedPassword,
+			SSHKey:       decryptedKey,
 			Status:       "offline",
 			HealthStatus: "unknown",
 			NeedsCollect: true,
@@ -303,8 +324,8 @@ func (s *MachineEnrollmentService) processEnrollment(id uint) {
 		IPAddress:     enrollment.Address,
 		SSHPort:       enrollment.SSHPort,
 		SSHUsername:   enrollment.SSHUsername,
-		SSHPassword:   enrollment.SSHPassword,
-		SSHKey:        enrollment.SSHKey,
+		SSHPassword:   decryptedPassword,
+		SSHKey:        decryptedKey,
 		Status:        "idle",
 		TotalCPU:      spec.CPUCores,
 		TotalMemoryGB: spec.MemoryGB,

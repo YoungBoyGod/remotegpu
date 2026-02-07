@@ -187,6 +187,11 @@ func (d *MachineDao) UpdateHeartbeat(ctx context.Context, id string, status stri
 		}).Error
 }
 
+// UpdateFields 更新机器指定字段
+func (d *MachineDao) UpdateFields(ctx context.Context, id string, fields map[string]interface{}) error {
+	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", id).Updates(fields).Error
+}
+
 // Delete 删除机器
 func (d *MachineDao) Delete(ctx context.Context, id string) error {
 	return d.db.WithContext(ctx).Delete(&entity.Host{}, "id = ?", id).Error

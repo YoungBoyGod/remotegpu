@@ -27,6 +27,17 @@ type CreateMachineRequest struct {
 	SSHKey      string `json:"ssh_key"`
 }
 
+// UpdateMachineRequest 更新机器请求
+type UpdateMachineRequest struct {
+	Name        string `json:"name"`
+	Region      string `json:"region"`
+	PublicIP    string `json:"public_ip"`
+	SSHPort     int    `json:"ssh_port"`
+	SSHUsername string `json:"ssh_username"`
+	SSHPassword string `json:"ssh_password"`
+	SSHKey      string `json:"ssh_key"`
+}
+
 // ImportMachineItem 批量导入机器条目
 type ImportMachineItem struct {
 	HostIP      string `json:"host_ip" binding:"required"`

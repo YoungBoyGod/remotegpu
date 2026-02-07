@@ -347,6 +347,52 @@ func (c *MachineController) Import(ctx *gin.Context) {
 	})
 }
 
+// Update 更新机器信息
+func (c *MachineController) Update(ctx *gin.Context) {
+	hostID := ctx.Param("id")
+
+	var req apiV1.UpdateMachineRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	fields := make(map[string]interface{})
+	if req.Name != "" {
+		fields["name"] = req.Name
+	}
+	if req.Region != "" {
+		fields["region"] = req.Region
+	}
+	if req.PublicIP != "" {
+		fields["public_ip"] = req.PublicIP
+	}
+	if req.SSHPort > 0 {
+		fields["ssh_port"] = req.SSHPort
+	}
+	if req.SSHUsername != "" {
+		fields["ssh_username"] = req.SSHUsername
+	}
+	if req.SSHPassword != "" {
+		fields["ssh_password"] = req.SSHPassword
+	}
+	if req.SSHKey != "" {
+		fields["ssh_key"] = req.SSHKey
+	}
+
+	if len(fields) == 0 {
+		c.Error(ctx, 400, "No fields to update")
+		return
+	}
+
+	if err := c.machineService.UpdateMachine(ctx, hostID, fields); err != nil {
+		c.Error(ctx, 500, "Failed to update machine")
+		return
+	}
+
+	c.Success(ctx, gin.H{"message": "Machine updated"})
+}
+
 // Delete 删除机器
 // @Summary 删除机器
 // @Description 从系统中删除机器
