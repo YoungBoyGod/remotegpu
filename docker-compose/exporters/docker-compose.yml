@@ -1,0 +1,60 @@
+services:
+  # Node Exporter - 主机监控
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: remotegpu-node-exporter
+    restart: always
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - remotegpu-network
+
+  # PostgreSQL Exporter
+  postgres-exporter:
+    image: prometheuscommunity/postgres-exporter:v0.15.0
+    container_name: remotegpu-postgres-exporter
+    restart: always
+    ports:
+      - "9187:9187"
+    environment:
+      DATA_SOURCE_NAME: "postgresql://postgres:remotegpu@192.168.10.210:5432/remotegpu?sslmode=disable"
+    networks:
+      - remotegpu-network
+
+  # Redis Exporter
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.56.0
+    container_name: remotegpu-redis-exporter
+    restart: always
+    ports:
+      - "9121:9121"
+    environment:
+      REDIS_ADDR: "redis://192.168.10.210:6379"
+      REDIS_PASSWORD: "remotegpu"
+    networks:
+      - remotegpu-network
+
+  # Nginx Exporter
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.0
+    container_name: remotegpu-nginx-exporter
+    restart: always
+    ports:
+      - "9113:9113"
+    command:
+      - '--nginx.scrape-uri=http://192.168.10.210/nginx_status'
+    networks:
+      - remotegpu-network
+
+networks:
+  remotegpu-network:
+    driver: bridge
