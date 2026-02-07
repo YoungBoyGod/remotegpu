@@ -9,8 +9,6 @@ import type { Machine } from '@/types/machine'
 // 扩展 Machine 类型以包含（模拟的）监控数据
 interface MonitoredMachine extends Machine {
   cpuUsage?: number
-  memoryUsage?: number
-  diskUsage?: number
   temperature?: number
   uptime?: string
 }
