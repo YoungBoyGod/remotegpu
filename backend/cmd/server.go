@@ -127,6 +127,7 @@ func initInfrastructure() error {
 		&entity.AlertRule{},
 		&entity.ActiveAlert{},
 		&entity.MachineEnrollment{},
+		&entity.HostMetric{},
 	)
 	if err != nil {
 		return fmt.Errorf("数据库迁移失败: %w", err)

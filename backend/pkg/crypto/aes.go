@@ -8,6 +8,8 @@ import (
 	"errors"
 	"io"
 	"os"
+
+	"github.com/YoungBoyGod/remotegpu/config"
 )
 
 // EncryptAES256GCM 使用 AES-256-GCM 加密数据
@@ -91,13 +93,20 @@ func DecryptAES256GCM(ciphertext string) (string, error) {
 }
 
 // getEncryptionKey 获取加密密钥
-// 优先从环境变量读取，如果不存在则使用默认密钥（仅用于开发环境）
+// 优先级：配置文件 > 环境变量 > 默认密钥
 func getEncryptionKey() ([]byte, error) {
-	keyStr := os.Getenv("ENCRYPTION_KEY")
-	if keyStr == "" {
-		// 警告：生产环境必须设置 ENCRYPTION_KEY 环境变量
-		// 这里使用默认密钥仅用于开发测试
-		keyStr = "default-32-byte-encryption-key!!"
+	var keyStr string
+
+	// 1. 优先从配置文件读取
+	if config.GlobalConfig != nil && config.GlobalConfig.Encryption.Key != "" {
+		keyStr = config.GlobalConfig.Encryption.Key
+	} else {
+		// 2. 从环境变量读取
+		keyStr = os.Getenv("ENCRYPTION_KEY")
+		if keyStr == "" {
+			// 3. 使用默认密钥（仅用于开发测试）
+			keyStr = "default-32-byte-encryption-key!!"
+		}
 	}
 
 	key := []byte(keyStr)

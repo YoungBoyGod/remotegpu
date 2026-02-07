@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  test-machine-01:
+    image: rastasheep/ubuntu-sshd:18.04
+    container_name: test-machine-01
+    ports:
+      - "2201:22"
+    environment:
+      - ROOT_PASSWORD=testpass123
+    networks:
+      - test-network
+
+  test-machine-02:
+    image: rastasheep/ubuntu-sshd:18.04
+    container_name: test-machine-02
+    ports:
+      - "2202:22"
+    environment:
+      - ROOT_PASSWORD=testpass123
+    networks:
+      - test-network
+
+  test-machine-03:
+    image: rastasheep/ubuntu-sshd:18.04
+    container_name: test-machine-03
+    ports:
+      - "2203:22"
+    environment:
+      - ROOT_PASSWORD=testpass123
+    networks:
+      - test-network
+
+networks:
+  test-network:
+    driver: bridge

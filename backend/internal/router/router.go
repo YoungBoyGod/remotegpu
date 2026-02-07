@@ -2,6 +2,7 @@ package router
 
 import (
 	"context"
+	"time"
 
 	"github.com/gin-gonic/gin"
 
@@ -106,6 +107,26 @@ func InitRouter(r *gin.Engine) {
 	imageSvc := serviceImage.NewImageService(db)
 	enrollmentSvc := serviceMachine.NewMachineEnrollmentService(db, machineSvc, &agentAdapter{svc: agentSvc})
 	enrollmentSvc.StartWorker(context.Background())
+
+	// 启动心跳监控服务
+	if config.GlobalConfig.HeartbeatMonitor.Enabled {
+		heartbeatMonitor := serviceMachine.NewHeartbeatMonitor(
+			db,
+			time.Duration(config.GlobalConfig.HeartbeatMonitor.Timeout)*time.Second,
+			time.Duration(config.GlobalConfig.HeartbeatMonitor.CheckInterval)*time.Second,
+		)
+		go heartbeatMonitor.Start(context.Background())
+	}
+
+	// 启动监控数据采集服务
+	if config.GlobalConfig.MetricsCollector.Enabled {
+		metricsCollector := serviceMachine.NewMetricsCollector(
+			db,
+			time.Duration(config.GlobalConfig.MetricsCollector.Interval)*time.Second,
+			config.GlobalConfig.MetricsCollector.RetentionDays,
+		)
+		go metricsCollector.Start(context.Background())
+	}
 
 	systemConfigSvc := serviceSystemConfig.NewSystemConfigService(db)
 	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc, promClient)

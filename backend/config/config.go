@@ -13,6 +13,7 @@ type Config struct {
 	Database      DatabaseConfig      `yaml:"database"`
 	Redis         RedisConfig         `yaml:"redis"`
 	JWT           JWTConfig           `yaml:"jwt"`
+	Encryption    EncryptionConfig    `yaml:"encryption"`
 	Log           LogConfig           `yaml:"log"`
 	Storage       StorageConfig       `yaml:"storage"`
 	Mail          MailConfig          `yaml:"mail"`
@@ -30,6 +31,8 @@ type Config struct {
 	Agent         AgentConfig         `yaml:"agent"`
 	Enrollment    EnrollmentConfig    `yaml:"machine_enrollment"`
 	MachineAction MachineActionConfig `yaml:"machine_action"`
+	HeartbeatMonitor HeartbeatMonitorConfig `yaml:"heartbeat_monitor"`
+	MetricsCollector MetricsCollectorConfig `yaml:"metrics_collector"`
 }
 
 // ServerConfig 服务器配置
@@ -62,6 +65,11 @@ type RedisConfig struct {
 type JWTConfig struct {
 	Secret     string `yaml:"secret"`
 	ExpireTime int    `yaml:"expire_time"` // 小时
+}
+
+// EncryptionConfig 加密配置
+type EncryptionConfig struct {
+	Key string `yaml:"key"` // AES-256 加密密钥(32字节)
 }
 
 // LogConfig 日志配置
@@ -221,6 +229,20 @@ type EnrollmentConfig struct {
 type MachineActionConfig struct {
 	MaxRetries int `yaml:"max_retries"` // 最大重试次数
 	RetryDelay int `yaml:"retry_delay"` // 重试延迟(秒)
+}
+
+// HeartbeatMonitorConfig 心跳监控配置
+type HeartbeatMonitorConfig struct {
+	Enabled       bool `yaml:"enabled"`        // 是否启用
+	Timeout       int  `yaml:"timeout"`        // 心跳超时时间(秒)
+	CheckInterval int  `yaml:"check_interval"` // 检查间隔(秒)
+}
+
+// MetricsCollectorConfig 监控数据采集配置
+type MetricsCollectorConfig struct {
+	Enabled       bool `yaml:"enabled"`        // 是否启用
+	Interval      int  `yaml:"interval"`       // 采集间隔(秒)
+	RetentionDays int  `yaml:"retention_days"` // 数据保留天数
 }
 
 var GlobalConfig *Config

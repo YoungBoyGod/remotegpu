@@ -191,3 +191,12 @@ func (d *MachineDao) UpdateHeartbeat(ctx context.Context, id string, status stri
 func (d *MachineDao) Delete(ctx context.Context, id string) error {
 	return d.db.WithContext(ctx).Delete(&entity.Host{}, "id = ?", id).Error
 }
+
+// ListOnline 获取所有在线的机器
+func (d *MachineDao) ListOnline(ctx context.Context) ([]entity.Host, error) {
+	var hosts []entity.Host
+	err := d.db.WithContext(ctx).
+		Where("status IN ?", []string{"online", "idle", "allocated"}).
+		Find(&hosts).Error
+	return hosts, err
+}
