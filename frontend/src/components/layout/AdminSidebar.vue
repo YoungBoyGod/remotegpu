@@ -83,6 +83,12 @@ const menuItems: MenuItem[] = [
     path: '/admin/tasks/list'
   },
   {
+    id: 'agents',
+    title: 'Agent 管理',
+    icon: Connection,
+    path: '/admin/agents'
+  },
+  {
     id: 'settings',
     title: '系统设置',
     icon: Setting,

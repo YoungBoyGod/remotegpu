@@ -1,7 +1,8 @@
 # RemoteGPU Agent 开发文档与功能清单
 
-> 生成日期: 2026-02-06
-> 基于: task-queue-design.md + 现有代码审计
+> 初始日期: 2026-02-06
+> 最后更新: 2026-02-07
+> 基于: task-queue-design.md + 现有代码审计 + 实现状态核实
 
 ---
 
@@ -17,15 +18,15 @@
                            │ HTTP (Pull, 每5秒轮询)
 ┌──────────────────────────┼───────────────────────────────┐
 │                          │                        Agent   │
-│  ┌────────┐  ┌─────────┐│  ┌──────────┐  ┌───────────┐  │
+│  ┌────────┐  ┌─────────┐  ┌──────────┐  ┌───────────┐  │
 │  │ SQLite │←→│Scheduler│←→│ Executor │  │ Poller    │  │
 │  │ (Store)│  │         │  │          │  │ (Client)  │  │
 │  └────────┘  └─────────┘  └──────────┘  └───────────┘  │
-│                    ↕                                      │
-│              ┌──────────┐                                 │
-│              │ Priority │                                 │
-│              │  Queue   │                                 │
-│              └──────────┘                                 │
+│       ↕            ↕            ↕                        │
+│  ┌────────┐  ┌──────────┐ ┌──────────┐                  │
+│  │ Syncer │  │ Priority │ │ Security │                  │
+│  │        │  │  Queue   │ │Validator │                  │
+│  └────────┘  └──────────┘ └──────────┘                  │
 │                                                           │
 │  本地 API: /api/v1/{tasks,queue/status,ping,system/info}  │
 └──────────────────────────────────────────────────────────┘
@@ -65,39 +66,49 @@ Server pending 任务
 | 启动入口 | `cmd/main.go` | 环境变量配置、组件初始化、优雅关闭 |
 | 路由注册 | `cmd/routes.go` | Gin 路由绑定 |
 | 响应格式 | `cmd/response.go` | 统一 JSON 响应 |
+| YAML 配置 | `internal/config/config.go` | YAML 文件 + 环境变量 fallback，支持 Server/Poll/Limits/Security 配置 |
+| 离线结果同步 | `internal/syncer/syncer.go` | 定期扫描未同步任务，断网重连后批量上报 Server |
+| 命令白名单 | `internal/security/validator.go` | 可配置的命令白名单和黑名单模式匹配 |
 
-### 2.2 未实现的功能（按设计文档章节）
+### 2.2 已实现但文档未记录的功能（本次核实更新）
 
-| 设计文档章节 | 功能 | 模型字段 | 代码现状 |
-|-------------|------|---------|---------|
-| 6.2 | 失败重试 | RetryCount/MaxRetries/RetryDelay | 字段已定义，无重试逻辑 |
-| 6.2 | 离线结果同步 | Synced | Store 有 ListUnsynced/MarkSynced，无调用方 |
-| 7.1 | 任务依赖 | DependsOn/ParentID | 字段已定义，调度时未检查 |
-| 7.1 | 任务组编排 | GroupID | 字段已定义，无 TaskGroup 实现 |
-| 8.1 | Token 认证 | — | 无认证中间件 |
-| 8.2 | 命令白名单 | — | 无白名单校验 |
-| 8.3 | 资源限制 | — | 无 CPU/内存/输出限制 |
-| 8.4 | 沙箱隔离 | — | 无 Docker/nsjail 集成 |
-| 9.2 | 单元测试 | — | 无 _test.go 文件 |
-| 10.3 | 抢占式调度 | TaskStatusPreempted/Suspended | 状态常量已定义，无抢占逻辑 |
-| 10.5 | 任务模板 | — | 无模板模块 |
-| 10.6 | 审计日志 | — | 无审计模块 |
-| — | 配置文件 | — | 仅环境变量，无 YAML/TOML |
-| — | 结构化日志 | — | 仅 log.Printf |
-| — | 进度上报 | — | /progress API 未实现 |
+| 功能 | 实现文件 | 代码现状 |
+|------|---------|---------|
+| 失败重试 | `scheduler.go:198-219` | 已实现：failed 后检查 max_retries，延迟 retry_delay 秒重新入队 |
+| 离线结果同步 | `syncer/syncer.go` | 已实现：定期扫描 ListUnsynced，上报后 MarkSynced |
+| 输出大小限制 | `executor.go:16-44` | 已实现：limitedWriter 限制 1MB，超出截断并标记 truncated |
+| 配置文件支持 | `config/config.go` | 已实现：YAML 配置 + 环境变量 fallback |
+| 结构化日志 | 全部文件 | 已实现：使用 log/slog，支持 Info/Warn/Error/Debug 级别 |
+| Token 认证 | `client/client.go:51-61` | 已实现：doPost 统一添加 Authorization: Bearer header |
+| 命令白名单 | `security/validator.go` | 已实现：白名单 + 黑名单模式匹配 |
+| 任务依赖检查 | `scheduler.go:158-174` | 已实现：dependenciesMet 检查 DependsOn 列表 |
+| 抢占式调度 | `scheduler.go:283-312` | 已实现：优先级差 >= 3 时触发抢占，被抢占任务延迟重新入队 |
+| 进度上报 | `client/client.go:176-207` | 已实现：ReportProgress API，renewLoop 中定期上报 |
+| 心跳上报 | `cmd/main.go:87-105` | 已实现：30 秒间隔定时心跳 |
+
+### 2.3 尚未实现的功能
+
+| 功能 | 说明 | 优先级 |
+|------|------|--------|
+| 任务组编排 | GroupID/ParentID 字段已定义，无 TaskGroup 实现 | P3 |
+| 单元测试 | 无 *_test.go 文件 | P1 |
+| 任务模板 | 无模板模块 | P3 |
+| 审计日志 | 无审计模块 | P3 |
+| 资源限制 | 无 cgroup/ulimit 集成 | P3 |
+| 沙箱隔离 | 无 Docker/nsjail 集成 | P3 |
 
 ---
 
 ## 三、功能清单与优先级排序
 
-### P0 - 核心可靠性（当前阻塞生产使用）
+### P0 - 核心可靠性 ✅ 全部已实现
 
-| # | 功能 | 说明 | 涉及文件 | 依赖 |
-|---|------|------|---------|------|
-| 1 | 失败重试机制 | 任务 failed 后按 max_retries/retry_delay 重新入队 | scheduler.go, executor.go | 无 |
-| 2 | 离线结果同步 | Agent 断网期间结果暂存，重连后批量上报 | 新建 syncer.go, scheduler.go | 无 |
-| 3 | 输出大小限制 | 防止 stdout/stderr 撑爆内存和数据库 | executor.go | 无 |
-| 4 | 配置文件支持 | YAML 配置替代硬编码环境变量 | 新建 config/config.go, cmd/main.go | 无 |
+| # | 功能 | 状态 | 实现文件 |
+|---|------|------|---------|
+| 1 | 失败重试机制 | ✅ 已实现 | `scheduler.go:198-219` |
+| 2 | 离线结果同步 | ✅ 已实现 | `syncer/syncer.go` |
+| 3 | 输出大小限制 | ✅ 已实现 | `executor.go:16-44` |
+| 4 | 配置文件支持 | ✅ 已实现 | `config/config.go` |
 
 ### P1 - 健壮性增强（提升运维信心）
 
