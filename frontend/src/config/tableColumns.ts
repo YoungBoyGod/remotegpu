@@ -188,11 +188,11 @@ export const adminTaskColumns: TableColumnConfig[] = [
     hidden: true,
   },
   {
-    prop: 'finished_at',
+    prop: 'ended_at',
     label: '结束时间',
     width: 170,
     sortable: true,
-    slot: 'finished_at',
+    slot: 'ended_at',
     hidden: true,
   },
   {
@@ -276,11 +276,11 @@ export const customerTaskColumns: TableColumnConfig[] = [
     hidden: true,
   },
   {
-    prop: 'finished_at',
+    prop: 'ended_at',
     label: '结束时间',
     width: 170,
     sortable: true,
-    slot: 'finished_at',
+    slot: 'ended_at',
     hidden: true,
   },
   {

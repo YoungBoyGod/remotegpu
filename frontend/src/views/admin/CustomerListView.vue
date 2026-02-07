@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getCustomerList, disableCustomer } from '@/api/admin'
+import { getCustomerList, disableCustomer, enableCustomer } from '@/api/admin'
 import type { Customer } from '@/types/customer'
 import type { PageRequest } from '@/types/common'
 import DataTable from '@/components/common/DataTable.vue'
@@ -21,6 +21,23 @@ const pageRequest = ref<PageRequest>({
 const filters = ref({
   status: '',
   keyword: ''
+})
+
+const filteredCustomers = computed(() => {
+  let result = customers.value
+  if (filters.value.status) {
+    result = result.filter((c) => c.status === filters.value.status)
+  }
+  const kw = filters.value.keyword.trim().toLowerCase()
+  if (kw) {
+    result = result.filter((c) =>
+      (c.company_code || '').toLowerCase().includes(kw) ||
+      (c.username || '').toLowerCase().includes(kw) ||
+      (c.company || '').toLowerCase().includes(kw) ||
+      (c.email || '').toLowerCase().includes(kw)
+    )
+  }
+  return result
 })
 
 const loadCustomers = async () => {
@@ -82,7 +99,28 @@ const handleDisable = async (customer: Customer) => {
     loadCustomers()
   } catch (error: any) {
     if (error !== 'cancel') {
-      console.error('禁用客户失败:', error)
+      ElMessage.error(error?.msg || '禁用失败')
+    }
+  }
+}
+
+const handleEnable = async (customer: Customer) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要启用客户 "${getCustomerName(customer)}" 吗?`,
+      '启用确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+    await enableCustomer(customer.id)
+    ElMessage.success('已启用')
+    loadCustomers()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.msg || '启用失败')
     }
   }
 }
@@ -146,8 +184,8 @@ onMounted(() => {
         <el-form-item label="状态">
           <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 120px">
             <el-option label="正常" value="active" />
-            <el-option label="未激活" value="inactive" />
             <el-option label="已停用" value="suspended" />
+            <el-option label="已删除" value="deleted" />
           </el-select>
         </el-form-item>
         <el-form-item label="关键词">
@@ -162,8 +200,8 @@ onMounted(() => {
 
     <!-- 数据表格 -->
     <DataTable
-      :data="customers"
-      :total="total"
+      :data="filteredCustomers"
+      :total="filteredCustomers.length"
       :loading="loading"
       :current-page="pageRequest.page"
       :page-size="pageRequest.pageSize"
@@ -191,14 +229,9 @@ onMounted(() => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="分配机器数" width="120">
-        <template #default="{ row }">
-          {{ row.allocatedMachines || 0 }}
-        </template>
-      </el-table-column>
       <el-table-column label="创建时间" width="180">
         <template #default="{ row }">
-          {{ formatDateTime(row.created_at || row.createdAt) }}
+          {{ formatDateTime(row.created_at) }}
         </template>
       </el-table-column>
       <el-table-column label="操作" width="240" fixed="right">
@@ -208,6 +241,9 @@ onMounted(() => {
           </el-button>
           <el-button v-if="row.status === 'active'" link type="warning" size="small" @click="handleDisable(row)">
             禁用
+          </el-button>
+          <el-button v-if="row.status === 'suspended'" link type="success" size="small" @click="handleEnable(row)">
+            启用
           </el-button>
         </template>
       </el-table-column>

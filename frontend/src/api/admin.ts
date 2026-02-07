@@ -132,10 +132,41 @@ export function addCustomer(data: CustomerForm): Promise<ApiResponse<Customer>> 
 }
 
 /**
+ * 获取客户详情
+ */
+export function getCustomerDetail(id: number): Promise<ApiResponse<Customer>> {
+  return request.get(`/admin/customers/${id}`)
+}
+
+/**
+ * 更新客户信息
+ */
+export interface UpdateCustomerPayload {
+  email?: string
+  display_name?: string
+  full_name?: string
+  company_code?: string
+  company?: string
+  phone?: string
+  role?: string
+}
+
+export function updateCustomer(id: number, data: UpdateCustomerPayload): Promise<ApiResponse<void>> {
+  return request.put(`/admin/customers/${id}`, data)
+}
+
+/**
  * 禁用客户
  */
 export function disableCustomer(id: number): Promise<ApiResponse<void>> {
   return request.post(`/admin/customers/${id}/disable`)
+}
+
+/**
+ * 启用客户
+ */
+export function enableCustomer(id: number): Promise<ApiResponse<void>> {
+  return request.post(`/admin/customers/${id}/enable`)
 }
 
 // ==================== 仪表盘 & 监控 ====================

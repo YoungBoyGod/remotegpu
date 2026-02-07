@@ -152,14 +152,21 @@ export function getDatasetList(params: PageRequest): Promise<ApiResponse<PageRes
 /**
  * 初始化分片上传
  */
-export function initMultipartUpload(data: { filename: string; size: number }): Promise<ApiResponse<any>> {
+export function initMultipartUpload(data: { filename: string; size: number; md5?: string }): Promise<ApiResponse<{ upload_id: string; urls: string[] }>> {
   return request.post('/customer/datasets/init-multipart', data)
+}
+
+/**
+ * 完成分片上传
+ */
+export function completeMultipartUpload(id: number, data: { upload_id: string; name: string; size: number }): Promise<ApiResponse<any>> {
+  return request.post(`/customer/datasets/${id}/complete`, data)
 }
 
 /**
  * 挂载数据集
  */
-export function mountDataset(id: number, data: { machineId: number; mountPath: string }): Promise<ApiResponse<any>> {
+export function mountDataset(id: number, data: { machine_id: string; mount_path: string; read_only?: boolean }): Promise<ApiResponse<any>> {
   return request.post(`/customer/datasets/${id}/mount`, data)
 }
 

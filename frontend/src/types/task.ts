@@ -27,7 +27,7 @@ export interface Task {
   exit_code?: number
   error_msg?: string
   started_at?: string | null
-  finished_at?: string | null
+  ended_at?: string | null
   created_at?: string
 }
 

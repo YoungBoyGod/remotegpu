@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Setting } from '@element-plus/icons-vue'
@@ -416,8 +416,36 @@ const formatEnvVars = (env: Task['env_vars']) => {
   return JSON.stringify(env, null, 2)
 }
 
+// 轮询：当列表中存在运行中/待处理的任务时，自动刷新
+const hasActiveTasks = computed(() =>
+  tasks.value.some(t => ['pending', 'queued', 'assigned', 'running'].includes(t.status))
+)
+
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const startPolling = () => {
+  stopPolling()
+  pollTimer = setInterval(() => {
+    if (hasActiveTasks.value) {
+      loadTasks()
+    }
+  }, 5000)
+}
+
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
 onMounted(() => {
   initColumns()
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 
 watch(viewMode, (mode) => {
@@ -507,8 +535,8 @@ watch(viewMode, (mode) => {
         <template #started_at="{ row }">
           {{ formatDate(row.started_at) }}
         </template>
-        <template #finished_at="{ row }">
-          {{ formatDate(row.finished_at) }}
+        <template #ended_at="{ row }">
+          {{ formatDate(row.ended_at) }}
         </template>
         <template #actions="{ row }">
           <el-button link type="primary" size="small" @click="handleViewDetail(row)">详情</el-button>
@@ -597,7 +625,7 @@ watch(viewMode, (mode) => {
           </el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDate(detailTask.created_at) }}</el-descriptions-item>
           <el-descriptions-item label="开始时间">{{ formatDate(detailTask.started_at) }}</el-descriptions-item>
-          <el-descriptions-item label="结束时间">{{ formatDate(detailTask.finished_at) }}</el-descriptions-item>
+          <el-descriptions-item label="结束时间">{{ formatDate(detailTask.ended_at) }}</el-descriptions-item>
           <el-descriptions-item label="退出码">{{ detailTask.exit_code ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="错误信息">{{ detailTask.error_msg || '-' }}</el-descriptions-item>
         </el-descriptions>

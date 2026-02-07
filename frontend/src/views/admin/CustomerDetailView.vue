@@ -2,14 +2,13 @@
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getCustomerDetail } from '@/api/admin'
-import type { CustomerDetail } from '@/types/customer'
-import StatCard from '@/components/common/StatCard.vue'
+import type { Customer } from '@/types/customer'
 
 const route = useRoute()
 const router = useRouter()
 
 const loading = ref(true)
-const customerDetail = ref<CustomerDetail | null>(null)
+const customerDetail = ref<Customer | null>(null)
 
 const loadCustomerDetail = async () => {
   try {
@@ -22,6 +21,13 @@ const loadCustomerDetail = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN')
 }
 
 const handleBack = () => {
@@ -50,95 +56,33 @@ onMounted(() => {
             <span class="card-title">基本信息</span>
           </template>
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="客户名称">
-              {{ customerDetail.name }}
+            <el-descriptions-item label="用户名">
+              {{ customerDetail.username }}
             </el-descriptions-item>
             <el-descriptions-item label="状态">
               <el-tag :type="customerDetail.status === 'active' ? 'success' : 'danger'">
                 {{ customerDetail.status === 'active' ? '正常' : '已停用' }}
               </el-tag>
             </el-descriptions-item>
+            <el-descriptions-item label="公司代号">
+              {{ customerDetail.company_code || '-' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="公司名称">
+              {{ customerDetail.company || '-' }}
+            </el-descriptions-item>
             <el-descriptions-item label="联系人">
-              {{ customerDetail.contactPerson }}
+              {{ customerDetail.full_name || customerDetail.display_name || '-' }}
             </el-descriptions-item>
-            <el-descriptions-item label="联系邮箱">
-              {{ customerDetail.contactEmail }}
+            <el-descriptions-item label="邮箱">
+              {{ customerDetail.email }}
             </el-descriptions-item>
-            <el-descriptions-item label="联系电话">
-              {{ customerDetail.contactPhone }}
+            <el-descriptions-item label="电话">
+              {{ customerDetail.phone || '-' }}
             </el-descriptions-item>
             <el-descriptions-item label="创建时间">
-              {{ customerDetail.createdAt }}
+              {{ formatDateTime(customerDetail.created_at) }}
             </el-descriptions-item>
           </el-descriptions>
-        </el-card>
-
-        <!-- 使用统计 -->
-        <div class="stats-grid">
-          <StatCard
-            title="分配机器数"
-            :value="customerDetail.usageStats?.allocatedMachines || 0"
-            icon="💻"
-            color="primary"
-          />
-          <StatCard
-            title="运行任务数"
-            :value="customerDetail.usageStats?.runningTasks || 0"
-            icon="🚀"
-            color="success"
-          />
-          <StatCard
-            title="总任务数"
-            :value="customerDetail.usageStats?.totalTasks || 0"
-            icon="📊"
-            color="info"
-          />
-          <StatCard
-            title="存储使用(GB)"
-            :value="customerDetail.usageStats?.storageUsed || 0"
-            icon="💾"
-            color="warning"
-          />
-        </div>
-
-        <!-- 分配的机器 -->
-        <el-card class="machines-card">
-          <template #header>
-            <span class="card-title">分配的机器</span>
-          </template>
-          <el-table :data="customerDetail.allocatedMachines" stripe border>
-            <el-table-column prop="machineName" label="机器名称" min-width="150" />
-            <el-table-column prop="region" label="区域" width="120" />
-            <el-table-column prop="allocatedAt" label="分配时间" width="180" />
-            <el-table-column prop="expiresAt" label="到期时间" width="180" />
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
-                <el-tag :type="row.status === 'active' ? 'success' : 'warning'">
-                  {{ row.status === 'active' ? '使用中' : '即将到期' }}
-                </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
-        </el-card>
-
-        <!-- 操作日志 -->
-        <el-card class="logs-card">
-          <template #header>
-            <span class="card-title">操作日志</span>
-          </template>
-          <el-timeline>
-            <el-timeline-item
-              v-for="log in customerDetail.operationLogs"
-              :key="log.id"
-              :timestamp="log.timestamp"
-              placement="top"
-            >
-              <div class="log-content">
-                <div class="log-action">{{ log.action }}</div>
-                <div class="log-operator">操作人: {{ log.operator }}</div>
-              </div>
-            </el-timeline-item>
-          </el-timeline>
         </el-card>
       </div>
     </el-skeleton>
@@ -164,9 +108,7 @@ onMounted(() => {
   margin: 8px 0 0 0;
 }
 
-.info-card,
-.machines-card,
-.logs-card {
+.info-card {
   margin-bottom: 20px;
 }
 
@@ -176,26 +118,4 @@ onMounted(() => {
   color: #303133;
 }
 
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-  margin-bottom: 20px;
-}
-
-.log-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.log-action {
-  font-size: 14px;
-  color: #303133;
-}
-
-.log-operator {
-  font-size: 12px;
-  color: #909399;
-}
 </style>

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import type { FormInstance, FormRules } from 'element-plus'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Refresh, Setting } from '@element-plus/icons-vue'
@@ -394,9 +394,49 @@ const formatEnvVars = (env: Task['env_vars']) => {
   return JSON.stringify(env, null, 2)
 }
 
+// 任务统计概览
+const taskStats = computed(() => {
+  const all = tasks.value
+  return {
+    total: total.value,
+    running: all.filter(t => t.status === 'running').length,
+    completed: all.filter(t => t.status === 'completed').length,
+    failed: all.filter(t => t.status === 'failed').length,
+    pending: all.filter(t => ['pending', 'queued', 'assigned'].includes(t.status)).length,
+  }
+})
+
+// 轮询：当列表中存在活跃任务时自动刷新
+const hasActiveTasks = computed(() =>
+  tasks.value.some(t => ['pending', 'queued', 'assigned', 'running'].includes(t.status))
+)
+
+let pollTimer: ReturnType<typeof setInterval> | null = null
+
+const startPolling = () => {
+  stopPolling()
+  pollTimer = setInterval(() => {
+    if (hasActiveTasks.value) {
+      loadTasks()
+    }
+  }, 5000)
+}
+
+const stopPolling = () => {
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
 onMounted(() => {
   initColumns()
   loadTasks()
+  startPolling()
+})
+
+onUnmounted(() => {
+  stopPolling()
 })
 </script>
 
@@ -429,6 +469,30 @@ onMounted(() => {
         <el-button type="primary" :icon="Plus" @click="openCreateDialog">创建任务</el-button>
       </template>
     </PageHeader>
+
+    <!-- 任务统计概览 -->
+    <div class="stats-row">
+      <div class="stat-item">
+        <div class="stat-value">{{ taskStats.total }}</div>
+        <div class="stat-label">总任务数</div>
+      </div>
+      <div class="stat-item stat-pending">
+        <div class="stat-value">{{ taskStats.pending }}</div>
+        <div class="stat-label">待处理</div>
+      </div>
+      <div class="stat-item stat-running">
+        <div class="stat-value">{{ taskStats.running }}</div>
+        <div class="stat-label">运行中</div>
+      </div>
+      <div class="stat-item stat-completed">
+        <div class="stat-value">{{ taskStats.completed }}</div>
+        <div class="stat-label">已完成</div>
+      </div>
+      <div class="stat-item stat-failed">
+        <div class="stat-value">{{ taskStats.failed }}</div>
+        <div class="stat-label">失败</div>
+      </div>
+    </div>
 
     <el-card class="filter-card">
       <el-form :inline="true" :model="filters">
@@ -486,8 +550,8 @@ onMounted(() => {
         <template #started_at="{ row }">
           {{ formatDate(row.started_at) }}
         </template>
-        <template #finished_at="{ row }">
-          {{ formatDate(row.finished_at) }}
+        <template #ended_at="{ row }">
+          {{ formatDate(row.ended_at) }}
         </template>
         <template #actions="{ row }">
           <el-button link type="primary" size="small" @click="handleViewDetail(row)">详情</el-button>
@@ -582,7 +646,7 @@ onMounted(() => {
           </el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDate(detailTask.created_at) }}</el-descriptions-item>
           <el-descriptions-item label="开始时间">{{ formatDate(detailTask.started_at) }}</el-descriptions-item>
-          <el-descriptions-item label="结束时间">{{ formatDate(detailTask.finished_at) }}</el-descriptions-item>
+          <el-descriptions-item label="结束时间">{{ formatDate(detailTask.ended_at) }}</el-descriptions-item>
           <el-descriptions-item label="退出码">{{ detailTask.exit_code ?? '-' }}</el-descriptions-item>
           <el-descriptions-item label="错误信息">{{ detailTask.error_msg || '-' }}</el-descriptions-item>
         </el-descriptions>
@@ -613,6 +677,38 @@ onMounted(() => {
 <style scoped>
 .task-list-view {
   padding: 24px;
+}
+
+.stats-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.stat-item {
+  flex: 1;
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border-left: 3px solid #909399;
+}
+
+.stat-item.stat-pending { border-left-color: #e6a23c; }
+.stat-item.stat-running { border-left-color: #409eff; }
+.stat-item.stat-completed { border-left-color: #67c23a; }
+.stat-item.stat-failed { border-left-color: #f56c6c; }
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #303133;
+}
+
+.stat-label {
+  font-size: 13px;
+  color: #909399;
+  margin-top: 4px;
 }
 
 .filter-card {
