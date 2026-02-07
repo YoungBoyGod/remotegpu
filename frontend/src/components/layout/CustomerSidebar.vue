@@ -50,6 +50,12 @@ const menuItems = ref<MenuItem[]>([
     path: '/customer/datasets'
   },
   {
+    id: 'notifications',
+    title: '消息通知',
+    icon: '🔔',
+    path: '/customer/notifications'
+  },
+  {
     id: 'settings',
     title: '设置',
     icon: '⚙️',

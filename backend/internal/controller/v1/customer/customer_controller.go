@@ -170,3 +170,42 @@ func (c *CustomerController) Enable(ctx *gin.Context) {
 	}
 	c.Success(ctx, nil)
 }
+
+// UpdateQuota 更新客户配额
+func (c *CustomerController) UpdateQuota(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的客户 ID")
+		return
+	}
+
+	var req apiV1.UpdateQuotaRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	if err := c.customerService.UpdateQuota(ctx, uint(id), req.QuotaGPU, req.QuotaStorage); err != nil {
+		c.Error(ctx, 500, "更新配额失败")
+		return
+	}
+	c.Success(ctx, nil)
+}
+
+// ResourceUsage 获取客户资源使用统计
+func (c *CustomerController) ResourceUsage(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的客户 ID")
+		return
+	}
+
+	usage, err := c.customerService.GetResourceUsage(ctx, uint(id))
+	if err != nil {
+		c.Error(ctx, 500, "获取资源使用统计失败")
+		return
+	}
+	c.Success(ctx, usage)
+}

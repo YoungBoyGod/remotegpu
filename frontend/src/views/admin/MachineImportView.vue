@@ -34,7 +34,7 @@ const removeRow = (index: number) => {
 
 const validate = (): boolean => {
   for (let i = 0; i < machines.value.length; i++) {
-    const m = machines.value[i]
+    const m = machines.value[i]!
     if (!m.host_ip) {
       ElMessage.error(`第 ${i + 1} 行：请填写 IP 地址`)
       return false
@@ -94,13 +94,15 @@ const parseCSV = (text: string): ImportMachineItem[] => {
   if (lines.length < 2) return []
   const result: ImportMachineItem[] = []
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',').map(s => s.trim())
+    const line = lines[i]
+    if (!line) continue
+    const cols = line.split(',').map(s => s.trim())
     if (cols.length < 9) continue
     result.push({
-      host_ip: cols[0],
+      host_ip: cols[0] ?? '',
       ssh_port: Number(cols[1]) || 22,
-      region: cols[2],
-      gpu_model: cols[3],
+      region: cols[2] ?? '',
+      gpu_model: cols[3] ?? '',
       gpu_count: Number(cols[4]) || 1,
       cpu_cores: Number(cols[5]) || 0,
       ram_size: Number(cols[6]) || 0,

@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, watch } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getMachineDetail } from '@/api/admin'
+import { getMachineDetail, getMachineUsage } from '@/api/admin'
 import type { Machine } from '@/types/machine'
+import type { MachineUsage } from '@/api/admin'
 import { ElMessage } from 'element-plus'
 import { CopyDocument, View, Hide } from '@element-plus/icons-vue'
 
@@ -11,6 +12,7 @@ const router = useRouter()
 
 const loading = ref(false)
 const machine = ref<Machine | null>(null)
+const usage = ref<MachineUsage | null>(null)
 
 const loadMachine = async () => {
   const id = route.params.id as string
@@ -30,6 +32,23 @@ const loadMachine = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const loadUsage = async () => {
+  const id = route.params.id as string
+  if (!id) return
+  try {
+    const res = await getMachineUsage(id)
+    usage.value = res.data
+  } catch {
+    // 使用情况加载失败不阻塞页面
+  }
+}
+
+const usageColor = (percent: number) => {
+  if (percent >= 90) return '#f56c6c'
+  if (percent >= 70) return '#e6a23c'
+  return '#67c23a'
 }
 
 const getStatusType = (status?: string) => {
@@ -73,82 +92,7 @@ const activeAllocation = computed(() => {
   return machine.value?.allocations?.find((item) => item.status === 'active') || null
 })
 
-const remoteAccessKey = computed(() => `admin-machine-remote-access-${route.params.id || 'unknown'}`)
-const remoteAccessForm = ref({
-  enabled: false,
-  protocol: 'tcp',
-  public_domain: '',
-  public_port: 0,
-  target_port: 0,
-  extra_ports: '',
-  remark: ''
-})
 
-const baseDomain = import.meta.env.VITE_REMOTE_ACCESS_BASE_DOMAIN || 'remote.example.com'
-const portMappings: Record<number, number> = {
-  22: 2222,
-  80: 8080,
-  443: 8443,
-  3389: 13389,
-  5900: 15900,
-  6006: 16006,
-  8888: 18888,
-}
-const protocolDefaultPorts: Record<string, number> = {
-  http: 80,
-  https: 443,
-  ssh: 22,
-}
-
-const accessUrl = computed(() => {
-  if (!remoteAccessForm.value.public_domain || !remoteAccessForm.value.public_port) return '-'
-  const protocol = remoteAccessForm.value.protocol
-  if (protocol === 'http' || protocol === 'https') {
-    return `${protocol}://${remoteAccessForm.value.public_domain}:${remoteAccessForm.value.public_port}`
-  }
-  if (protocol === 'ssh') {
-    return `ssh <user>@${remoteAccessForm.value.public_domain} -p ${remoteAccessForm.value.public_port}`
-  }
-  return `${protocol}://${remoteAccessForm.value.public_domain}:${remoteAccessForm.value.public_port}`
-})
-
-const toSlug = (value: string) => {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9-]/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '')
-}
-
-const generateDomain = () => {
-  const raw = machine.value?.hostname || machine.value?.name || String(machine.value?.id || 'machine')
-  const slug = toSlug(raw) || 'machine'
-  return `${slug}.${baseDomain}`
-}
-
-const getMappedPort = (targetPort: number) => {
-  return portMappings[targetPort] || targetPort
-}
-
-const applyAutoDefaults = (force = false) => {
-  if (remoteAccessForm.value.enabled) {
-    if (force || !remoteAccessForm.value.public_domain) {
-      remoteAccessForm.value.public_domain = generateDomain()
-    }
-    if (force || !remoteAccessForm.value.target_port) {
-      const defaultPort = protocolDefaultPorts[remoteAccessForm.value.protocol]
-      if (defaultPort) {
-        remoteAccessForm.value.target_port = defaultPort
-      }
-    }
-    if (force || !remoteAccessForm.value.public_port) {
-      const mapped = getMappedPort(remoteAccessForm.value.target_port)
-      if (mapped) {
-        remoteAccessForm.value.public_port = mapped
-      }
-    }
-  }
-}
 
 const handleBack = () => {
   router.push('/admin/machines/list')
@@ -191,93 +135,10 @@ const copyToClipboard = async (text: string) => {
   }
 }
 
-const loadRemoteAccessConfig = () => {
-  try {
-    const raw = localStorage.getItem(remoteAccessKey.value)
-    if (!raw) return
-    const parsed = JSON.parse(raw)
-    remoteAccessForm.value = {
-      ...remoteAccessForm.value,
-      ...parsed
-    }
-  } catch (error) {
-    console.error('加载远程访问配置失败:', error)
-  }
-}
-
-const saveRemoteAccessConfig = () => {
-  if (remoteAccessForm.value.enabled && !remoteAccessForm.value.public_domain) {
-    ElMessage.error('请填写对外访问域名')
-    return
-  }
-  if (remoteAccessForm.value.enabled && !remoteAccessForm.value.public_port) {
-    ElMessage.error('请填写对外开放端口')
-    return
-  }
-  localStorage.setItem(remoteAccessKey.value, JSON.stringify(remoteAccessForm.value))
-  ElMessage.success('配置已保存（本地）')
-}
-
-const resetRemoteAccessConfig = () => {
-  remoteAccessForm.value = {
-    enabled: false,
-    protocol: 'tcp',
-    public_domain: '',
-    public_port: 0,
-    target_port: 0,
-    extra_ports: '',
-    remark: ''
-  }
-  localStorage.removeItem(remoteAccessKey.value)
-}
-
 onMounted(() => {
   loadMachine()
-  loadRemoteAccessConfig()
+  loadUsage()
 })
-
-watch(
-  () => machine.value?.id,
-  () => {
-    if (remoteAccessForm.value.enabled) {
-      applyAutoDefaults()
-    }
-  }
-)
-
-watch(
-  () => remoteAccessForm.value.enabled,
-  (enabled) => {
-    if (enabled) {
-      applyAutoDefaults()
-    }
-  }
-)
-
-watch(
-  () => remoteAccessForm.value.protocol,
-  (protocol, prev) => {
-    const prevDefault = protocolDefaultPorts[prev]
-    const currentDefault = protocolDefaultPorts[protocol]
-    if (!remoteAccessForm.value.target_port || remoteAccessForm.value.target_port === prevDefault) {
-      if (currentDefault) {
-        remoteAccessForm.value.target_port = currentDefault
-      }
-    }
-    applyAutoDefaults()
-  }
-)
-
-watch(
-  () => remoteAccessForm.value.target_port,
-  (port, prev) => {
-    if (!port) return
-    const prevMapped = prev ? getMappedPort(prev) : 0
-    if (!remoteAccessForm.value.public_port || remoteAccessForm.value.public_port === prevMapped) {
-      remoteAccessForm.value.public_port = getMappedPort(port)
-    }
-  }
-)
 </script>
 
 <template>
@@ -286,8 +147,11 @@ watch(
       <div class="header-left">
         <el-button @click="handleBack" :icon="'ArrowLeft'">返回列表</el-button>
         <h2 class="page-title">{{ machine?.name || machine?.hostname || machine?.id || '机器详情' }}</h2>
-        <el-tag v-if="machine" :type="getStatusType(machine.status)">
-          {{ getStatusText(machine.status) }}
+        <el-tag v-if="machine" :type="(machine as any).device_status === 'online' ? 'success' : 'danger'">
+          {{ (machine as any).device_status === 'online' ? '在线' : '离线' }}
+        </el-tag>
+        <el-tag v-if="machine" :type="getStatusType((machine as any).allocation_status)">
+          {{ getStatusText((machine as any).allocation_status) }}
         </el-tag>
         <el-tag v-if="machine" :type="machine.needs_collect ? 'warning' : 'success'">
           {{ machine.needs_collect ? '待采集' : '已采集' }}
@@ -307,9 +171,14 @@ watch(
           <el-descriptions-item label="主机名">{{ machine.hostname }}</el-descriptions-item>
           <el-descriptions-item label="区域">{{ machine.region }}</el-descriptions-item>
           <el-descriptions-item label="部署模式">{{ machine.deployment_mode || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="状态">
-            <el-tag :type="getStatusType(machine.status)">
-              {{ getStatusText(machine.status) }}
+          <el-descriptions-item label="设备状态">
+            <el-tag :type="(machine as any).device_status === 'online' ? 'success' : 'danger'">
+              {{ (machine as any).device_status === 'online' ? '在线' : '离线' }}
+            </el-tag>
+          </el-descriptions-item>
+          <el-descriptions-item label="分配状态">
+            <el-tag :type="getStatusType((machine as any).allocation_status)">
+              {{ getStatusText((machine as any).allocation_status) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="健康状态">
@@ -413,6 +282,45 @@ watch(
         </el-tabs>
       </el-card>
 
+      <!-- 使用情况 -->
+      <el-card class="info-card" v-if="usage">
+        <template #header>
+          <span>使用情况</span>
+        </template>
+        <div class="usage-grid">
+          <div class="usage-item">
+            <span class="usage-label">CPU</span>
+            <el-progress
+              type="dashboard"
+              :percentage="Math.round(usage.cpu_usage)"
+              :color="usageColor(usage.cpu_usage)"
+              :width="90"
+            />
+          </div>
+          <div class="usage-item">
+            <span class="usage-label">内存</span>
+            <el-progress
+              type="dashboard"
+              :percentage="Math.round(usage.memory_usage)"
+              :color="usageColor(usage.memory_usage)"
+              :width="90"
+            />
+          </div>
+          <div class="usage-item">
+            <span class="usage-label">磁盘</span>
+            <el-progress
+              type="dashboard"
+              :percentage="Math.round(usage.disk_usage)"
+              :color="usageColor(usage.disk_usage)"
+              :width="90"
+            />
+          </div>
+        </div>
+        <div class="usage-meta" v-if="usage.collected_at">
+          <span>采集时间：{{ formatDateTime(usage.collected_at) }}</span>
+        </div>
+      </el-card>
+
       <!-- 硬件配置 -->
       <el-card class="info-card">
         <template #header>
@@ -499,53 +407,19 @@ watch(
         </el-table>
       </el-card>
 
-      <!-- 远程访问配置 -->
-      <el-card class="info-card">
+      <!-- 外映射配置 -->
+      <el-card class="info-card" v-if="machine.external_ip || machine.nginx_domain || machine.external_ssh_port || machine.external_jupyter_port || machine.external_vnc_port">
         <template #header>
-          <span>远程访问配置</span>
+          <span>外映射配置</span>
         </template>
-        <div class="remote-hint">
-          当前仅支持本地保存配置，后续将对接 Nginx 反向代理与后端接口。
-        </div>
-        <el-form :model="remoteAccessForm" label-width="140px">
-          <el-form-item label="启用对外访问">
-            <el-switch v-model="remoteAccessForm.enabled" />
-          </el-form-item>
-          <el-form-item label="访问协议">
-            <el-select v-model="remoteAccessForm.protocol" style="width: 200px">
-              <el-option label="TCP" value="tcp" />
-              <el-option label="HTTP" value="http" />
-              <el-option label="HTTPS" value="https" />
-              <el-option label="SSH" value="ssh" />
-            </el-select>
-          </el-form-item>
-          <el-form-item label="对外访问域名">
-            <el-input v-model="remoteAccessForm.public_domain" placeholder="例如：gpu-001.example.com" />
-            <el-button class="inline-button" @click="applyAutoDefaults(true)">自动生成</el-button>
-          </el-form-item>
-          <el-form-item label="对外开放端口">
-            <el-input-number v-model="remoteAccessForm.public_port" :min="1" :max="65535" />
-            <el-button class="inline-button" @click="applyAutoDefaults(true)">自动生成</el-button>
-          </el-form-item>
-          <el-form-item label="目标端口">
-            <el-input-number v-model="remoteAccessForm.target_port" :min="0" :max="65535" />
-            <span class="form-tip">可选，目标服务端口（用于反向代理映射）</span>
-          </el-form-item>
-          <el-form-item label="额外开放端口">
-            <el-input v-model="remoteAccessForm.extra_ports" placeholder="多个端口用英文逗号分隔，如：5901,6006" />
-          </el-form-item>
-          <el-form-item label="访问地址">
-            <el-tag type="success">{{ accessUrl }}</el-tag>
-            <span class="form-tip">默认域名：{{ baseDomain }}</span>
-          </el-form-item>
-          <el-form-item label="备注">
-            <el-input v-model="remoteAccessForm.remark" type="textarea" :rows="2" placeholder="说明用途或访问限制" />
-          </el-form-item>
-          <el-form-item>
-            <el-button type="primary" @click="saveRemoteAccessConfig">保存配置</el-button>
-            <el-button @click="resetRemoteAccessConfig">重置</el-button>
-          </el-form-item>
-        </el-form>
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="外部IP/域名">{{ machine.external_ip || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="Nginx域名">{{ machine.nginx_domain || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="Nginx配置路径">{{ machine.nginx_config_path || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="SSH映射端口">{{ machine.external_ssh_port || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="Jupyter映射端口">{{ machine.external_jupyter_port || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="VNC映射端口">{{ machine.external_vnc_port || '-' }}</el-descriptions-item>
+        </el-descriptions>
       </el-card>
 
       <!-- 时间信息 -->
@@ -650,19 +524,30 @@ watch(
   font-size: 14px;
 }
 
-.remote-hint {
-  margin-bottom: 12px;
-  color: #909399;
-  font-size: 12px;
+.usage-grid {
+  display: flex;
+  justify-content: space-around;
+  padding: 16px 0;
 }
 
-.form-tip {
-  margin-left: 12px;
-  color: #909399;
-  font-size: 12px;
+.usage-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
 }
 
-.inline-button {
-  margin-left: 12px;
+.usage-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.usage-meta {
+  text-align: center;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

@@ -2,12 +2,15 @@ package middleware
 
 import (
 	"bytes"
+	"encoding/json"
 	"io"
+	"strings"
 	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	"github.com/YoungBoyGod/remotegpu/internal/service/audit"
 	"github.com/gin-gonic/gin"
+	"gorm.io/datatypes"
 )
 
 // AuditMiddleware 审计中间件
@@ -42,6 +45,12 @@ func AuditMiddleware(auditSvc *audit.AuditService) gin.HandlerFunc {
 		action := parseAction(c.Request.Method, c.FullPath())
 		resourceType, resourceID := parseResource(c.FullPath(), c.Params)
 
+		// 构建请求参数摘要
+		var detail datatypes.JSON
+		if len(bodyBytes) > 0 {
+			detail = buildRequestSummary(bodyBytes)
+		}
+
 		log := &entity.AuditLog{
 			CustomerID:   customerID,
 			Username:     usernameStr,
@@ -51,6 +60,7 @@ func AuditMiddleware(auditSvc *audit.AuditService) gin.HandlerFunc {
 			Action:       action,
 			ResourceType: resourceType,
 			ResourceID:   resourceID,
+			Detail:       detail,
 			StatusCode:   c.Writer.Status(),
 			CreatedAt:    time.Now(),
 		}
@@ -60,9 +70,39 @@ func AuditMiddleware(auditSvc *audit.AuditService) gin.HandlerFunc {
 }
 
 func parseAction(method, path string) string {
+	// 细粒度操作解析：根据路径后缀区分具体操作
+	if method == "POST" {
+		switch {
+		case strings.HasSuffix(path, "/allocate"):
+			return "allocate"
+		case strings.HasSuffix(path, "/reclaim"):
+			return "reclaim"
+		case strings.HasSuffix(path, "/disable"):
+			return "disable"
+		case strings.HasSuffix(path, "/enable"):
+			return "enable"
+		case strings.HasSuffix(path, "/stop"):
+			return "stop"
+		case strings.HasSuffix(path, "/cancel"):
+			return "cancel"
+		case strings.HasSuffix(path, "/retry"):
+			return "retry"
+		case strings.HasSuffix(path, "/collect"):
+			return "collect"
+		case strings.HasSuffix(path, "/maintenance"):
+			return "maintenance"
+		case strings.HasSuffix(path, "/acknowledge"):
+			return "acknowledge"
+		case strings.HasSuffix(path, "/sync"):
+			return "sync"
+		case strings.HasSuffix(path, "/import"):
+			return "import"
+		default:
+			return "create"
+		}
+	}
+
 	switch method {
-	case "POST":
-		return "create"
 	case "PUT", "PATCH":
 		return "update"
 	case "DELETE":
@@ -78,33 +118,60 @@ func parseResource(path string, params gin.Params) (string, string) {
 		resourceID = id
 	}
 
-	// 简单解析资源类型
 	resourceType := "unknown"
 	switch {
-	case contains(path, "machines"):
+	case strings.Contains(path, "machines"):
 		resourceType = "machine"
-	case contains(path, "customers"):
+	case strings.Contains(path, "customers"):
 		resourceType = "customer"
-	case contains(path, "keys"):
+	case strings.Contains(path, "keys"):
 		resourceType = "ssh_key"
-	case contains(path, "datasets"):
+	case strings.Contains(path, "datasets"):
 		resourceType = "dataset"
-	case contains(path, "tasks"):
+	case strings.Contains(path, "tasks"):
 		resourceType = "task"
+	case strings.Contains(path, "allocations"):
+		resourceType = "allocation"
+	case strings.Contains(path, "documents"):
+		resourceType = "document"
+	case strings.Contains(path, "alerts"):
+		resourceType = "alert"
+	case strings.Contains(path, "images"):
+		resourceType = "image"
+	case strings.Contains(path, "settings"):
+		resourceType = "system_config"
+	case strings.Contains(path, "storage"):
+		resourceType = "storage"
 	}
 
 	return resourceType, resourceID
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
+// buildRequestSummary 构建请求参数摘要，过滤敏感字段
+func buildRequestSummary(body []byte) datatypes.JSON {
+	var raw map[string]any
+	if err := json.Unmarshal(body, &raw); err != nil {
+		return nil
+	}
 
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
+	// 过滤敏感字段
+	sensitiveKeys := []string{"password", "ssh_password", "ssh_key", "token", "secret"}
+	for _, key := range sensitiveKeys {
+		if _, ok := raw[key]; ok {
+			raw[key] = "***"
 		}
 	}
-	return false
+
+	// 截断过长的值
+	for k, v := range raw {
+		if s, ok := v.(string); ok && len(s) > 200 {
+			raw[k] = s[:200] + "..."
+		}
+	}
+
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	return datatypes.JSON(data)
 }

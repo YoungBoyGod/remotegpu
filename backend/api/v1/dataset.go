@@ -20,3 +20,9 @@ type MountRequest struct {
 	MountPoint string `json:"mount_point" binding:"required"`
 	ReadOnly   bool   `json:"read_only"`
 }
+
+// UpdateMountStatusRequest 更新挂载状态请求（Agent 回调）
+type UpdateMountStatusRequest struct {
+	Status       string `json:"status" binding:"required"`
+	ErrorMessage string `json:"error_message"`
+}

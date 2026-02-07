@@ -25,6 +25,7 @@ import (
 type AgentClient interface {
 	ResetSSH(ctx context.Context, hostID string) error
 	CleanupMachine(ctx context.Context, hostID string) error
+	SyncSSHKeys(ctx context.Context, hostID string, publicKeys []string, username string) error
 }
 
 const (
@@ -36,17 +37,21 @@ const (
 const (
 	machineActionResetSSH = "reset_ssh"
 	machineActionCleanup  = "cleanup"
+	machineActionSyncKeys = "sync_keys"
 )
 
 type machineActionPayload struct {
-	Action string `json:"action"`
-	HostID string `json:"host_id"`
+	Action     string   `json:"action"`
+	HostID     string   `json:"host_id"`
+	PublicKeys []string `json:"public_keys,omitempty"` // sync_keys 时携带公钥列表
+	Username   string   `json:"username,omitempty"`    // sync_keys 时携带用户名
 }
 
 type AllocationService struct {
 	db            *gorm.DB
 	allocationDao *dao.AllocationDao
 	machineDao    *dao.MachineDao
+	sshKeyDao     *dao.SSHKeyDao
 	auditService  *audit.AuditService
 	agentClient   AgentClient
 	redisClient   *redis.Client
@@ -69,6 +74,7 @@ func NewAllocationService(db *gorm.DB, auditSvc *audit.AuditService, agentClient
 		db:            db,
 		allocationDao: dao.NewAllocationDao(db),
 		machineDao:    dao.NewMachineDao(db),
+		sshKeyDao:     dao.NewSSHKeyDao(db),
 		auditService:  auditSvc,
 		agentClient:   agentClient,
 		redisClient:   cache.GetRedis(),
@@ -162,9 +168,21 @@ func (s *AllocationService) executeAction(ctx context.Context, payload machineAc
 		return s.agentClient.ResetSSH(ctx, payload.HostID)
 	case machineActionCleanup:
 		return s.agentClient.CleanupMachine(ctx, payload.HostID)
+	case machineActionSyncKeys:
+		return s.agentClient.SyncSSHKeys(ctx, payload.HostID, payload.PublicKeys, payload.Username)
 	default:
 		return fmt.Errorf("unknown machine action: %s", payload.Action)
 	}
+}
+
+// EnqueueSyncKeys 入队 SSH 密钥同步操作（供 SSHKeyService 调用）
+func (s *AllocationService) EnqueueSyncKeys(ctx context.Context, hostID string, publicKeys []string, username string) error {
+	return s.enqueueAction(ctx, machineActionPayload{
+		Action:     machineActionSyncKeys,
+		HostID:     hostID,
+		PublicKeys: publicKeys,
+		Username:   username,
+	})
 }
 
 func (s *AllocationService) handleActionFailure(ctx context.Context, payload machineActionPayload, err error) {
@@ -290,6 +308,9 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 		cancel()
 	}
 
+	// 异步注入客户 SSH 公钥到新分配的机器
+	go s.syncCustomerKeysToHost(context.Background(), customerID, hostID)
+
 	return allocation, nil
 }
 
@@ -398,4 +419,73 @@ func (s *AllocationService) ValidateHostOwnership(ctx context.Context, hostID st
 // @modified 2026-02-04
 func (s *AllocationService) ListByCustomerID(ctx context.Context, customerID uint, page, pageSize int) ([]entity.Allocation, int64, error) {
 	return s.allocationDao.FindActiveByCustomerID(ctx, customerID, page, pageSize)
+}
+
+// BatchAllocateResult 批量分配结果
+type BatchAllocateResult struct {
+	Success []string          `json:"success"`
+	Failed  map[string]string `json:"failed"`
+}
+
+// BatchAllocate 批量分配机器给客户
+func (s *AllocationService) BatchAllocate(ctx context.Context, hostIDs []string, customerID uint, durationMonths int, remark string) (*BatchAllocateResult, error) {
+	result := &BatchAllocateResult{
+		Success: make([]string, 0),
+		Failed:  make(map[string]string),
+	}
+	for _, hostID := range hostIDs {
+		if _, err := s.AllocateMachine(ctx, customerID, hostID, durationMonths, remark); err != nil {
+			result.Failed[hostID] = err.Error()
+		} else {
+			result.Success = append(result.Success, hostID)
+		}
+	}
+	return result, nil
+}
+
+// BatchReclaimResult 批量回收结果
+type BatchReclaimResult struct {
+	Success []string          `json:"success"`
+	Failed  map[string]string `json:"failed"`
+}
+
+// BatchReclaim 批量回收机器
+func (s *AllocationService) BatchReclaim(ctx context.Context, hostIDs []string) (*BatchReclaimResult, error) {
+	result := &BatchReclaimResult{
+		Success: make([]string, 0),
+		Failed:  make(map[string]string),
+	}
+	for _, hostID := range hostIDs {
+		if err := s.ReclaimMachine(ctx, hostID); err != nil {
+			result.Failed[hostID] = err.Error()
+		} else {
+			result.Success = append(result.Success, hostID)
+		}
+	}
+	return result, nil
+}
+
+// syncCustomerKeysToHost 将客户的所有 SSH 公钥同步到指定机器
+func (s *AllocationService) syncCustomerKeysToHost(ctx context.Context, customerID uint, hostID string) {
+	if s.sshKeyDao == nil {
+		return
+	}
+
+	keys, err := s.sshKeyDao.ListByCustomerID(ctx, customerID)
+	if err != nil {
+		logger.GetLogger().Warn(fmt.Sprintf("获取客户 SSH 密钥失败: %v", err))
+		return
+	}
+	if len(keys) == 0 {
+		return
+	}
+
+	publicKeys := make([]string, 0, len(keys))
+	for _, k := range keys {
+		publicKeys = append(publicKeys, k.PublicKey)
+	}
+
+	if err := s.EnqueueSyncKeys(ctx, hostID, publicKeys, ""); err != nil {
+		logger.GetLogger().Warn(fmt.Sprintf("入队 SSH 密钥同步失败: %v", err))
+	}
 }

@@ -39,15 +39,13 @@ const filters = ref({
 const loadImages = async () => {
   loading.value = true
   try {
-    const params: Record<string, any> = {
+    const res = await getImageList({
       page: page.value,
       pageSize: pageSize.value,
-    }
-    if (filters.value.category) params.category = filters.value.category
-    if (filters.value.framework) params.framework = filters.value.framework
-    if (filters.value.status) params.status = filters.value.status
-
-    const res = await getImageList(params)
+      category: filters.value.category || undefined,
+      framework: filters.value.framework || undefined,
+      status: filters.value.status || undefined,
+    })
     images.value = res.data.list || []
     total.value = res.data.total || 0
   } catch (error) {
@@ -154,10 +152,12 @@ onMounted(() => {
       <el-form :inline="true" :model="filters">
         <el-form-item label="分类">
           <el-select v-model="filters.category" placeholder="全部分类" clearable style="width: 140px">
-            <el-option label="训练" value="training" />
-            <el-option label="推理" value="inference" />
-            <el-option label="开发" value="development" />
             <el-option label="基础" value="base" />
+            <el-option label="PyTorch" value="pytorch" />
+            <el-option label="TensorFlow" value="tensorflow" />
+            <el-option label="PaddlePaddle" value="paddlepaddle" />
+            <el-option label="Jupyter" value="jupyter" />
+            <el-option label="推理" value="inference" />
           </el-select>
         </el-form-item>
         <el-form-item label="框架">

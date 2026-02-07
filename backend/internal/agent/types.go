@@ -1,6 +1,9 @@
 package agent
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 // Request 通用请求结构
 type Request struct {
@@ -31,6 +34,13 @@ type ResetSSHRequest struct {
 	HostID    string `json:"host_id"`
 	PublicKey string `json:"public_key"`
 	Username  string `json:"username,omitempty"`
+}
+
+// SyncSSHKeysRequest 同步SSH密钥请求（全量覆盖）
+type SyncSSHKeysRequest struct {
+	HostID     string   `json:"host_id"`
+	PublicKeys []string `json:"public_keys"` // 客户的所有公钥列表
+	Username   string   `json:"username,omitempty"`
 }
 
 // CleanupRequest 清理机器请求
@@ -85,4 +95,9 @@ type ExecuteCommandResponse struct {
 	ExitCode int    `json:"exit_code"`
 	Stdout   string `json:"stdout"`
 	Stderr   string `json:"stderr"`
+}
+
+// buildAuthorizedKeysContent 将公钥列表拼接为 authorized_keys 文件内容
+func buildAuthorizedKeysContent(publicKeys []string) string {
+	return strings.Join(publicKeys, "\n")
 }

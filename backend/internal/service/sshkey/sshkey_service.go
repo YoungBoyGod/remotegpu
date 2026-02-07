@@ -18,14 +18,27 @@ var (
 	ErrKeyNotOwnedByUser = errors.New("无权操作此 SSH 密钥")
 )
 
+// KeySyncer 密钥同步接口（避免循环依赖）
+type KeySyncer interface {
+	EnqueueSyncKeys(ctx context.Context, hostID string, publicKeys []string, username string) error
+}
+
 type SSHKeyService struct {
-	sshKeyDao *dao.SSHKeyDao
+	sshKeyDao     *dao.SSHKeyDao
+	allocationDao *dao.AllocationDao
+	keySyncer     KeySyncer
 }
 
 func NewSSHKeyService(db *gorm.DB) *SSHKeyService {
 	return &SSHKeyService{
-		sshKeyDao: dao.NewSSHKeyDao(db),
+		sshKeyDao:     dao.NewSSHKeyDao(db),
+		allocationDao: dao.NewAllocationDao(db),
 	}
+}
+
+// SetKeySyncer 设置密钥同步器（在 router 初始化时注入，避免循环依赖）
+func (s *SSHKeyService) SetKeySyncer(syncer KeySyncer) {
+	s.keySyncer = syncer
 }
 
 // CreateKey 创建 SSH 密钥
@@ -56,6 +69,9 @@ func (s *SSHKeyService) CreateKey(ctx context.Context, customerID uint, name, pu
 		return nil, err
 	}
 
+	// 异步同步密钥到客户已分配的所有机器
+	go s.syncKeysToAllocatedMachines(context.Background(), customerID)
+
 	return key, nil
 }
 
@@ -78,7 +94,14 @@ func (s *SSHKeyService) DeleteKey(ctx context.Context, customerID, keyID uint) e
 		return ErrKeyNotOwnedByUser
 	}
 
-	return s.sshKeyDao.Delete(ctx, keyID)
+	if err := s.sshKeyDao.Delete(ctx, keyID); err != nil {
+		return err
+	}
+
+	// 异步同步密钥到客户已分配的所有机器
+	go s.syncKeysToAllocatedMachines(context.Background(), customerID)
+
+	return nil
 }
 
 // GetKey 获取单个 SSH 密钥
@@ -118,4 +141,33 @@ func GetMD5Fingerprint(publicKey string) (string, error) {
 
 	fingerprint := ssh.FingerprintLegacyMD5(key)
 	return strings.TrimPrefix(fingerprint, "MD5:"), nil
+}
+
+// syncKeysToAllocatedMachines 将客户的所有公钥同步到其已分配的机器
+func (s *SSHKeyService) syncKeysToAllocatedMachines(ctx context.Context, customerID uint) {
+	if s.keySyncer == nil {
+		return
+	}
+
+	// 获取客户所有公钥
+	keys, err := s.sshKeyDao.ListByCustomerID(ctx, customerID)
+	if err != nil {
+		return
+	}
+
+	publicKeys := make([]string, 0, len(keys))
+	for _, k := range keys {
+		publicKeys = append(publicKeys, k.PublicKey)
+	}
+
+	// 获取客户所有活跃分配的机器
+	allocations, err := s.allocationDao.FindAllActiveByCustomerID(ctx, customerID)
+	if err != nil {
+		return
+	}
+
+	// 逐台机器入队同步任务
+	for _, alloc := range allocations {
+		_ = s.keySyncer.EnqueueSyncKeys(ctx, alloc.HostID, publicKeys, "")
+	}
 }

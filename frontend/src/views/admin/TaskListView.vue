@@ -130,20 +130,15 @@ const formatDate = (value?: string | null) => {
 }
 
 const buildParams = () => {
-  const params: Record<string, any> = {
+  const customerId = filters.value.customer_id ? Number(filters.value.customer_id) : undefined
+  return {
     page: pageRequest.value.page,
     pageSize: pageRequest.value.pageSize,
+    keyword: filters.value.keyword || undefined,
+    status: filters.value.status || undefined,
+    customer_id: customerId && !Number.isNaN(customerId) ? customerId : undefined,
+    host_id: filters.value.host_id || undefined,
   }
-  if (filters.value.keyword) params.keyword = filters.value.keyword
-  if (filters.value.status) params.status = filters.value.status
-  if (filters.value.customer_id) {
-    const customerId = Number(filters.value.customer_id)
-    if (!Number.isNaN(customerId)) {
-      params.customer_id = customerId
-    }
-  }
-  if (filters.value.host_id) params.host_id = filters.value.host_id
-  return params
 }
 
 const loadTasks = async () => {

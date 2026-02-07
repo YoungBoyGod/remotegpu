@@ -11,9 +11,12 @@ type Image struct {
 	DisplayName string `gorm:"type:varchar(256)" json:"display_name"`
 	Description string `gorm:"type:text" json:"description"`
 
-	Category    string `gorm:"type:varchar(64)" json:"category"`
-	Framework   string `gorm:"type:varchar(64)" json:"framework"`
-	CUDAVersion string `gorm:"type:varchar(32)" json:"cuda_version"`
+	Category         string `gorm:"type:varchar(64)" json:"category"`
+	Framework        string `gorm:"type:varchar(64)" json:"framework"`
+	FrameworkVersion string `gorm:"type:varchar(64)" json:"framework_version"`
+	CUDAVersion      string `gorm:"type:varchar(32)" json:"cuda_version"`
+	PythonVersion    string `gorm:"type:varchar(32)" json:"python_version"`
+	Size             int64  `json:"size"`
 
 	RegistryURL string `gorm:"type:varchar(512)" json:"registry_url"`
 	IsOfficial  bool   `gorm:"default:false" json:"is_official"`
@@ -54,6 +57,13 @@ type DatasetMount struct {
 	MountPath string `gorm:"type:varchar(256);not null" json:"mount_path"`
 	ReadOnly  bool   `gorm:"default:true" json:"read_only"`
 
-	Status    string    `gorm:"type:varchar(20);default:'mounting'" json:"status"` // mounting, mounted, error, unmounted
-	CreatedAt time.Time `json:"created_at"`
+	Status       string    `gorm:"type:varchar(20);default:'mounting'" json:"status"` // mounting, mounted, error, unmounted
+	ErrorMessage string    `gorm:"type:text" json:"error_message,omitempty"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt    time.Time `json:"updated_at"`
+}
+
+// TableName 指定表名
+func (DatasetMount) TableName() string {
+	return "dataset_mounts"
 }

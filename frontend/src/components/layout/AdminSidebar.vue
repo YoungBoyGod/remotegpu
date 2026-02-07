@@ -11,7 +11,9 @@ import {
   List,
   Setting,
   ArrowRight,
-  ArrowDown
+  ArrowDown,
+  FolderOpened,
+  Document
 } from '@element-plus/icons-vue'
 
 interface MenuItem {
@@ -87,6 +89,18 @@ const menuItems: MenuItem[] = [
     title: 'Agent 管理',
     icon: Connection,
     path: '/admin/agents'
+  },
+  {
+    id: 'storage',
+    title: '存储管理',
+    icon: FolderOpened,
+    path: '/admin/storage'
+  },
+  {
+    id: 'documents',
+    title: '文档中心',
+    icon: Document,
+    path: '/admin/documents'
   },
   {
     id: 'settings',

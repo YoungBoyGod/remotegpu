@@ -13,6 +13,16 @@ echo "RemoteGPU 服务启动脚本"
 echo "========================================="
 echo ""
 
+# 创建共享网络（如果不存在）
+echo ">>> 检查共享网络..."
+if ! docker network inspect remotegpu-network >/dev/null 2>&1; then
+    echo "创建 remotegpu-network 网络..."
+    docker network create remotegpu-network
+else
+    echo "remotegpu-network 网络已存在"
+fi
+echo ""
+
 # 第一层：基础服务
 echo ">>> 第一层：启动基础服务..."
 services_layer1=("postgresql" "redis" "etcd")

@@ -32,6 +32,10 @@ type Customer struct {
 	PhoneVerified      bool   `gorm:"default:false" json:"phone_verified"`
 	MustChangePassword bool   `gorm:"default:false" json:"must_change_password"`
 
+	// 配额限制
+	QuotaGPU     int   `gorm:"default:0" json:"quota_gpu"`      // GPU 数量配额，0 表示不限制
+	QuotaStorage int64 `gorm:"default:0" json:"quota_storage"`  // 存储容量配额（MB），0 表示不限制
+
 	// Billing
 	Balance  float64 `gorm:"type:decimal(10,4);default:0.00" json:"balance"`
 	Currency string  `gorm:"type:varchar(10);default:'CNY'" json:"currency"`

@@ -5,19 +5,31 @@
 // 分配记录状态
 export type AllocationRecordStatus = 'active' | 'expired' | 'reclaimed' | 'pending'
 
-// 分配记录
+// 分配记录（字段与后端 snake_case 一致）
 export interface AllocationRecord {
-  id: number
-  machineId: number
-  machineName: string
-  customerId: number
-  customerName: string
-  allocatedAt: string
-  duration: number  // 月数
-  expiresAt: string
+  id: string
+  customer_id: number
+  host_id: string
+  workspace_id?: number | null
+  start_time: string
+  end_time: string
+  actual_end_time?: string | null
   status: AllocationRecordStatus
-  notes?: string
-  operator: string
+  remark?: string
+  created_at?: string
+  updated_at?: string
+  customer?: {
+    id: number
+    username?: string
+    display_name?: string
+    company?: string
+  }
+  host?: {
+    id: string
+    name?: string
+    region?: string
+    ip_address?: string
+  }
 }
 
 // 续期表单

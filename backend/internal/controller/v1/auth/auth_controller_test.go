@@ -66,10 +66,12 @@ func setupTestEnv(t *testing.T) *testEnv {
 		status TEXT DEFAULT 'active',
 		email_verified INTEGER DEFAULT 0,
 		phone_verified INTEGER DEFAULT 0,
+		must_change_password INTEGER DEFAULT 0,
+		quota_gpu INTEGER DEFAULT 0,
+		quota_storage INTEGER DEFAULT 0,
 		balance REAL DEFAULT 0,
 		currency TEXT DEFAULT 'CNY',
-		last_login_at DATETIME,
-		must_change_password INTEGER DEFAULT 0
+		last_login_at DATETIME
 	)`).Error
 	require.NoError(t, err)
 

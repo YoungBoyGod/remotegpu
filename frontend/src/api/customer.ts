@@ -3,6 +3,37 @@ import type { ApiResponse, PageRequest, PageResponse } from '@/types/common'
 import type { Machine } from '@/types/machine'
 import type { Task, TaskLogResponse, TaskResultResponse } from '@/types/task'
 
+// ==================== 仪表盘 ====================
+
+/**
+ * 聚合客户端仪表盘数据（前端并行调用已有 API）
+ */
+export async function getDashboardOverview(): Promise<ApiResponse<any>> {
+  const [machinesRes, tasksRes, datasetsRes] = await Promise.all([
+    request.get('/customer/machines', { params: { page: 1, pageSize: 1 } }),
+    request.get('/customer/tasks', { params: { page: 1, pageSize: 5 } }),
+    request.get('/customer/datasets', { params: { page: 1, pageSize: 1 } }),
+  ])
+
+  const totalMachines = machinesRes?.data?.total || 0
+  const taskList: any[] = tasksRes?.data?.list || []
+  const totalTasks = tasksRes?.data?.total || 0
+  const runningTasks = taskList.filter((t: any) => t.status === 'running').length
+  const datasetTotal = datasetsRes?.data?.total || 0
+
+  return {
+    code: 0,
+    msg: 'success',
+    data: {
+      myMachines: totalMachines,
+      runningTasks,
+      totalTasks,
+      datasetCount: datasetTotal,
+      recentTasks: taskList,
+    },
+  } as ApiResponse<any>
+}
+
 // ==================== 我的机器 ====================
 
 /**
@@ -168,6 +199,50 @@ export function completeMultipartUpload(id: number, data: { upload_id: string; n
  */
 export function mountDataset(id: number, data: { machine_id: string; mount_path: string; read_only?: boolean }): Promise<ApiResponse<any>> {
   return request.post(`/customer/datasets/${id}/mount`, data)
+}
+
+// ==================== 通知管理 ====================
+
+export interface Notification {
+  id: number
+  customer_id: number
+  title: string
+  content: string
+  type: string
+  level: string
+  is_read: boolean
+  read_at?: string
+  created_at: string
+}
+
+/**
+ * 获取通知列表
+ */
+export function getNotifications(params: PageRequest & { unread?: boolean }): Promise<ApiResponse<PageResponse<Notification>>> {
+  const query: Record<string, any> = { page: params.page, page_size: params.pageSize }
+  if (params.unread) query.unread = 'true'
+  return request.get('/customer/notifications', { params: query })
+}
+
+/**
+ * 获取未读通知数量
+ */
+export function getUnreadCount(): Promise<ApiResponse<{ count: number }>> {
+  return request.get('/customer/notifications/unread-count')
+}
+
+/**
+ * 标记单条通知已读
+ */
+export function markNotificationRead(id: number): Promise<ApiResponse<void>> {
+  return request.post(`/customer/notifications/${id}/read`)
+}
+
+/**
+ * 标记全部通知已读
+ */
+export function markAllNotificationsRead(): Promise<ApiResponse<void>> {
+  return request.post('/customer/notifications/read-all')
 }
 
 // ==================== SSH 密钥管理 ====================

@@ -81,3 +81,52 @@ func (d *OpsDao) AcknowledgeAlert(ctx context.Context, id uint) error {
 func (d *OpsDao) CreateAlert(ctx context.Context, alert *entity.ActiveAlert) error {
 	return d.db.WithContext(ctx).Create(alert).Error
 }
+
+// --- AlertRule CRUD ---
+
+// CreateAlertRule 创建告警规则
+func (d *OpsDao) CreateAlertRule(ctx context.Context, rule *entity.AlertRule) error {
+	return d.db.WithContext(ctx).Create(rule).Error
+}
+
+// FindAlertRuleByID 根据 ID 查询告警规则
+func (d *OpsDao) FindAlertRuleByID(ctx context.Context, id uint) (*entity.AlertRule, error) {
+	var rule entity.AlertRule
+	err := d.db.WithContext(ctx).First(&rule, "id = ?", id).Error
+	return &rule, err
+}
+
+// UpdateAlertRule 更新告警规则
+func (d *OpsDao) UpdateAlertRule(ctx context.Context, id uint, fields map[string]any) error {
+	return d.db.WithContext(ctx).Model(&entity.AlertRule{}).Where("id = ?", id).Updates(fields).Error
+}
+
+// DeleteAlertRule 删除告警规则
+func (d *OpsDao) DeleteAlertRule(ctx context.Context, id uint) error {
+	return d.db.WithContext(ctx).Delete(&entity.AlertRule{}, "id = ?", id).Error
+}
+
+// ListAlertRules 分页查询告警规则
+func (d *OpsDao) ListAlertRules(ctx context.Context, page, pageSize int, severity string, enabled *bool) ([]entity.AlertRule, int64, error) {
+	var rules []entity.AlertRule
+	var total int64
+
+	query := d.db.WithContext(ctx).Model(&entity.AlertRule{})
+	if severity != "" {
+		query = query.Where("severity = ?", severity)
+	}
+	if enabled != nil {
+		query = query.Where("enabled = ?", *enabled)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	err := query.Order("created_at desc").
+		Offset(offset).Limit(pageSize).
+		Find(&rules).Error
+
+	return rules, total, err
+}

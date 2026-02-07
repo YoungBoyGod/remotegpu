@@ -86,15 +86,38 @@ func (c *AgentTaskController) CompleteTask(ctx *gin.Context) {
 		AttemptID string `json:"attempt_id" binding:"required"`
 		ExitCode  int    `json:"exit_code"`
 		Error     string `json:"error"`
+		Stdout    string `json:"stdout"`
+		Stderr    string `json:"stderr"`
 	}
 	if err := ctx.ShouldBindJSON(&req); err != nil {
 		c.Error(ctx, 400, err.Error())
 		return
 	}
 
-	if err := c.taskService.CompleteTask(ctx, id, req.AgentID, req.AttemptID, req.ExitCode, req.Error); err != nil {
+	if err := c.taskService.CompleteTask(ctx, id, req.AgentID, req.AttemptID, req.ExitCode, req.Error, req.Stdout, req.Stderr); err != nil {
 		c.Error(ctx, 409, err.Error())
 		return
 	}
 	c.Success(ctx, gin.H{"task_id": id, "status": "completed"})
+}
+
+// ReportProgress 上报任务进度
+func (c *AgentTaskController) ReportProgress(ctx *gin.Context) {
+	id := ctx.Param("id")
+	var req struct {
+		AgentID   string `json:"agent_id" binding:"required"`
+		AttemptID string `json:"attempt_id" binding:"required"`
+		Percent   int    `json:"percent"`
+		Message   string `json:"message"`
+	}
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	if err := c.taskService.ReportProgress(ctx, id, req.AgentID, req.AttemptID, req.Percent, req.Message); err != nil {
+		c.Error(ctx, 409, err.Error())
+		return
+	}
+	c.Success(ctx, gin.H{"task_id": id, "progress": req.Percent})
 }

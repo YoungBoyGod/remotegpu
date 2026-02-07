@@ -143,6 +143,7 @@ swagger:
 
 agent:
   enabled: true
+  token: "${AGENT_TOKEN}"  # Agent 认证 Token
   protocol: "http"      # 默认协议: grpc, http
   grpc_port: 50051      # gRPC 端口
   http_port: 8090       # HTTP 端口

@@ -10,7 +10,6 @@ import type { Machine } from '@/types/machine'
 interface MonitoredMachine extends Machine {
   cpuUsage?: number
   memoryUsage?: number
-  gpuUsage?: number
   diskUsage?: number
   temperature?: number
   uptime?: string

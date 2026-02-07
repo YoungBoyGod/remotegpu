@@ -10,10 +10,16 @@ import (
 )
 
 // AgentAuth Agent Token 认证中间件
-// 从请求头 X-Agent-Token 读取 token，与配置中的 agent.token 比对
+// 同时支持 X-Agent-Token 和 Authorization: Bearer 两种认证方式
 func AgentAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := c.GetHeader("X-Agent-Token")
+		// 兼容 Agent 客户端使用 Authorization: Bearer 发送 Token
+		if token == "" {
+			if auth := c.GetHeader("Authorization"); len(auth) > 7 && auth[:7] == "Bearer " {
+				token = auth[7:]
+			}
+		}
 		if token == "" {
 			response.Error(c, http.StatusUnauthorized, "缺少 Agent 认证令牌")
 			c.Abort()

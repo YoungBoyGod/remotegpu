@@ -30,6 +30,13 @@ type CreateMachineRequest struct {
 	JupyterToken string `json:"jupyter_token"`
 	VNCURL       string `json:"vnc_url"`
 	VNCPassword  string `json:"vnc_password"`
+	// 外映射配置
+	ExternalIP          string `json:"external_ip"`
+	ExternalSSHPort     int    `json:"external_ssh_port"`
+	ExternalJupyterPort int    `json:"external_jupyter_port"`
+	ExternalVNCPort     int    `json:"external_vnc_port"`
+	NginxDomain         string `json:"nginx_domain"`
+	NginxConfigPath     string `json:"nginx_config_path"`
 }
 
 // UpdateMachineRequest 更新机器请求
@@ -46,6 +53,13 @@ type UpdateMachineRequest struct {
 	JupyterToken string `json:"jupyter_token"`
 	VNCURL       string `json:"vnc_url"`
 	VNCPassword  string `json:"vnc_password"`
+	// 外映射配置
+	ExternalIP          string `json:"external_ip"`
+	ExternalSSHPort     int    `json:"external_ssh_port"`
+	ExternalJupyterPort int    `json:"external_jupyter_port"`
+	ExternalVNCPort     int    `json:"external_vnc_port"`
+	NginxDomain         string `json:"nginx_domain"`
+	NginxConfigPath     string `json:"nginx_config_path"`
 }
 
 // ImportMachineItem 批量导入机器条目
@@ -64,6 +78,25 @@ type ImportMachineItem struct {
 // ImportMachineRequest 批量导入机器请求
 type ImportMachineRequest struct {
 	Machines []ImportMachineItem `json:"machines" binding:"required,dive"`
+}
+
+// BatchSetMaintenanceRequest 批量启用/禁用机器请求
+type BatchSetMaintenanceRequest struct {
+	HostIDs     []string `json:"host_ids" binding:"required,min=1"`
+	Maintenance bool     `json:"maintenance"`
+}
+
+// BatchAllocateRequest 批量分配机器请求
+type BatchAllocateRequest struct {
+	HostIDs        []string `json:"host_ids" binding:"required,min=1"`
+	CustomerID     uint     `json:"customer_id" binding:"required"`
+	DurationMonths int      `json:"duration_months" binding:"required,min=1"`
+	Remark         string   `json:"remark"`
+}
+
+// BatchReclaimRequest 批量回收机器请求
+type BatchReclaimRequest struct {
+	HostIDs []string `json:"host_ids" binding:"required,min=1"`
 }
 
 // CreateMachineEnrollmentRequest 用户添加机器请求

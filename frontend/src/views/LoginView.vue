@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { User, Lock } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import type { FormInstance, FormRules } from 'element-plus'
 
 const router = useRouter()
+const route = useRoute()
 const authStore = useAuthStore()
 
 // 表单数据
@@ -42,12 +43,18 @@ const handleLogin = async (formEl: FormInstance | undefined) => {
     if (valid) {
       loading.value = true
       try {
-        await authStore.login({
+        const response = await authStore.login({
           username: loginForm.username,
           password: loginForm.password,
         })
         ElMessage.success('登录成功')
-        router.push('/')
+        // 首次登录强制改密
+        if (response.data.mustChangePassword) {
+          router.push('/change-password')
+        } else {
+          const redirect = route.query.redirect as string
+          router.push(redirect || '/')
+        }
       } catch (error: any) {
         const code = error?.code ?? error?.response?.data?.code
         const msg = error?.msg || error?.message || error?.response?.data?.msg

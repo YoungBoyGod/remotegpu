@@ -12,6 +12,7 @@ services:
       - ./ssl:/etc/nginx/ssl:ro
       - ./logs:/var/log/nginx
       - ./logrotate.conf:/etc/logrotate.d/nginx:ro
+      - ../../frontend/dist:/usr/share/nginx/html:ro
       - nginx_cache:/var/cache/nginx
       - nginx_run:/var/run
     healthcheck:
@@ -30,4 +31,4 @@ volumes:
 
 networks:
   remotegpu-network:
-    driver: bridge
+    external: true

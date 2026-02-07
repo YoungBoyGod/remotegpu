@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
@@ -17,6 +18,7 @@ type MachineService struct {
 	machineDao    *dao.MachineDao
 	hostMetricDao *dao.HostMetricDao
 	db            *gorm.DB
+	statusCache   *HostStatusCache
 }
 
 func NewMachineService(db *gorm.DB) *MachineService {
@@ -25,6 +27,16 @@ func NewMachineService(db *gorm.DB) *MachineService {
 		hostMetricDao: dao.NewHostMetricDao(db),
 		db:            db,
 	}
+}
+
+// SetStatusCache 注入设备状态缓存（可选，不影响现有调用）
+func (s *MachineService) SetStatusCache(c *HostStatusCache) {
+	s.statusCache = c
+}
+
+// GetStatusCache 获取设备状态缓存
+func (s *MachineService) GetStatusCache() *HostStatusCache {
+	return s.statusCache
 }
 
 var (
@@ -310,6 +322,15 @@ func (s *MachineService) GetMachineDetail(ctx context.Context, hostID string) (m
 		}
 	}
 
+	// 解密 VNC 密码
+	vncPassword := ""
+	if host.VNCPassword != "" {
+		decrypted, err := crypto.DecryptAES256GCM(host.VNCPassword)
+		if err == nil {
+			vncPassword = decrypted
+		}
+	}
+
 	return map[string]interface{}{
 		"id":            host.ID,
 		"name":          host.Name,
@@ -336,7 +357,13 @@ func (s *MachineService) GetMachineDetail(ctx context.Context, hostID string) (m
 		"jupyter_url":   host.JupyterURL,
 		"jupyter_token": host.JupyterToken,
 		"vnc_url":       host.VNCURL,
-		"vnc_password":  host.VNCPassword,
+		"vnc_password":  vncPassword,
+		"external_ip":           host.ExternalIP,
+		"external_ssh_port":     host.ExternalSSHPort,
+		"external_jupyter_port": host.ExternalJupyterPort,
+		"external_vnc_port":     host.ExternalVNCPort,
+		"nginx_domain":          host.NginxDomain,
+		"nginx_config_path":     host.NginxConfigPath,
 		"last_heartbeat": host.LastHeartbeat,
 		"created_at":    host.CreatedAt,
 		"updated_at":    host.UpdatedAt,
@@ -370,6 +397,29 @@ func (s *MachineService) GetStatusStats(ctx context.Context) (map[string]int64, 
 
 // UpdateMachine 更新机器信息
 func (s *MachineService) UpdateMachine(ctx context.Context, hostID string, fields map[string]interface{}) error {
+	// IP 唯一性校验：如果更新了 ip_address，检查是否与其他机器冲突
+	if ip, ok := fields["ip_address"]; ok {
+		if ipStr, _ := ip.(string); ipStr != "" {
+			existing, err := s.machineDao.FindByIPAddress(ctx, ipStr)
+			if err == nil && existing.ID != hostID {
+				return ErrHostDuplicateIP
+			} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+	}
+	// Hostname 唯一性校验
+	if hostname, ok := fields["hostname"]; ok {
+		if hn, _ := hostname.(string); hn != "" {
+			existing, err := s.machineDao.FindByHostname(ctx, hn)
+			if err == nil && existing.ID != hostID {
+				return ErrHostDuplicateHostname
+			} else if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) {
+				return err
+			}
+		}
+	}
+
 	// 如果更新了 SSH 密码，需要加密
 	if password, ok := fields["ssh_password"]; ok {
 		if pw, _ := password.(string); pw != "" {
@@ -413,10 +463,117 @@ func (s *MachineService) UpdateAllocationStatus(ctx context.Context, hostID stri
 	return s.machineDao.UpdateAllocationStatus(ctx, hostID, allocationStatus)
 }
 
-// Heartbeat 处理 Agent 心跳上报，更新心跳时间和设备在线状态
+// BatchSetMaintenance 批量设置维护状态
+func (s *MachineService) BatchSetMaintenance(ctx context.Context, hostIDs []string, maintenance bool) (int64, error) {
+	status := "idle"
+	if maintenance {
+		status = "maintenance"
+	}
+	return s.machineDao.BatchUpdateAllocationStatus(ctx, hostIDs, status)
+}
+
+// Heartbeat 处理 Agent 心跳上报，优先写入 Redis 缓存，减少数据库写入压力
 func (s *MachineService) Heartbeat(ctx context.Context, hostID string) error {
-	// 心跳只影响 device_status，不影响 allocation_status
+	if s.statusCache != nil {
+		status := &CachedHostStatus{
+			HostID:        hostID,
+			DeviceStatus:  "online",
+			LastHeartbeat: time.Now(),
+		}
+		_ = s.statusCache.SetOnline(ctx, status)
+		return nil
+	}
 	return s.machineDao.UpdateHeartbeat(ctx, hostID, "online")
+}
+
+// HeartbeatMetrics 心跳携带的监控指标
+type HeartbeatMetrics struct {
+	CPUUsagePercent    *float64
+	MemoryUsagePercent *float64
+	MemoryUsedGB       *int64
+	DiskUsagePercent   *float64
+	DiskUsedGB         *int64
+	GPUMetrics         []GPUMetricData
+}
+
+// GPUMetricData 单个 GPU 的监控指标
+type GPUMetricData struct {
+	Index         int
+	UUID          string
+	Name          string
+	UtilPercent   *float64
+	MemoryUsedMB  *int
+	MemoryTotalMB *int
+	TemperatureC  *int
+	PowerUsageW   *float64
+}
+
+// AgentRegistration Agent 注册信息
+type AgentRegistration struct {
+	AgentID    string
+	MachineID  string
+	Version    string
+	Hostname   string
+	IPAddress  string
+	AgentPort  int
+	MaxWorkers int
+}
+
+// HeartbeatWithMetrics 处理带监控指标的心跳上报
+func (s *MachineService) HeartbeatWithMetrics(ctx context.Context, hostID string, metrics *HeartbeatMetrics) error {
+	// 写入 Redis 缓存（如果可用）
+	if s.statusCache != nil {
+		status := &CachedHostStatus{
+			HostID:        hostID,
+			DeviceStatus:  "online",
+			LastHeartbeat: time.Now(),
+		}
+		if metrics != nil {
+			status.CPUUsage = metrics.CPUUsagePercent
+			status.MemoryUsage = metrics.MemoryUsagePercent
+			status.DiskUsage = metrics.DiskUsagePercent
+			status.GPUCount = len(metrics.GPUMetrics)
+		}
+		_ = s.statusCache.SetOnline(ctx, status)
+	} else {
+		// 无缓存时直接写数据库
+		if err := s.machineDao.UpdateHeartbeat(ctx, hostID, "online"); err != nil {
+			return err
+		}
+	}
+
+	// 监控指标仍然写入 host_metrics 表
+	if metrics != nil {
+		metric := &entity.HostMetric{
+			HostID:             hostID,
+			CPUUsagePercent:    metrics.CPUUsagePercent,
+			MemoryUsagePercent: metrics.MemoryUsagePercent,
+			MemoryUsedGB:       metrics.MemoryUsedGB,
+			DiskUsagePercent:   metrics.DiskUsagePercent,
+			DiskUsedGB:         metrics.DiskUsedGB,
+			CollectedAt:        time.Now(),
+		}
+		if err := s.hostMetricDao.Create(ctx, metric); err != nil {
+			return fmt.Errorf("保存心跳指标失败: %w", err)
+		}
+	}
+
+	return nil
+}
+
+// RegisterAgent 处理 Agent 注册
+func (s *MachineService) RegisterAgent(ctx context.Context, info *AgentRegistration) error {
+	fields := make(map[string]interface{})
+	fields["device_status"] = "online"
+
+	if info.Hostname != "" {
+		fields["hostname"] = info.Hostname
+	}
+	if info.AgentPort > 0 {
+		fields["agent_port"] = info.AgentPort
+	}
+
+	return s.machineDao.UpdateFields(ctx, info.MachineID, fields)
 }
 
 // ListAgents 获取 Agent 列表（基于 hosts 表构建 Agent 视图）
@@ -511,4 +668,29 @@ func (s *MachineService) GetMachineUsage(ctx context.Context, hostID string) (ma
 	result["gpu_usage"] = gpuUsage
 
 	return result, nil
+}
+
+// GetRealtimeStatus 从 Redis 缓存读取设备实时状态，缓存未命中时回退到数据库
+func (s *MachineService) GetRealtimeStatus(ctx context.Context, hostID string) (*CachedHostStatus, error) {
+	if s.statusCache != nil {
+		cached, err := s.statusCache.Get(ctx, hostID)
+		if err == nil {
+			return cached, nil
+		}
+	}
+
+	// 回退到数据库
+	host, err := s.machineDao.FindByID(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+
+	status := &CachedHostStatus{
+		HostID:       host.ID,
+		DeviceStatus: host.DeviceStatus,
+	}
+	if host.LastHeartbeat != nil {
+		status.LastHeartbeat = *host.LastHeartbeat
+	}
+	return status, nil
 }

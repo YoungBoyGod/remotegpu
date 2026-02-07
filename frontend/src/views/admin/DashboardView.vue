@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { getDashboardOverview, getGPUTrend, getRecentAllocations } from '@/api/admin'
 import StatCard from '@/components/common/StatCard.vue'
@@ -48,7 +48,27 @@ const gpuTrend = ref<GPUTrendPoint[]>([])
 const recentAllocationList = ref<RecentAllocation[]>([])
 
 // 计算在线机器数 = 总数 - 离线数
-const onlineMachines = () => stats.value.total_machines - stats.value.offline_machines
+const onlineMachines = computed(() => stats.value.total_machines - stats.value.offline_machines)
+
+// 机器利用率 = 已分配 / 总数
+const utilizationRate = computed(() => {
+  if (stats.value.total_machines === 0) return 0
+  return Math.round((stats.value.allocated_machines / stats.value.total_machines) * 100)
+})
+
+// GPU 平均使用率
+const avgGPUUsage = computed(() => {
+  if (gpuTrend.value.length === 0) return 0
+  const sum = gpuTrend.value.reduce((acc, p) => acc + p.usage, 0)
+  return Math.round(sum / gpuTrend.value.length)
+})
+
+// GPU 趋势柱状图颜色：根据使用率变化
+const trendBarColor = (usage: number) => {
+  if (usage >= 80) return 'linear-gradient(180deg, #f56c6c, #fab6b6)'
+  if (usage >= 50) return 'linear-gradient(180deg, #e6a23c, #f3d19e)'
+  return 'linear-gradient(180deg, #409eff, #79bbff)'
+}
 
 const loadStats = async () => {
   try {
@@ -102,14 +122,26 @@ const formatTime = (timeStr: string) => {
   return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
+// 分配状态中文映射
+const allocationStatusLabel = (status: string) => {
+  const map: Record<string, string> = {
+    active: '使用中',
+    expired: '已过期',
+    reclaimed: '已回收',
+    pending: '待生效',
+  }
+  return map[status] || status
+}
+
 // 分配状态标签类型
 const allocationStatusType = (status: string) => {
   const map: Record<string, string> = {
     active: 'success',
     expired: 'info',
     reclaimed: 'warning',
+    pending: '',
   }
-  return (map[status] || 'info') as 'success' | 'info' | 'warning' | 'danger'
+  return (map[status] || 'info') as 'success' | 'info' | 'warning' | 'danger' | ''
 }
 
 // 自动刷新
@@ -147,16 +179,30 @@ onUnmounted(() => {
       />
       <StatCard
         title="在线机器"
-        :value="onlineMachines()"
+        :value="onlineMachines"
         icon="✅"
         color="success"
         :loading="statsLoading"
       />
       <StatCard
-        title="已分配机器"
+        title="已分配"
         :value="stats.allocated_machines"
         icon="🔗"
         color="warning"
+        :loading="statsLoading"
+      />
+      <StatCard
+        title="空闲机器"
+        :value="stats.idle_machines"
+        icon="💤"
+        color="info"
+        :loading="statsLoading"
+      />
+      <StatCard
+        title="离线机器"
+        :value="stats.offline_machines"
+        icon="⚠️"
+        color="danger"
         :loading="statsLoading"
       />
       <StatCard
@@ -167,6 +213,34 @@ onUnmounted(() => {
         :loading="statsLoading"
       />
     </div>
+
+    <!-- 利用率概览 -->
+    <el-row :gutter="20" class="utilization-row">
+      <el-col :span="12">
+        <el-card class="utilization-card">
+          <div class="utilization-item">
+            <span class="utilization-label">机器利用率</span>
+            <el-progress
+              :percentage="utilizationRate"
+              :stroke-width="18"
+              :color="utilizationRate >= 80 ? '#f56c6c' : utilizationRate >= 50 ? '#e6a23c' : '#409eff'"
+            />
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :span="12">
+        <el-card class="utilization-card">
+          <div class="utilization-item">
+            <span class="utilization-label">GPU 平均使用率（24h）</span>
+            <el-progress
+              :percentage="avgGPUUsage"
+              :stroke-width="18"
+              :color="avgGPUUsage >= 80 ? '#f56c6c' : avgGPUUsage >= 50 ? '#e6a23c' : '#67c23a'"
+            />
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
 
     <!-- 图表和列表区域 -->
     <el-row :gutter="20" class="content-row">
@@ -180,6 +254,11 @@ onUnmounted(() => {
           </template>
           <el-skeleton :loading="trendLoading" :rows="5" animated>
             <div v-if="gpuTrend.length > 0" class="gpu-trend-chart">
+              <div class="trend-y-axis">
+                <span>100%</span>
+                <span>50%</span>
+                <span>0%</span>
+              </div>
               <div class="trend-bars">
                 <div
                   v-for="(point, index) in gpuTrend"
@@ -187,10 +266,10 @@ onUnmounted(() => {
                   class="trend-bar-item"
                 >
                   <div class="trend-bar-wrapper">
+                    <span class="trend-bar-value">{{ point.usage }}%</span>
                     <div
                       class="trend-bar"
-                      :style="{ height: point.usage + '%' }"
-                      :title="point.usage + '%'"
+                      :style="{ height: point.usage + '%', background: trendBarColor(point.usage) }"
                     />
                   </div>
                   <span class="trend-bar-label">{{ point.time }}</span>
@@ -223,11 +302,16 @@ onUnmounted(() => {
                 <div class="allocation-info">
                   <span class="allocation-machine">{{ alloc.host?.name || alloc.host_id }}</span>
                   <span class="allocation-arrow">→</span>
-                  <span class="allocation-customer">{{ alloc.customer?.display_name || alloc.customer?.username || '-' }}</span>
+                  <span class="allocation-customer">
+                    {{ alloc.customer?.display_name || alloc.customer?.username || '-' }}
+                    <span v-if="alloc.customer?.company" class="allocation-company">
+                      ({{ alloc.customer.company }})
+                    </span>
+                  </span>
                 </div>
                 <div class="allocation-meta">
                   <el-tag :type="allocationStatusType(alloc.status)" size="small">
-                    {{ alloc.status }}
+                    {{ allocationStatusLabel(alloc.status) }}
                   </el-tag>
                   <span class="allocation-time">{{ formatTime(alloc.created_at) }}</span>
                 </div>
@@ -290,16 +374,51 @@ onUnmounted(() => {
   color: #303133;
 }
 
+/* 利用率概览 */
+.utilization-row {
+  margin-bottom: 24px;
+}
+
+.utilization-card {
+  height: 100%;
+}
+
+.utilization-item {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.utilization-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #606266;
+}
+
 /* GPU 趋势图 */
 .gpu-trend-chart {
+  display: flex;
+  gap: 8px;
   padding: 8px 0;
+}
+
+.trend-y-axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  font-size: 11px;
+  color: #909399;
+  padding-bottom: 22px;
+  min-width: 36px;
+  text-align: right;
 }
 
 .trend-bars {
   display: flex;
   align-items: flex-end;
   gap: 8px;
-  height: 160px;
+  height: 180px;
+  flex: 1;
 }
 
 .trend-bar-item {
@@ -314,16 +433,23 @@ onUnmounted(() => {
   flex: 1;
   width: 100%;
   display: flex;
-  align-items: flex-end;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.trend-bar-value {
+  font-size: 10px;
+  color: #606266;
+  margin-bottom: 2px;
+  white-space: nowrap;
 }
 
 .trend-bar {
   width: 70%;
   min-height: 2px;
-  background: linear-gradient(180deg, #409eff, #79bbff);
   border-radius: 3px 3px 0 0;
-  transition: height 0.3s;
+  transition: height 0.3s, background 0.3s;
 }
 
 .trend-bar-label {
@@ -370,6 +496,11 @@ onUnmounted(() => {
 
 .allocation-customer {
   color: #606266;
+}
+
+.allocation-company {
+  font-size: 12px;
+  color: #909399;
 }
 
 .allocation-meta {

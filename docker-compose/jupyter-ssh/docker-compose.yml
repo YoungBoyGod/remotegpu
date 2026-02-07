@@ -1,0 +1,40 @@
+services:
+  jupyter-ssh-01:
+    build: .
+    container_name: jupyter-ssh-01
+    ports:
+      - "2211:22"
+      - "8891:8888"
+    environment:
+      - SSH_PASSWORD=remotegpu123
+      - JUPYTER_TOKEN=remotegpu
+      - JUPYTER_PORT=8888
+    volumes:
+      - jupyter-data-01:/workspace
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+
+  jupyter-ssh-02:
+    build: .
+    container_name: jupyter-ssh-02
+    ports:
+      - "2212:22"
+      - "8892:8888"
+    environment:
+      - SSH_PASSWORD=remotegpu123
+      - JUPYTER_TOKEN=remotegpu
+      - JUPYTER_PORT=8888
+    volumes:
+      - jupyter-data-02:/workspace
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+
+volumes:
+  jupyter-data-01:
+  jupyter-data-02:
+
+networks:
+  remotegpu-network:
+    external: true

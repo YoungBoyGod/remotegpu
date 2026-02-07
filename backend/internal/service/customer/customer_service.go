@@ -2,6 +2,7 @@ package customer
 
 import (
 	"context"
+	"errors"
 
 	"github.com/YoungBoyGod/remotegpu/internal/dao"
 	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
@@ -9,9 +10,15 @@ import (
 	"gorm.io/gorm"
 )
 
+var (
+	ErrQuotaExceeded = errors.New("已超出配额限制")
+)
+
 type CustomerService struct {
 	customerDao   *dao.CustomerDao
 	allocationDao *dao.AllocationDao
+	datasetDao    *dao.DatasetDao
+	auditDao      *dao.AuditDao
 	db            *gorm.DB
 }
 
@@ -19,6 +26,8 @@ func NewCustomerService(db *gorm.DB) *CustomerService {
 	return &CustomerService{
 		customerDao:   dao.NewCustomerDao(db),
 		allocationDao: dao.NewAllocationDao(db),
+		datasetDao:    dao.NewDatasetDao(db),
+		auditDao:      dao.NewAuditDao(db),
 		db:            db,
 	}
 }
@@ -85,8 +94,106 @@ func (s *CustomerService) GetCustomerDetail(ctx context.Context, id uint) (map[s
 		allocList = append(allocList, item)
 	}
 
+	// 获取资源使用统计
+	usage, _ := s.GetResourceUsage(ctx, id)
+
 	return map[string]interface{}{
-		"customer":    customer,
-		"allocations": allocList,
+		"customer":       customer,
+		"allocations":    allocList,
+		"resource_usage": usage,
 	}, nil
+}
+
+// ResourceUsage 客户资源使用统计
+type ResourceUsage struct {
+	AllocatedMachines int64 `json:"allocated_machines"` // 已分配机器数
+	AllocatedGPUs     int64 `json:"allocated_gpus"`     // 已分配 GPU 数
+	StorageUsedMB     int64 `json:"storage_used_mb"`    // 存储用量（MB）
+	DatasetCount      int64 `json:"dataset_count"`      // 数据集数量
+}
+
+// GetResourceUsage 获取客户资源使用统计
+func (s *CustomerService) GetResourceUsage(ctx context.Context, customerID uint) (*ResourceUsage, error) {
+	machineCount, err := s.allocationDao.CountActiveByCustomerID(ctx, customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	gpuCount, err := s.allocationDao.CountGPUsByCustomerID(ctx, customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	storageBytes, err := s.datasetDao.SumStorageByCustomerID(ctx, customerID)
+	if err != nil {
+		return nil, err
+	}
+
+	_, datasetCount, err := s.datasetDao.ListByCustomerID(ctx, customerID, 1, 1)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ResourceUsage{
+		AllocatedMachines: machineCount,
+		AllocatedGPUs:     gpuCount,
+		StorageUsedMB:     storageBytes / (1024 * 1024),
+		DatasetCount:      datasetCount,
+	}, nil
+}
+
+// UpdateQuota 更新客户配额
+func (s *CustomerService) UpdateQuota(ctx context.Context, customerID uint, quotaGPU int, quotaStorage int64) error {
+	_, err := s.customerDao.FindByID(ctx, customerID)
+	if err != nil {
+		return err
+	}
+	return s.customerDao.UpdateQuota(ctx, customerID, quotaGPU, quotaStorage)
+}
+
+// CheckGPUQuota 检查客户 GPU 配额是否允许新增分配
+func (s *CustomerService) CheckGPUQuota(ctx context.Context, customerID uint, additionalGPUs int64) error {
+	customer, err := s.customerDao.FindByID(ctx, customerID)
+	if err != nil {
+		return err
+	}
+
+	// quota_gpu 为 0 表示不限制
+	if customer.QuotaGPU == 0 {
+		return nil
+	}
+
+	currentGPUs, err := s.allocationDao.CountGPUsByCustomerID(ctx, customerID)
+	if err != nil {
+		return err
+	}
+
+	if currentGPUs+additionalGPUs > int64(customer.QuotaGPU) {
+		return ErrQuotaExceeded
+	}
+	return nil
+}
+
+// CheckStorageQuota 检查客户存储配额是否允许新增存储
+func (s *CustomerService) CheckStorageQuota(ctx context.Context, customerID uint, additionalMB int64) error {
+	customer, err := s.customerDao.FindByID(ctx, customerID)
+	if err != nil {
+		return err
+	}
+
+	// quota_storage 为 0 表示不限制
+	if customer.QuotaStorage == 0 {
+		return nil
+	}
+
+	currentBytes, err := s.datasetDao.SumStorageByCustomerID(ctx, customerID)
+	if err != nil {
+		return err
+	}
+
+	currentMB := currentBytes / (1024 * 1024)
+	if currentMB+additionalMB > customer.QuotaStorage {
+		return ErrQuotaExceeded
+	}
+	return nil
 }

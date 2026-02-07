@@ -149,12 +149,25 @@ const router = createRouter({
           component: () => import('@/views/admin/AgentListView.vue'),
           meta: { title: 'Agent 管理' },
         },
+        {
+          path: 'storage',
+          name: 'admin-storage',
+          component: () => import('@/views/admin/StorageView.vue'),
+          meta: { title: '存储管理' },
+        },
         // 系统设置
         {
           path: 'settings/platform',
           name: 'admin-settings-platform',
           component: () => import('@/views/admin/PlatformSettingsView.vue'),
           meta: { title: '平台配置' },
+        },
+        // 文档中心
+        {
+          path: 'documents',
+          name: 'admin-documents',
+          component: () => import('@/views/DocumentCenterView.vue'),
+          meta: { title: '文档中心' },
         },
         {
           path: ':pathMatch(.*)*',
@@ -249,12 +262,24 @@ const router = createRouter({
           meta: { title: '数据集管理' },
         },
         {
+          path: 'notifications',
+          name: 'customer-notifications',
+          component: () => import('@/views/customer/NotificationListView.vue'),
+          meta: { title: '消息通知' },
+        },
+        {
           path: ':pathMatch(.*)*',
           name: 'customer-coming-soon',
           component: () => import('@/views/ComingSoonView.vue'),
           meta: { title: '功能开发中' },
         },
       ],
+    },
+    {
+      path: '/403',
+      name: 'forbidden',
+      component: () => import('@/views/ForbiddenView.vue'),
+      meta: { requiresAuth: false },
     },
     {
       path: '/:pathMatch(.*)*',
@@ -271,9 +296,9 @@ router.beforeEach(async (to, from, next) => {
   const requiresAuth = to.meta.requiresAuth !== false
   const requiresRole = to.meta.requiresRole as string | string[] | undefined
 
-  // 未登录用户访问需要认证的页面，重定向到登录页
+  // 未登录用户访问需要认证的页面，重定向到登录页并保存来源路径
   if (requiresAuth && !authStore.isAuthenticated) {
-    next('/login')
+    next({ path: '/login', query: { redirect: to.fullPath } })
     return
   }
 
@@ -319,11 +344,7 @@ router.beforeEach(async (to, from, next) => {
     const role = authStore.user?.role
     const allowedRoles = Array.isArray(requiresRole) ? requiresRole : [requiresRole]
     if (!role || !allowedRoles.includes(role)) {
-      if (role === 'admin') {
-        next('/admin/dashboard')
-      } else {
-        next('/customer/dashboard')
-      }
+      next('/403')
       return
     }
   }

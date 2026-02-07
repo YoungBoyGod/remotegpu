@@ -78,6 +78,12 @@ export interface Machine {
   jupyter_token?: string
   vnc_url?: string
   vnc_password?: string
+  external_ip?: string
+  external_ssh_port?: number
+  external_jupyter_port?: number
+  external_vnc_port?: number
+  nginx_domain?: string
+  nginx_config_path?: string
   agent_port?: number
   start_time?: string
   end_time?: string

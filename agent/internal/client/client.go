@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/YoungBoyGod/remotegpu-agent/internal/collector"
 	"github.com/YoungBoyGod/remotegpu-agent/internal/models"
 	"github.com/google/uuid"
 )
@@ -55,7 +56,7 @@ func (c *ServerClient) doPost(url string, body []byte) (*http.Response, error) {
 	}
 	req.Header.Set("Content-Type", "application/json")
 	if c.token != "" {
-		req.Header.Set("Authorization", "Bearer "+c.token)
+		req.Header.Set("X-Agent-Token", c.token)
 	}
 	return c.httpClient.Do(req)
 }
@@ -206,11 +207,14 @@ func (c *ServerClient) ReportProgress(taskID, attemptID string, percent int, mes
 	return nil
 }
 
-// Heartbeat 上报心跳
-func (c *ServerClient) Heartbeat() error {
-	reqBody := map[string]string{
+// Heartbeat 上报心跳，可携带系统和 GPU 监控指标
+func (c *ServerClient) Heartbeat(metrics *collector.Metrics) error {
+	reqBody := map[string]interface{}{
 		"agent_id":   c.agentID,
 		"machine_id": c.machineID,
+	}
+	if metrics != nil {
+		reqBody["metrics"] = metrics
 	}
 
 	body, err := json.Marshal(reqBody)

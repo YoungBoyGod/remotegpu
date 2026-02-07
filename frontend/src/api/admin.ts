@@ -12,7 +12,7 @@ import type { SystemConfig, UpdateSystemConfigsPayload } from '@/types/systemCon
  * 获取机器列表
  */
 export function getMachineList(
-  params: PageRequest & { status?: string; region?: string; gpu_model?: string; filters?: Record<string, any> }
+  params: PageRequest & { status?: string; region?: string; gpu_model?: string; keyword?: string; filters?: Record<string, any> }
 ): Promise<ApiResponse<PageResponse<Machine>>> {
   const query: Record<string, any> = {
     page: params.page,
@@ -22,10 +22,12 @@ export function getMachineList(
   const status = params.status ?? source.status
   const region = params.region ?? source.region
   const gpuModel = params.gpu_model ?? source.gpu_model
+  const keyword = params.keyword ?? source.keyword
 
   if (status) query.status = status
   if (region) query.region = region
   if (gpuModel) query.gpu_model = gpuModel
+  if (keyword) query.keyword = keyword
 
   return request.get('/admin/machines', { params: query })
 }
@@ -55,6 +57,12 @@ export interface CreateMachinePayload {
   jupyter_token?: string
   vnc_url?: string
   vnc_password?: string
+  external_ip?: string
+  external_ssh_port?: number
+  external_jupyter_port?: number
+  external_vnc_port?: number
+  nginx_domain?: string
+  nginx_config_path?: string
 }
 
 export function addMachine(data: CreateMachinePayload): Promise<ApiResponse<Machine>> {
@@ -135,6 +143,32 @@ export function collectMachineSpec(id: string): Promise<ApiResponse<Machine>> {
   return request.post(`/admin/machines/${id}/collect`)
 }
 
+/**
+ * 获取机器使用情况
+ */
+export interface MachineUsageGPU {
+  index: number
+  name: string
+  memory_total_mb: number
+  status: string
+}
+
+export interface MachineUsage {
+  host_id: string
+  status: string
+  device_status: string
+  allocation_status: string
+  collected_at: string
+  cpu_usage: number
+  memory_usage: number
+  disk_usage: number
+  gpu_usage: MachineUsageGPU[]
+}
+
+export function getMachineUsage(id: string): Promise<ApiResponse<MachineUsage>> {
+  return request.get(`/admin/machines/${id}/usage`)
+}
+
 // ==================== 客户管理 ====================
 
 /**
@@ -206,6 +240,24 @@ export function getGPUTrend(): Promise<ApiResponse<any>> {
 }
 
 /**
+ * 获取分配记录列表
+ */
+export function getAllocationList(
+  params: PageRequest & { status?: string; keyword?: string; filters?: Record<string, any> }
+): Promise<ApiResponse<PageResponse<AllocationRecord>>> {
+  const query: Record<string, any> = {
+    page: params.page,
+    page_size: params.pageSize,
+  }
+  const source = params.filters || {}
+  const status = params.status ?? source.status
+  const keyword = params.keyword ?? source.keyword
+  if (status) query.status = status
+  if (keyword) query.keyword = keyword
+  return request.get('/admin/allocations', { params: query })
+}
+
+/**
  * 获取最近分配记录
  */
 export function getRecentAllocations(): Promise<ApiResponse<any>> {
@@ -233,6 +285,75 @@ export function acknowledgeAlert(id: number): Promise<ApiResponse<void>> {
   return request.post(`/admin/alerts/${id}/acknowledge`)
 }
 
+/**
+ * 批量确认告警
+ */
+export function batchAcknowledgeAlerts(ids: number[]): Promise<ApiResponse<void>> {
+  return request.post('/admin/alerts/batch-acknowledge', { ids })
+}
+
+// ==================== 告警规则管理 ====================
+
+export interface AlertRule {
+  id: number
+  name: string
+  metric_type: string
+  condition: string
+  threshold: number
+  severity: string
+  duration_seconds: number
+  enabled: boolean
+  description?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AlertRuleForm {
+  name: string
+  metric_type: string
+  condition: string
+  threshold: number
+  severity: string
+  duration_seconds: number
+  enabled: boolean
+  description?: string
+}
+
+/**
+ * 获取告警规则列表
+ */
+export function getAlertRuleList(params?: PageRequest): Promise<ApiResponse<PageResponse<AlertRule>>> {
+  return request.get('/admin/alert-rules', { params })
+}
+
+/**
+ * 创建告警规则
+ */
+export function createAlertRule(data: AlertRuleForm): Promise<ApiResponse<AlertRule>> {
+  return request.post('/admin/alert-rules', data)
+}
+
+/**
+ * 更新告警规则
+ */
+export function updateAlertRule(id: number, data: AlertRuleForm): Promise<ApiResponse<AlertRule>> {
+  return request.put(`/admin/alert-rules/${id}`, data)
+}
+
+/**
+ * 删除告警规则
+ */
+export function deleteAlertRule(id: number): Promise<ApiResponse<void>> {
+  return request.delete(`/admin/alert-rules/${id}`)
+}
+
+/**
+ * 启用/禁用告警规则
+ */
+export function toggleAlertRule(id: number, enabled: boolean): Promise<ApiResponse<void>> {
+  return request.post(`/admin/alert-rules/${id}/toggle`, { enabled })
+}
+
 // ==================== 镜像管理 ====================
 
 /**
@@ -249,12 +370,79 @@ export function syncImages(): Promise<ApiResponse<{ message: string }>> {
   return request.post('/admin/images/sync')
 }
 
+// ==================== 文档管理 ====================
+
+export interface DocumentItem {
+  id: number
+  title: string
+  category: string
+  file_name: string
+  file_path: string
+  file_size: number
+  content_type: string
+  uploaded_by: number
+  created_at: string
+  updated_at: string
+  uploader?: { id: number; username?: string; display_name?: string }
+}
+
+/**
+ * 获取文档列表
+ */
+export function getDocumentList(params: PageRequest & { category?: string; keyword?: string }): Promise<ApiResponse<PageResponse<DocumentItem>>> {
+  return request.get('/admin/documents', { params })
+}
+
+/**
+ * 获取文档详情
+ */
+export function getDocumentDetail(id: number): Promise<ApiResponse<DocumentItem>> {
+  return request.get(`/admin/documents/${id}`)
+}
+
+/**
+ * 上传文档（multipart/form-data）
+ */
+export function uploadDocument(data: FormData): Promise<ApiResponse<DocumentItem>> {
+  return request.post('/admin/documents', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
+}
+
+/**
+ * 更新文档信息
+ */
+export function updateDocument(id: number, data: { title?: string; category?: string }): Promise<ApiResponse<void>> {
+  return request.put(`/admin/documents/${id}`, data)
+}
+
+/**
+ * 删除文档
+ */
+export function deleteDocument(id: number): Promise<ApiResponse<void>> {
+  return request.delete(`/admin/documents/${id}`)
+}
+
+/**
+ * 获取文档分类列表
+ */
+export function getDocumentCategories(): Promise<ApiResponse<string[]>> {
+  return request.get('/admin/documents/categories')
+}
+
+/**
+ * 获取文档下载链接
+ */
+export function getDocumentDownloadUrl(id: number): Promise<ApiResponse<{ url: string }>> {
+  return request.get(`/admin/documents/${id}/download`)
+}
+
 // ==================== 审计日志 ====================
 
 /**
  * 获取审计日志
  */
-export function getAuditLogs(params: PageRequest & { username?: string; action?: string; resource_type?: string }): Promise<ApiResponse<PageResponse<any>>> {
+export function getAuditLogs(params: PageRequest & { username?: string; action?: string; resource_type?: string; start_time?: string; end_time?: string }): Promise<ApiResponse<PageResponse<any>>> {
   return request.get('/admin/audit/logs', { params })
 }
 
@@ -369,8 +557,17 @@ export function getAgentList(): Promise<ApiResponse<AgentListResponse>> {
 /**
  * 获取所有系统配置
  */
-export function getSystemConfigs(): Promise<ApiResponse<SystemConfig[]>> {
-  return request.get('/admin/settings/configs')
+export function getSystemConfigs(group?: string): Promise<ApiResponse<SystemConfig[]>> {
+  const params: Record<string, any> = {}
+  if (group) params.group = group
+  return request.get('/admin/settings/configs', { params })
+}
+
+/**
+ * 获取配置分组列表
+ */
+export function getConfigGroups(): Promise<ApiResponse<string[]>> {
+  return request.get('/admin/settings/configs/groups')
 }
 
 /**
@@ -378,4 +575,67 @@ export function getSystemConfigs(): Promise<ApiResponse<SystemConfig[]>> {
  */
 export function updateSystemConfigs(data: UpdateSystemConfigsPayload): Promise<ApiResponse<void>> {
   return request.put('/admin/settings/configs', data)
+}
+
+// ==================== 存储管理 ====================
+
+export interface StorageBackend {
+  name: string
+  type: string
+  is_default: boolean
+}
+
+export interface StorageStats {
+  backend_name: string
+  file_count: number
+  total_size: number
+}
+
+/**
+ * 获取存储后端列表
+ */
+export function getStorageBackends(): Promise<ApiResponse<{ backends: StorageBackend[] }>> {
+  return request.get('/admin/storage/backends')
+}
+
+/**
+ * 获取存储统计
+ */
+export function getStorageStats(backend?: string): Promise<ApiResponse<StorageStats>> {
+  const params: Record<string, any> = {}
+  if (backend) params.backend = backend
+  return request.get('/admin/storage/stats', { params })
+}
+
+export interface StorageFileInfo {
+  name: string
+  size: number
+  content_type: string
+  last_modified: string
+  etag?: string
+  is_dir: boolean
+}
+
+/**
+ * 获取存储文件列表
+ */
+export function getStorageFiles(backend?: string, prefix?: string): Promise<ApiResponse<{ files: StorageFileInfo[]; total: number }>> {
+  const params: Record<string, any> = {}
+  if (backend) params.backend = backend
+  if (prefix) params.prefix = prefix
+  return request.get('/admin/storage/files', { params })
+}
+
+/**
+ * 删除存储文件
+ */
+export function deleteStorageFile(data: { backend?: string; path: string }): Promise<ApiResponse<{ message: string }>> {
+  return request.post('/admin/storage/files/delete', data)
+}
+
+/**
+ * 获取存储文件下载链接
+ */
+export function getStorageDownloadUrl(backend: string, path: string): Promise<ApiResponse<{ url: string }>> {
+  return request.get('/admin/storage/files/download-url', { params: { backend, path } })
 }

@@ -5,6 +5,9 @@ import type { AllocationRecord } from '@/types/allocation'
 import type { PageRequest } from '@/types/common'
 import DataTable from '@/components/common/DataTable.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
+
+const router = useRouter()
 
 const loading = ref(false)
 const allocations = ref<AllocationRecord[]>([])
@@ -60,31 +63,44 @@ const handleReset = () => {
 }
 
 const handleReclaim = async (allocation: AllocationRecord) => {
+  const machineName = allocation.host?.name || allocation.host_id
   try {
     await ElMessageBox.confirm(
-      `确定要回收机器 "${allocation.machineName}" 吗?`,
+      `确定要回收机器 "${machineName}" 吗？回收后客户将无法继续使用。`,
       '回收确认',
       {
-        confirmButtonText: '确定',
+        confirmButtonText: '确定回收',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
-    await reclaimMachine(allocation.id)
+    await reclaimMachine(allocation.host_id)
     ElMessage.success('回收成功')
     loadAllocations()
   } catch (error: any) {
     if (error !== 'cancel') {
-      console.error('回收机器失败:', error)
+      ElMessage.error(error?.msg || '回收机器失败')
     }
   }
+}
+
+const handleViewMachine = (allocation: AllocationRecord) => {
+  router.push(`/admin/machines/${allocation.host_id}`)
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString()
 }
 
 const getStatusType = (status: string) => {
   const statusMap: Record<string, any> = {
     active: 'success',
-    expiring: 'warning',
-    expired: 'danger'
+    pending: 'warning',
+    expired: 'danger',
+    reclaimed: 'info'
   }
   return statusMap[status] || 'info'
 }
@@ -92,8 +108,9 @@ const getStatusType = (status: string) => {
 const getStatusText = (status: string) => {
   const statusMap: Record<string, string> = {
     active: '使用中',
-    expiring: '即将到期',
-    expired: '已到期'
+    pending: '待生效',
+    expired: '已到期',
+    reclaimed: '已回收'
   }
   return statusMap[status] || status
 }
@@ -115,8 +132,9 @@ onMounted(() => {
         <el-form-item label="状态">
           <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 120px">
             <el-option label="使用中" value="active" />
-            <el-option label="即将到期" value="expiring" />
+            <el-option label="待生效" value="pending" />
             <el-option label="已到期" value="expired" />
+            <el-option label="已回收" value="reclaimed" />
           </el-select>
         </el-form-item>
         <el-form-item label="关键词">
@@ -140,12 +158,33 @@ onMounted(() => {
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
     >
-      <el-table-column prop="customerName" label="客户名称" min-width="150" />
-      <el-table-column prop="machineName" label="机器名称" min-width="150" />
-      <el-table-column prop="region" label="区域" width="120" />
-      <el-table-column prop="allocatedAt" label="分配时间" width="180" />
-      <el-table-column prop="duration" label="分配时长(天)" width="120" />
-      <el-table-column prop="expiresAt" label="到期时间" width="180" />
+      <el-table-column label="客户" min-width="150">
+        <template #default="{ row }">
+          {{ row.customer?.company || row.customer?.display_name || row.customer?.username || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="机器" min-width="150">
+        <template #default="{ row }">
+          <el-link type="primary" @click="handleViewMachine(row)">
+            {{ row.host?.name || row.host_id }}
+          </el-link>
+        </template>
+      </el-table-column>
+      <el-table-column label="区域" width="120">
+        <template #default="{ row }">
+          {{ row.host?.region || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column label="开始时间" width="180">
+        <template #default="{ row }">
+          {{ formatDateTime(row.start_time) }}
+        </template>
+      </el-table-column>
+      <el-table-column label="到期时间" width="180">
+        <template #default="{ row }">
+          {{ formatDateTime(row.end_time) }}
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="120">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)">
@@ -153,13 +192,16 @@ onMounted(() => {
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
+          <el-button link type="primary" size="small" @click="handleViewMachine(row)">
+            查看机器
+          </el-button>
           <el-button
             link
             type="danger"
             size="small"
-            :disabled="row.status === 'expired'"
+            :disabled="row.status !== 'active'"
             @click="handleReclaim(row)"
           >
             回收

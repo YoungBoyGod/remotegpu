@@ -154,10 +154,73 @@ func (c *DatasetController) Mount(ctx *gin.Context) {
 		return
 	}
 
+	// 创建挂载记录并校验路径合法性
+	mount, err := c.datasetService.MountDataset(ctx, uint(datasetID), req.MachineID, req.MountPoint, req.ReadOnly)
+	if err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	// 异步发送挂载命令到 Agent
 	if err := c.agentService.MountDataset(ctx, req.MachineID, uint(datasetID), req.MountPoint); err != nil {
 		c.Error(ctx, 500, "挂载数据集失败")
 		return
 	}
 
-	c.Success(ctx, gin.H{"message": "挂载命令已发送"})
+	c.Success(ctx, gin.H{"message": "挂载命令已发送", "mount_id": mount.ID})
+}
+
+// Unmount 卸载数据集
+func (c *DatasetController) Unmount(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	idStr := ctx.Param("id")
+	datasetID, _ := strconv.ParseUint(idStr, 10, 64)
+
+	// 验证数据集所有权
+	if err := c.datasetService.ValidateOwnership(ctx, uint(datasetID), userID.(uint)); err != nil {
+		c.Error(ctx, 403, "无权限操作该数据集")
+		return
+	}
+
+	mountIDStr := ctx.Param("mount_id")
+	mountID, err := strconv.ParseUint(mountIDStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的挂载 ID")
+		return
+	}
+
+	if err := c.datasetService.UnmountDataset(ctx, uint(mountID)); err != nil {
+		c.Error(ctx, 500, err.Error())
+		return
+	}
+	c.Success(ctx, gin.H{"message": "卸载成功"})
+}
+
+// ListMounts 获取数据集的挂载列表
+func (c *DatasetController) ListMounts(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	idStr := ctx.Param("id")
+	datasetID, _ := strconv.ParseUint(idStr, 10, 64)
+
+	if err := c.datasetService.ValidateOwnership(ctx, uint(datasetID), userID.(uint)); err != nil {
+		c.Error(ctx, 403, "无权限操作该数据集")
+		return
+	}
+
+	mounts, err := c.datasetService.ListMountsByDataset(ctx, uint(datasetID))
+	if err != nil {
+		c.Error(ctx, 500, "获取挂载列表失败")
+		return
+	}
+	c.Success(ctx, mounts)
 }

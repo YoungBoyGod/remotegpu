@@ -10,6 +10,9 @@ type Client interface {
 	// ResetSSH 重置SSH密钥
 	ResetSSH(ctx context.Context, req *ResetSSHRequest) (*Response, error)
 
+	// SyncSSHKeys 同步SSH密钥（全量覆盖 authorized_keys）
+	SyncSSHKeys(ctx context.Context, req *SyncSSHKeysRequest) (*Response, error)
+
 	// CleanupMachine 清理机器
 	CleanupMachine(ctx context.Context, req *CleanupRequest) (*Response, error)
 

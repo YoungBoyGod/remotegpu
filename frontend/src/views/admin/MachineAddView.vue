@@ -148,6 +148,43 @@ const handleCancel = () => {
           />
         </el-form-item>
 
+        <el-divider content-position="left">外映射配置（可选）</el-divider>
+
+        <el-alert
+          type="info"
+          show-icon
+          :closable="false"
+          title="配置 Nginx 反向代理或端口映射，用于外部访问 SSH、Jupyter、VNC 等服务。"
+          class="machine-tip"
+        />
+
+        <el-form-item label="外部IP/域名">
+          <el-input v-model="formData.external_ip" placeholder="可选，对外访问的IP或域名" />
+        </el-form-item>
+
+        <el-form-item label="SSH映射端口">
+          <el-input-number v-model="formData.external_ssh_port" :min="0" :max="65535" />
+          <span class="form-tip">对外暴露的SSH端口，0表示不映射</span>
+        </el-form-item>
+
+        <el-form-item label="Jupyter映射端口">
+          <el-input-number v-model="formData.external_jupyter_port" :min="0" :max="65535" />
+          <span class="form-tip">对外暴露的Jupyter端口，0表示不映射</span>
+        </el-form-item>
+
+        <el-form-item label="VNC映射端口">
+          <el-input-number v-model="formData.external_vnc_port" :min="0" :max="65535" />
+          <span class="form-tip">对外暴露的VNC端口，0表示不映射</span>
+        </el-form-item>
+
+        <el-form-item label="Nginx域名">
+          <el-input v-model="formData.nginx_domain" placeholder="可选，如 gpu-001.example.com" />
+        </el-form-item>
+
+        <el-form-item label="Nginx配置路径">
+          <el-input v-model="formData.nginx_config_path" placeholder="可选，如 /etc/nginx/conf.d/gpu-001.conf" />
+        </el-form-item>
+
         <el-form-item>
           <el-button type="primary" :loading="loading" @click="handleSubmit">
             提交
@@ -177,5 +214,11 @@ const handleCancel = () => {
 
 .machine-tip {
   margin-bottom: 16px;
+}
+
+.form-tip {
+  margin-left: 12px;
+  color: #909399;
+  font-size: 12px;
 }
 </style>

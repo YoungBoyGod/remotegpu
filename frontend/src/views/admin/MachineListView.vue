@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMachineList, deleteMachine, setMachineMaintenance, collectMachineSpec, allocateMachine, reclaimMachine, getCustomerList } from '@/api/admin'
+import { getMachineList, deleteMachine, setMachineMaintenance, collectMachineSpec, allocateMachine, reclaimMachine, getCustomerList, batchImportMachines } from '@/api/admin'
+import type { ImportMachineItem } from '@/api/admin'
 import type { Machine } from '@/types/machine'
 import type { Customer } from '@/types/customer'
 import type { PageRequest } from '@/types/common'
@@ -31,6 +32,77 @@ const allocateForm = ref({
   remark: ''
 })
 
+// 批量导入相关
+const importDialogVisible = ref(false)
+const importLoading = ref(false)
+const importText = ref('')
+const importPreview = ref<ImportMachineItem[]>([])
+const importError = ref('')
+
+// 解析批量导入文本（CSV 格式）
+const parseImportText = () => {
+  importError.value = ''
+  importPreview.value = []
+  if (!importText.value.trim()) return
+
+  const lines = importText.value.trim().split('\n').filter(l => l.trim())
+  const items: ImportMachineItem[] = []
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i]
+    if (!line) continue
+    const trimmed = line.trim()
+    // 跳过表头行
+    if (i === 0 && trimmed.includes('host_ip')) continue
+
+    const cols = trimmed.split(',').map(c => c.trim())
+    if (cols.length < 9) {
+      importError.value = `第 ${i + 1} 行格式错误：需要至少 9 列`
+      return
+    }
+
+    items.push({
+      host_ip: cols[0] ?? '',
+      ssh_port: parseInt(cols[1] ?? '') || 22,
+      region: cols[2] ?? '',
+      gpu_model: cols[3] ?? '',
+      gpu_count: parseInt(cols[4] ?? '') || 0,
+      cpu_cores: parseInt(cols[5] ?? '') || 0,
+      ram_size: parseInt(cols[6] ?? '') || 0,
+      disk_size: parseInt(cols[7] ?? '') || 0,
+      price_hourly: parseFloat(cols[8] ?? '') || 0,
+    })
+  }
+
+  importPreview.value = items
+}
+
+const handleImport = () => {
+  importDialogVisible.value = true
+  importText.value = ''
+  importPreview.value = []
+  importError.value = ''
+}
+
+const handleConfirmImport = async () => {
+  if (importPreview.value.length === 0) {
+    ElMessage.warning('请先输入并解析导入数据')
+    return
+  }
+
+  try {
+    importLoading.value = true
+    const res = await batchImportMachines({ machines: importPreview.value })
+    ElMessage.success(`成功导入 ${res.data.count} 台机器`)
+    importDialogVisible.value = false
+    loadMachines()
+  } catch (error) {
+    console.error('批量导入失败:', error)
+  } finally {
+    importLoading.value = false
+  }
+}
+
 // 计算序号
 const getRowIndex = (index: number) => {
   return (pageRequest.value.page - 1) * pageRequest.value.pageSize + index + 1
@@ -40,6 +112,7 @@ const getRowIndex = (index: number) => {
 const filters = ref({
   status: '',
   region: '',
+  gpu_model: '',
   keyword: ''
 })
 
@@ -78,6 +151,7 @@ const handleReset = () => {
   filters.value = {
     status: '',
     region: '',
+    gpu_model: '',
     keyword: ''
   }
   handleSearch()
@@ -110,7 +184,7 @@ const handleDelete = async (machine: Machine) => {
 
 const handleToggleMaintenance = async (machine: Machine) => {
   try {
-    const newStatus = machine.status !== 'maintenance'
+    const newStatus = (machine as any).allocation_status !== 'maintenance'
     await setMachineMaintenance(String(machine.id), newStatus)
     ElMessage.success(newStatus ? '已设置为维护状态' : '已取消维护状态')
     loadMachines()
@@ -140,24 +214,30 @@ const handleCollectSpec = async (machine: Machine) => {
   }
 }
 
-const getStatusType = (status: string) => {
-  const statusMap: Record<string, string> = {
-    idle: 'success',
-    allocated: 'primary',
-    offline: 'danger',
-    maintenance: 'warning'
-  }
-  return statusMap[status] || 'info'
+const getDeviceStatusType = (status?: string) => {
+  return status === 'online' ? 'success' : 'danger'
 }
 
-const getStatusText = (status: string) => {
-  const statusMap: Record<string, string> = {
+const getDeviceStatusText = (status?: string) => {
+  return status === 'online' ? '在线' : '离线'
+}
+
+const getAllocStatusType = (status?: string) => {
+  const map: Record<string, string> = {
+    idle: 'success',
+    allocated: 'warning',
+    maintenance: 'info'
+  }
+  return map[status || ''] || 'info'
+}
+
+const getAllocStatusText = (status?: string) => {
+  const map: Record<string, string> = {
     idle: '空闲',
     allocated: '已分配',
-    offline: '离线',
     maintenance: '维护中'
   }
-  return statusMap[status] || status
+  return map[status || ''] || status || '-'
 }
 
 const getCollectType = (needsCollect?: boolean) => (needsCollect ? 'warning' : 'success')
@@ -260,7 +340,10 @@ onMounted(() => {
   <div class="machine-list">
     <div class="page-header">
       <h2 class="page-title">机器列表</h2>
-      <el-button type="primary" @click="handleAdd">添加机器</el-button>
+      <div class="header-actions">
+        <el-button @click="handleImport">批量导入</el-button>
+        <el-button type="primary" @click="handleAdd">添加机器</el-button>
+      </div>
     </div>
 
     <!-- 筛选栏 -->
@@ -276,6 +359,9 @@ onMounted(() => {
         </el-form-item>
         <el-form-item label="区域">
           <el-input v-model="filters.region" placeholder="请输入区域" clearable style="width: 150px" />
+        </el-form-item>
+        <el-form-item label="GPU型号">
+          <el-input v-model="filters.gpu_model" placeholder="如 A100/H100" clearable style="width: 150px" />
         </el-form-item>
         <el-form-item label="关键词">
           <el-input v-model="filters.keyword" placeholder="机器名称/IP" clearable style="width: 200px" />
@@ -298,6 +384,55 @@ onMounted(() => {
       @page-change="handlePageChange"
       @size-change="handleSizeChange"
     >
+      <el-table-column type="expand">
+        <template #default="{ row }">
+          <div class="expand-connection">
+            <div class="conn-section">
+              <span class="conn-title">SSH</span>
+              <template v-if="getSSHCommand(row)">
+                <div class="conn-row">
+                  <span class="conn-label">主机：</span>
+                  <span>{{ row.ssh_host || row.public_ip || row.ip_address || '-' }}</span>
+                </div>
+                <div class="conn-row">
+                  <span class="conn-label">端口：</span>
+                  <span>{{ row.ssh_port || 22 }}</span>
+                </div>
+                <div class="conn-row">
+                  <span class="conn-label">用户：</span>
+                  <span>{{ row.ssh_username || 'root' }}</span>
+                </div>
+                <div class="conn-row">
+                  <span class="conn-label">命令：</span>
+                  <code class="ssh-cmd">{{ getSSHCommand(row) }}</code>
+                  <el-button link :icon="CopyDocument" @click="copyToClipboard(getSSHCommand(row))" />
+                </div>
+              </template>
+              <span v-else class="conn-empty">未配置</span>
+            </div>
+            <div class="conn-section">
+              <span class="conn-title">Jupyter</span>
+              <template v-if="row.jupyter_url">
+                <div class="conn-row">
+                  <a class="conn-link" :href="row.jupyter_url" target="_blank">{{ row.jupyter_url }}</a>
+                  <el-button link :icon="CopyDocument" @click="copyToClipboard(row.jupyter_url)" />
+                </div>
+              </template>
+              <span v-else class="conn-empty">未配置</span>
+            </div>
+            <div class="conn-section">
+              <span class="conn-title">VNC</span>
+              <template v-if="row.vnc_url">
+                <div class="conn-row">
+                  <a class="conn-link" :href="row.vnc_url" target="_blank">{{ row.vnc_url }}</a>
+                  <el-button link :icon="CopyDocument" @click="copyToClipboard(row.vnc_url)" />
+                </div>
+              </template>
+              <span v-else class="conn-empty">未配置</span>
+            </div>
+          </div>
+        </template>
+      </el-table-column>
       <el-table-column label="序号" width="70" align="center">
         <template #default="{ $index }">
           {{ getRowIndex($index) }}
@@ -312,10 +447,17 @@ onMounted(() => {
         </template>
       </el-table-column>
       <el-table-column prop="region" label="区域" width="100" />
-      <el-table-column label="状态" width="100">
+      <el-table-column label="设备状态" width="100">
         <template #default="{ row }">
-          <el-tag :type="getStatusType(row.status)">
-            {{ getStatusText(row.status) }}
+          <el-tag :type="getDeviceStatusType(row.device_status)">
+            {{ getDeviceStatusText(row.device_status) }}
+          </el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="分配状态" width="100">
+        <template #default="{ row }">
+          <el-tag :type="getAllocStatusType(row.allocation_status)">
+            {{ getAllocStatusText(row.allocation_status) }}
           </el-tag>
         </template>
       </el-table-column>
@@ -356,16 +498,10 @@ onMounted(() => {
           <span v-else>-</span>
         </template>
       </el-table-column>
-      <el-table-column label="分配状态" width="120">
-        <template #default="{ row }">
-          <el-tag v-if="row.status === 'allocated'" type="warning">已分配</el-tag>
-          <el-tag v-else type="info">未分配</el-tag>
-        </template>
-      </el-table-column>
       <el-table-column label="操作" width="280" fixed="right">
         <template #default="{ row }">
           <el-button
-            v-if="row.status !== 'allocated'"
+            v-if="row.allocation_status !== 'allocated'"
             link
             type="success"
             size="small"
@@ -374,7 +510,7 @@ onMounted(() => {
             分配
           </el-button>
           <el-button
-            v-if="row.status === 'allocated'"
+            v-if="row.allocation_status === 'allocated'"
             link
             type="danger"
             size="small"
@@ -392,7 +528,7 @@ onMounted(() => {
             补采
           </el-button>
           <el-button link type="primary" size="small" @click="handleToggleMaintenance(row)">
-            {{ row.status === 'maintenance' ? '取消维护' : '设为维护' }}
+            {{ row.allocation_status === 'maintenance' ? '取消维护' : '设为维护' }}
           </el-button>
           <el-button link type="danger" size="small" @click="handleDelete(row)">
             删除
@@ -451,6 +587,60 @@ onMounted(() => {
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 批量导入弹窗 -->
+    <el-dialog
+      v-model="importDialogVisible"
+      title="批量导入机器"
+      width="700px"
+      :close-on-click-modal="false"
+    >
+      <div class="import-hint">
+        请输入 CSV 格式数据，每行一台机器，字段顺序：<br />
+        <code>host_ip, ssh_port, region, gpu_model, gpu_count, cpu_cores, ram_size, disk_size, price_hourly</code>
+      </div>
+      <el-input
+        v-model="importText"
+        type="textarea"
+        :rows="8"
+        placeholder="192.168.1.10, 22, cn-east, A100, 8, 64, 512, 2000, 50.0"
+      />
+      <div class="import-actions">
+        <el-button @click="parseImportText">解析预览</el-button>
+        <span v-if="importError" class="import-error">{{ importError }}</span>
+        <span v-else-if="importPreview.length > 0" class="import-count">
+          共解析 {{ importPreview.length }} 条记录
+        </span>
+      </div>
+      <el-table
+        v-if="importPreview.length > 0"
+        :data="importPreview"
+        border
+        max-height="250"
+        style="margin-top: 12px"
+      >
+        <el-table-column prop="host_ip" label="IP" width="140" />
+        <el-table-column prop="ssh_port" label="SSH端口" width="80" />
+        <el-table-column prop="region" label="区域" width="90" />
+        <el-table-column prop="gpu_model" label="GPU型号" width="90" />
+        <el-table-column prop="gpu_count" label="GPU数" width="70" />
+        <el-table-column prop="cpu_cores" label="CPU核" width="70" />
+        <el-table-column prop="ram_size" label="内存GB" width="80" />
+        <el-table-column prop="disk_size" label="磁盘GB" width="80" />
+        <el-table-column prop="price_hourly" label="时价" width="70" />
+      </el-table>
+      <template #footer>
+        <el-button @click="importDialogVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="importLoading"
+          :disabled="importPreview.length === 0"
+          @click="handleConfirmImport"
+        >
+          确认导入
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -489,5 +679,89 @@ onMounted(() => {
   white-space: nowrap;
   display: inline-block;
   vertical-align: middle;
+}
+
+.expand-connection {
+  display: flex;
+  gap: 32px;
+  padding: 12px 24px;
+  background: #f9fafb;
+}
+
+.conn-section {
+  flex: 1;
+}
+
+.conn-title {
+  display: block;
+  font-weight: 600;
+  font-size: 13px;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.conn-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 4px;
+}
+
+.conn-label {
+  color: #909399;
+  min-width: 40px;
+}
+
+.conn-link {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.conn-link:hover {
+  text-decoration: underline;
+}
+
+.conn-empty {
+  font-size: 13px;
+  color: #c0c4cc;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.import-hint {
+  margin-bottom: 12px;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.8;
+}
+
+.import-hint code {
+  font-size: 12px;
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 3px;
+  color: #409eff;
+}
+
+.import-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.import-error {
+  color: #f56c6c;
+  font-size: 13px;
+}
+
+.import-count {
+  color: #67c23a;
+  font-size: 13px;
 }
 </style>

@@ -3,6 +3,7 @@ package store
 import (
 	"os"
 	"testing"
+	"time"
 
 	"github.com/YoungBoyGod/remotegpu-agent/internal/models"
 )
@@ -111,5 +112,87 @@ func TestDelete(t *testing.T) {
 	_, err := st.Get("t1")
 	if err == nil {
 		t.Error("expected error after delete")
+	}
+}
+
+func TestSaveAndGetWithTimestamps(t *testing.T) {
+	st := tempStore(t)
+
+	now := time.Now().Truncate(time.Second)
+	task := &models.Task{
+		ID:        "ts1",
+		Command:   "echo ts",
+		Status:    models.TaskStatusCompleted,
+		CreatedAt: now,
+		StartedAt: now.Add(1 * time.Second),
+		EndedAt:   now.Add(5 * time.Second),
+	}
+	st.Save(task)
+
+	got, err := st.Get("ts1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.CreatedAt.Unix() != now.Unix() {
+		t.Errorf("CreatedAt 不匹配: 期望 %v，实际 %v", now, got.CreatedAt)
+	}
+	if got.StartedAt.IsZero() {
+		t.Error("StartedAt 不应为零值")
+	}
+	if got.EndedAt.IsZero() {
+		t.Error("EndedAt 不应为零值")
+	}
+}
+
+func TestSaveAndGetWithArgsAndEnv(t *testing.T) {
+	st := tempStore(t)
+
+	task := &models.Task{
+		ID:      "ae1",
+		Command: "echo",
+		Args:    []string{"arg1", "arg2", "arg3"},
+		Env:     map[string]string{"KEY1": "val1", "KEY2": "val2"},
+		Status:  models.TaskStatusPending,
+	}
+	st.Save(task)
+
+	got, err := st.Get("ae1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got.Args) != 3 || got.Args[0] != "arg1" {
+		t.Errorf("Args 反序列化不正确: %v", got.Args)
+	}
+	if len(got.Env) != 2 || got.Env["KEY1"] != "val1" {
+		t.Errorf("Env 反序列化不正确: %v", got.Env)
+	}
+}
+
+func TestSaveUpdatesExisting(t *testing.T) {
+	st := tempStore(t)
+
+	// 第一次保存
+	task := &models.Task{
+		ID:      "u1",
+		Command: "echo v1",
+		Status:  models.TaskStatusPending,
+	}
+	st.Save(task)
+
+	// 第二次保存（更新）
+	task.Status = models.TaskStatusCompleted
+	task.Stdout = "output"
+	task.ExitCode = 0
+	st.Save(task)
+
+	got, err := st.Get("u1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != models.TaskStatusCompleted {
+		t.Errorf("更新后状态应为 completed，实际为 %s", got.Status)
+	}
+	if got.Stdout != "output" {
+		t.Errorf("更新后 Stdout 应为 output，实际为 %q", got.Stdout)
 	}
 }

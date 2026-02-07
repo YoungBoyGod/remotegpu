@@ -1,0 +1,14 @@
+# 仪表板自动配置
+apiVersion: 1
+
+providers:
+  - name: "RemoteGPU"
+    orgId: 1
+    folder: "RemoteGPU"
+    type: file
+    disableDeletion: false
+    editable: true
+    updateIntervalSeconds: 30
+    options:
+      path: /etc/grafana/provisioning/dashboards
+      foldersFromFilesStructure: false

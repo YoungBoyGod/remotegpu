@@ -4,6 +4,7 @@ export interface SystemConfig {
   config_key: string
   config_value: string
   config_type: 'string' | 'integer' | 'boolean' | 'json'
+  config_group: string
   description: string
   is_public: boolean
   created_at: string

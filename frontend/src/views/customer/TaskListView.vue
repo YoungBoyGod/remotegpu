@@ -175,14 +175,13 @@ const formatDate = (value?: string | null) => {
 }
 
 const buildParams = () => {
-  const params: Record<string, any> = {
+  return {
     page: pageRequest.value.page,
     pageSize: pageRequest.value.pageSize,
+    keyword: filters.value.keyword || undefined,
+    status: filters.value.status || undefined,
+    host_id: filters.value.host_id || undefined,
   }
-  if (filters.value.keyword) params.keyword = filters.value.keyword
-  if (filters.value.status) params.status = filters.value.status
-  if (filters.value.host_id) params.host_id = filters.value.host_id
-  return params
 }
 
 const loadTasks = async () => {

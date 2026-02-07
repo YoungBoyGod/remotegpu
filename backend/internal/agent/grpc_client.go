@@ -150,6 +150,28 @@ func (c *GRPCClient) ResetSSH(ctx context.Context, req *ResetSSHRequest) (*Respo
 	}, nil
 }
 
+// SyncSSHKeys 同步SSH密钥（通过 ExecuteCommand 写入 authorized_keys）
+func (c *GRPCClient) SyncSSHKeys(ctx context.Context, req *SyncSSHKeysRequest) (*Response, error) {
+	// gRPC proto 暂未定义 SyncSSHKeys，通过 ExecuteCommand 实现
+	username := req.Username
+	if username == "" {
+		username = "root"
+	}
+	keysContent := buildAuthorizedKeysContent(req.PublicKeys)
+	cmd := fmt.Sprintf("mkdir -p /home/%s/.ssh && echo '%s' > /home/%s/.ssh/authorized_keys && chmod 600 /home/%s/.ssh/authorized_keys && chmod 700 /home/%s/.ssh",
+		username, keysContent, username, username, username)
+
+	_, err := c.ExecuteCommand(ctx, &ExecuteCommandRequest{
+		HostID:  req.HostID,
+		Command: cmd,
+		Timeout: 30,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &Response{Success: true, Message: "ssh keys synced"}, nil
+}
+
 // CleanupMachine 清理机器
 func (c *GRPCClient) CleanupMachine(ctx context.Context, req *CleanupRequest) (*Response, error) {
 	client, err := c.getClient(req.HostID)

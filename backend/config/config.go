@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"regexp"
 
 	"gopkg.in/yaml.v3"
 )
@@ -248,12 +249,27 @@ type MetricsCollectorConfig struct {
 
 var GlobalConfig *Config
 
-// LoadConfig 加载配置文件
+// expandEnvVars 展开配置内容中的 ${VAR} 环境变量引用
+var envVarPattern = regexp.MustCompile(`\$\{([^}]+)\}`)
+
+func expandEnvVars(data []byte) []byte {
+	return envVarPattern.ReplaceAllFunc(data, func(match []byte) []byte {
+		varName := string(envVarPattern.FindSubmatch(match)[1])
+		if val, ok := os.LookupEnv(varName); ok {
+			return []byte(val)
+		}
+		return match
+	})
+}
+
+// LoadConfig 加载配置文件，支持 ${ENV_VAR} 环境变量替换
 func LoadConfig(path string) error {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return fmt.Errorf("读取配置文件失败: %w", err)
 	}
+
+	data = expandEnvVars(data)
 
 	var cfg Config
 	if err := yaml.Unmarshal(data, &cfg); err != nil {

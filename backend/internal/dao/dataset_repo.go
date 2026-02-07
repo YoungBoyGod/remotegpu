@@ -50,3 +50,19 @@ func (d *DatasetDao) FindByID(ctx context.Context, id uint) (*entity.Dataset, er
 	}
 	return &dataset, nil
 }
+
+// SumStorageByCustomerID 统计客户数据集总存储用量（字节）
+func (d *DatasetDao) SumStorageByCustomerID(ctx context.Context, customerID uint) (int64, error) {
+	var total *int64
+	err := d.db.WithContext(ctx).Model(&entity.Dataset{}).
+		Where("customer_id = ? AND status != ?", customerID, "deleted").
+		Select("COALESCE(SUM(total_size), 0)").
+		Scan(&total).Error
+	if err != nil {
+		return 0, err
+	}
+	if total == nil {
+		return 0, nil
+	}
+	return *total, nil
+}

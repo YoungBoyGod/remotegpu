@@ -146,6 +146,12 @@ func (c *MachineController) Create(ctx *gin.Context) {
 		JupyterToken: req.JupyterToken,
 		VNCURL:       req.VNCURL,
 		VNCPassword:  req.VNCPassword,
+		ExternalIP:          req.ExternalIP,
+		ExternalSSHPort:     req.ExternalSSHPort,
+		ExternalJupyterPort: req.ExternalJupyterPort,
+		ExternalVNCPort:     req.ExternalVNCPort,
+		NginxDomain:         req.NginxDomain,
+		NginxConfigPath:     req.NginxConfigPath,
 		Status:           "offline",
 		DeviceStatus:     "offline",
 		AllocationStatus: "idle",
@@ -411,6 +417,25 @@ func (c *MachineController) Update(ctx *gin.Context) {
 	if req.VNCPassword != "" {
 		fields["vnc_password"] = req.VNCPassword
 	}
+	// 外映射配置字段
+	if req.ExternalIP != "" {
+		fields["external_ip"] = req.ExternalIP
+	}
+	if req.ExternalSSHPort > 0 {
+		fields["external_ssh_port"] = req.ExternalSSHPort
+	}
+	if req.ExternalJupyterPort > 0 {
+		fields["external_jupyter_port"] = req.ExternalJupyterPort
+	}
+	if req.ExternalVNCPort > 0 {
+		fields["external_vnc_port"] = req.ExternalVNCPort
+	}
+	if req.NginxDomain != "" {
+		fields["nginx_domain"] = req.NginxDomain
+	}
+	if req.NginxConfigPath != "" {
+		fields["nginx_config_path"] = req.NginxConfigPath
+	}
 
 	if len(fields) == 0 {
 		c.Error(ctx, 400, "No fields to update")
@@ -492,4 +517,58 @@ func (c *MachineController) Usage(ctx *gin.Context) {
 		return
 	}
 	c.Success(ctx, usage)
+}
+
+// BatchSetMaintenance 批量启用/禁用机器（设置维护状态）
+func (c *MachineController) BatchSetMaintenance(ctx *gin.Context) {
+	var req apiV1.BatchSetMaintenanceRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	affected, err := c.machineService.BatchSetMaintenance(ctx, req.HostIDs, req.Maintenance)
+	if err != nil {
+		c.Error(ctx, 500, "批量操作失败: "+err.Error())
+		return
+	}
+
+	c.Success(ctx, gin.H{
+		"affected": affected,
+		"total":    len(req.HostIDs),
+	})
+}
+
+// BatchAllocate 批量分配机器给客户
+func (c *MachineController) BatchAllocate(ctx *gin.Context) {
+	var req apiV1.BatchAllocateRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	result, err := c.allocationService.BatchAllocate(ctx, req.HostIDs, req.CustomerID, req.DurationMonths, req.Remark)
+	if err != nil {
+		c.Error(ctx, 500, "批量分配失败: "+err.Error())
+		return
+	}
+
+	c.Success(ctx, result)
+}
+
+// BatchReclaim 批量回收机器
+func (c *MachineController) BatchReclaim(ctx *gin.Context) {
+	var req apiV1.BatchReclaimRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	result, err := c.allocationService.BatchReclaim(ctx, req.HostIDs)
+	if err != nil {
+		c.Error(ctx, 500, "批量回收失败: "+err.Error())
+		return
+	}
+
+	c.Success(ctx, result)
 }

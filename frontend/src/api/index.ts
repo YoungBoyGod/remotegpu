@@ -2,27 +2,18 @@
  * API 统一导出
  *
  * 使用方式：
- * import { authApi, environmentApi, cmdbApi } from '@/api'
- *
- * 或者：
- * import * as api from '@/api'
+ * import { authApi, adminApi, customerApi } from '@/api'
  */
 
-// 导出所有模块
+// 导出业务模块
 export * as authApi from './auth'
-export * as cmdbApi from './cmdb'
+export * as adminApi from './admin'
+export * as customerApi from './customer'
+export * as hostApi from './host'
 export * as environmentApi from './environment'
-export * as schedulerApi from './scheduler'
-export * as storageApi from './storage'
-export * as imageApi from './image'
-export * as billingApi from './billing'
-export * as monitoringApi from './monitoring'
-export * as artifactApi from './artifact'
-export * as issueApi from './issue'
-export * as requirementApi from './requirement'
-export * as notificationApi from './notification'
-export * as webhookApi from './webhook'
+export * as workspaceApi from './workspace'
+export * as quotaApi from './quota'
 
-// 导出公共模块
+// 导出公共类型
 export * from './common/types'
 export { default as request } from '@/utils/request'

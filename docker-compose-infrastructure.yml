@@ -1,3 +1,11 @@
+# ⚠️ 已废弃 — 请勿使用此文件
+# 此文件与 docker-compose/ 下的独立服务配置存在版本和端口冲突：
+#   - Redis: 此处 redis:7-alpine 无密码，独立配置为 redis:8.4.0-alpine 有密码
+#   - Prometheus: 此处端口 9090，独立配置为 19090
+#   - Grafana: 此处端口 3000 密码 admin123，独立配置为 13000 密码通过 .env
+# 请使用 docker-compose/ 目录下各服务的独立 docker-compose.yml
+# 启动脚本: docker-compose/start-all.sh
+
 version: '3.8'
 
 services:

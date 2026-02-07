@@ -19,8 +19,14 @@ const tokenBlacklistPrefix = "auth:token:blacklist:"
 func Auth(db *gorm.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// CodeX 2026-02-04: enforce account status check with DB when available.
-		// 从 Header 获取 token
+		// 从 Header 获取 token，SSE 等场景回退到 query 参数
 		authHeader := c.GetHeader("Authorization")
+		if authHeader == "" {
+			// 支持 SSE 连接通过 query 参数传递 token
+			if token := c.Query("token"); token != "" {
+				authHeader = "Bearer " + token
+			}
+		}
 		if authHeader == "" {
 			response.Error(c, http.StatusUnauthorized, "请提供认证令牌")
 			c.Abort()

@@ -104,3 +104,22 @@ func (d *AllocationDao) FindActiveByCustomerID(ctx context.Context, customerID u
 
 	return allocations, total, err
 }
+
+// CountActiveByCustomerID 统计客户活跃分配数量
+func (d *AllocationDao) CountActiveByCustomerID(ctx context.Context, customerID uint) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&entity.Allocation{}).
+		Where("customer_id = ? AND status = ?", customerID, "active").
+		Count(&count).Error
+	return count, err
+}
+
+// CountGPUsByCustomerID 统计客户已分配的 GPU 数量（通过活跃分配关联的主机上的 GPU）
+func (d *AllocationDao) CountGPUsByCustomerID(ctx context.Context, customerID uint) (int64, error) {
+	var count int64
+	err := d.db.WithContext(ctx).Model(&entity.GPU{}).
+		Joins("JOIN allocations ON allocations.host_id = gpus.host_id").
+		Where("allocations.customer_id = ? AND allocations.status = ?", customerID, "active").
+		Count(&count).Error
+	return count, err
+}

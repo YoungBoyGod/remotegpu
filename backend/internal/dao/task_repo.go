@@ -140,7 +140,7 @@ func (d *TaskDao) RenewLease(ctx context.Context, id, agentID, attemptID string,
 }
 
 // CompleteTask 完成任务
-func (d *TaskDao) CompleteTask(ctx context.Context, id, agentID, attemptID string, exitCode int, errMsg string) error {
+func (d *TaskDao) CompleteTask(ctx context.Context, id, agentID, attemptID string, exitCode int, errMsg, stdout, stderr string) error {
 	now := time.Now()
 	status := "completed"
 	if exitCode != 0 {
@@ -153,7 +153,24 @@ func (d *TaskDao) CompleteTask(ctx context.Context, id, agentID, attemptID strin
 			"status":    status,
 			"exit_code": exitCode,
 			"error_msg": errMsg,
+			"stdout":    stdout,
+			"stderr":    stderr,
 			"ended_at":  now,
+		})
+
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return result.Error
+}
+
+// UpdateProgress 更新任务进度
+func (d *TaskDao) UpdateProgress(ctx context.Context, id, agentID, attemptID string, percent int, message string) error {
+	result := d.db.WithContext(ctx).Model(&entity.Task{}).
+		Where("id = ? AND assigned_agent_id = ? AND attempt_id = ? AND status = ?", id, agentID, attemptID, "running").
+		Updates(map[string]any{
+			"progress":         percent,
+			"progress_message": message,
 		})
 
 	if result.RowsAffected == 0 {

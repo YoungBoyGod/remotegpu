@@ -70,3 +70,30 @@ func (d *ImageDao) Update(ctx context.Context, img *entity.Image) error {
 func (d *ImageDao) Delete(ctx context.Context, id uint) error {
 	return d.db.WithContext(ctx).Delete(&entity.Image{}, id).Error
 }
+
+// FindByName 按镜像名称查找（用于同步去重）
+func (d *ImageDao) FindByName(ctx context.Context, name string) (*entity.Image, error) {
+	var img entity.Image
+	if err := d.db.WithContext(ctx).Where("name = ?", name).First(&img).Error; err != nil {
+		return nil, err
+	}
+	return &img, nil
+}
+
+// ListExistingNames 批量查询已存在的镜像名称（用于同步去重）
+func (d *ImageDao) ListExistingNames(ctx context.Context, names []string) (map[string]bool, error) {
+	if len(names) == 0 {
+		return map[string]bool{}, nil
+	}
+	var existing []struct{ Name string }
+	if err := d.db.WithContext(ctx).Model(&entity.Image{}).
+		Select("name").Where("name IN ?", names).
+		Find(&existing).Error; err != nil {
+		return nil, err
+	}
+	result := make(map[string]bool, len(existing))
+	for _, e := range existing {
+		result[e.Name] = true
+	}
+	return result, nil
+}

@@ -5,7 +5,7 @@
 // API 响应结构
 export interface ApiResponse<T = any> {
   code: number
-  message: string
+  msg: string
   data: T
   traceId?: string
 }

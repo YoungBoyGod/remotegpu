@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/YoungBoyGod/remotegpu-agent/internal/client"
+	"github.com/YoungBoyGod/remotegpu-agent/internal/collector"
 	agentcfg "github.com/YoungBoyGod/remotegpu-agent/internal/config"
 	"github.com/YoungBoyGod/remotegpu-agent/internal/handler"
 	"github.com/YoungBoyGod/remotegpu-agent/internal/models"
@@ -83,11 +84,15 @@ func main() {
 		sy.Start()
 		slog.Info("syncer started")
 
+		// 创建指标采集器
+		metricsCollector := collector.NewCollector()
+
 		// 启动心跳定时器
 		heartbeatTicker = time.NewTicker(30 * time.Second)
 		go func() {
-			// 立即发送一次心跳
-			if err := serverClient.Heartbeat(); err != nil {
+			// 立即发送一次心跳（携带指标）
+			metrics := metricsCollector.Collect()
+			if err := serverClient.Heartbeat(metrics); err != nil {
 				slog.Error("heartbeat error", "error", err)
 			} else {
 				slog.Info("heartbeat sent")
@@ -95,7 +100,8 @@ func main() {
 
 			// 定时发送心跳
 			for range heartbeatTicker.C {
-				if err := serverClient.Heartbeat(); err != nil {
+				metrics := metricsCollector.Collect()
+				if err := serverClient.Heartbeat(metrics); err != nil {
 					slog.Error("heartbeat error", "error", err)
 				} else {
 					slog.Debug("heartbeat sent")

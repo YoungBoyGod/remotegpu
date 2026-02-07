@@ -172,6 +172,28 @@ func (s *AgentService) CleanupMachine(ctx context.Context, hostID string) error 
 	return err
 }
 
+// SyncSSHKeys 同步客户SSH密钥到指定机器
+func (s *AgentService) SyncSSHKeys(ctx context.Context, hostID string, publicKeys []string, username string) error {
+	addr, err := s.getHostAddress(ctx, hostID)
+	if err != nil {
+		return err
+	}
+
+	if httpClient, ok := s.client.(*agent.HTTPClient); ok {
+		httpClient.RegisterHost(hostID, addr)
+	}
+	if grpcClient, ok := s.client.(*agent.GRPCClient); ok {
+		grpcClient.RegisterHost(hostID, addr)
+	}
+
+	_, err = s.client.SyncSSHKeys(ctx, &agent.SyncSSHKeysRequest{
+		HostID:     hostID,
+		PublicKeys: publicKeys,
+		Username:   username,
+	})
+	return err
+}
+
 // CheckAgentHealth 检查 Agent 健康状态
 // @author Claude
 // @description 验证与指定主机上 Agent 的连接是否正常

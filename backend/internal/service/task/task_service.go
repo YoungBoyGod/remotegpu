@@ -169,10 +169,15 @@ func (s *TaskService) RenewLease(ctx context.Context, id, agentID, attemptID str
 }
 
 // CompleteTask 完成任务
-func (s *TaskService) CompleteTask(ctx context.Context, id, agentID, attemptID string, exitCode int, errMsg string) error {
-	if err := s.taskDao.CompleteTask(ctx, id, agentID, attemptID, exitCode, errMsg); err != nil {
+func (s *TaskService) CompleteTask(ctx context.Context, id, agentID, attemptID string, exitCode int, errMsg, stdout, stderr string) error {
+	if err := s.taskDao.CompleteTask(ctx, id, agentID, attemptID, exitCode, errMsg, stdout, stderr); err != nil {
 		return err
 	}
 	middleware.TasksCompletedTotal.Inc()
 	return nil
+}
+
+// ReportProgress 上报任务进度
+func (s *TaskService) ReportProgress(ctx context.Context, id, agentID, attemptID string, percent int, message string) error {
+	return s.taskDao.UpdateProgress(ctx, id, agentID, attemptID, percent, message)
 }

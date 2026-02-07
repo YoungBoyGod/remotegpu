@@ -67,3 +67,12 @@ func (d *CustomerDao) Count(ctx context.Context) (int64, error) {
 	err := d.db.WithContext(ctx).Model(&entity.Customer{}).Count(&count).Error
 	return count, err
 }
+
+// UpdateQuota 更新客户配额
+func (d *CustomerDao) UpdateQuota(ctx context.Context, id uint, quotaGPU int, quotaStorage int64) error {
+	return d.db.WithContext(ctx).Model(&entity.Customer{}).Where("id = ?", id).
+		Updates(map[string]interface{}{
+			"quota_gpu":     quotaGPU,
+			"quota_storage": quotaStorage,
+		}).Error
+}

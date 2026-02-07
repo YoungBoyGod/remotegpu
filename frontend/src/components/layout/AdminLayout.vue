@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminSidebar from './AdminSidebar.vue'
+import NotificationBell from '@/components/common/NotificationBell.vue'
 import { UserFilled, ArrowDown } from '@element-plus/icons-vue'
 import type { UserInfo } from '@/types/common'
 import { useAuthStore } from '@/stores/auth'
@@ -40,6 +41,9 @@ const handleLogout = async () => {
           <span class="page-title">{{ $route.meta.title || '管理后台' }}</span>
         </div>
         <div class="navbar-right">
+          <!-- 通知铃铛 -->
+          <NotificationBell />
+
           <!-- 用户信息 -->
           <el-dropdown @command="handleLogout">
             <div class="user-info">

@@ -12,6 +12,10 @@ export const useAuthStore = defineStore('auth', () => {
 
   // 计算属性
   const isAuthenticated = computed(() => !!accessToken.value)
+  const isAdmin = computed(() => user.value?.role === 'admin')
+  const isCustomer = computed(() =>
+    !!user.value?.role && ['customer', 'customer_owner', 'customer_member'].includes(user.value.role)
+  )
 
   // 登录
   const login = async (credentials: LoginRequest) => {
@@ -83,6 +87,8 @@ export const useAuthStore = defineStore('auth', () => {
     refreshToken,
     user,
     isAuthenticated,
+    isAdmin,
+    isCustomer,
     login,
     logout,
     refreshAccessToken,

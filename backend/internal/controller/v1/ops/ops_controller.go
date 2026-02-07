@@ -3,7 +3,9 @@ package ops
 import (
 	"strconv"
 
+	apiV1 "github.com/YoungBoyGod/remotegpu/api/v1"
 	"github.com/YoungBoyGod/remotegpu/internal/controller/v1/common"
+	"github.com/YoungBoyGod/remotegpu/internal/model/entity"
 	serviceOps "github.com/YoungBoyGod/remotegpu/internal/service/ops"
 	"github.com/gin-gonic/gin"
 )
@@ -182,4 +184,151 @@ func (c *AlertController) Acknowledge(ctx *gin.Context) {
 	}
 
 	c.Success(ctx, gin.H{"message": "告警已确认"})
+}
+
+// ListRules 获取告警规则列表
+func (c *AlertController) ListRules(ctx *gin.Context) {
+	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
+	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
+	severity := ctx.Query("severity")
+
+	var enabled *bool
+	if enabledStr := ctx.Query("enabled"); enabledStr != "" {
+		e := enabledStr == "true"
+		enabled = &e
+	}
+
+	rules, total, err := c.opsService.ListAlertRules(ctx, page, pageSize, severity, enabled)
+	if err != nil {
+		c.Error(ctx, 500, "获取告警规则列表失败")
+		return
+	}
+
+	c.Success(ctx, gin.H{
+		"list":      rules,
+		"total":     total,
+		"page":      page,
+		"page_size": pageSize,
+	})
+}
+
+// CreateRule 创建告警规则
+func (c *AlertController) CreateRule(ctx *gin.Context) {
+	var req apiV1.CreateAlertRuleRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	rule := &entity.AlertRule{
+		Name:        req.Name,
+		Description: req.Description,
+		MetricType:  req.MetricType,
+		Threshold:   req.Threshold,
+		Condition:   req.Condition,
+		Duration:    req.Duration,
+		Severity:    req.Severity,
+		Enabled:     true,
+	}
+	if req.Severity == "" {
+		rule.Severity = "warning"
+	}
+	if req.Duration == 0 {
+		rule.Duration = 60
+	}
+	if req.Enabled != nil {
+		rule.Enabled = *req.Enabled
+	}
+
+	if err := c.opsService.CreateAlertRule(ctx, rule); err != nil {
+		c.Error(ctx, 500, "创建告警规则失败")
+		return
+	}
+	c.Success(ctx, rule)
+}
+
+// GetRule 获取告警规则详情
+func (c *AlertController) GetRule(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的规则 ID")
+		return
+	}
+
+	rule, err := c.opsService.GetAlertRule(ctx, uint(id))
+	if err != nil {
+		c.Error(ctx, 404, "告警规则不存在")
+		return
+	}
+	c.Success(ctx, rule)
+}
+
+// UpdateRule 更新告警规则
+func (c *AlertController) UpdateRule(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的规则 ID")
+		return
+	}
+
+	var req apiV1.UpdateAlertRuleRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, err.Error())
+		return
+	}
+
+	fields := make(map[string]any)
+	if req.Name != "" {
+		fields["name"] = req.Name
+	}
+	if req.Description != "" {
+		fields["description"] = req.Description
+	}
+	if req.MetricType != "" {
+		fields["metric_type"] = req.MetricType
+	}
+	if req.Threshold != nil {
+		fields["threshold"] = *req.Threshold
+	}
+	if req.Condition != "" {
+		fields["comparison"] = req.Condition
+	}
+	if req.Duration != nil {
+		fields["duration"] = *req.Duration
+	}
+	if req.Severity != "" {
+		fields["severity"] = req.Severity
+	}
+	if req.Enabled != nil {
+		fields["enabled"] = *req.Enabled
+	}
+
+	if len(fields) == 0 {
+		c.Error(ctx, 400, "没有需要更新的字段")
+		return
+	}
+
+	if err := c.opsService.UpdateAlertRule(ctx, uint(id), fields); err != nil {
+		c.Error(ctx, 500, "更新告警规则失败")
+		return
+	}
+	c.Success(ctx, gin.H{"message": "告警规则已更新"})
+}
+
+// DeleteRule 删除告警规则
+func (c *AlertController) DeleteRule(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的规则 ID")
+		return
+	}
+
+	if err := c.opsService.DeleteAlertRule(ctx, uint(id)); err != nil {
+		c.Error(ctx, 500, "删除告警规则失败")
+		return
+	}
+	c.Success(ctx, gin.H{"message": "告警规则已删除"})
 }

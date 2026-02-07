@@ -252,6 +252,14 @@ func (d *MachineDao) ListAll(ctx context.Context) ([]entity.Host, error) {
 	return hosts, err
 }
 
+// BatchUpdateAllocationStatus 批量更新分配状态
+func (d *MachineDao) BatchUpdateAllocationStatus(ctx context.Context, ids []string, allocationStatus string) (int64, error) {
+	result := d.db.WithContext(ctx).Model(&entity.Host{}).
+		Where("id IN ?", ids).
+		Update("allocation_status", allocationStatus)
+	return result.RowsAffected, result.Error
+}
+
 // ListOnline 获取所有在线的机器
 func (d *MachineDao) ListOnline(ctx context.Context) ([]entity.Host, error) {
 	var hosts []entity.Host

@@ -23,9 +23,17 @@ type Host struct {
 
 	// Jupyter & VNC
 	JupyterURL   string `gorm:"column:jupyter_url;type:varchar(255)" json:"jupyter_url"`
-	JupyterToken string `gorm:"column:jupyter_token;type:varchar(255)" json:"jupyter_token"`
+	JupyterToken string `gorm:"column:jupyter_token;type:varchar(255)" json:"-"`
 	VNCURL       string `gorm:"column:vnc_url;type:varchar(255)" json:"vnc_url"`
-	VNCPassword  string `gorm:"column:vnc_password;type:varchar(255)" json:"vnc_password"`
+	VNCPassword  string `gorm:"column:vnc_password;type:varchar(255)" json:"-"`
+
+	// 外映射配置（Nginx/端口映射）
+	ExternalIP          string `gorm:"type:varchar(64)" json:"external_ip"`
+	ExternalSSHPort     int    `gorm:"default:0" json:"external_ssh_port"`
+	ExternalJupyterPort int    `gorm:"default:0" json:"external_jupyter_port"`
+	ExternalVNCPort     int    `gorm:"default:0" json:"external_vnc_port"`
+	NginxDomain         string `gorm:"type:varchar(255)" json:"nginx_domain"`
+	NginxConfigPath     string `gorm:"type:varchar(500)" json:"nginx_config_path"`
 
 	// Specs
 	OSType        string `gorm:"type:varchar(20);default:'linux'" json:"os_type"`

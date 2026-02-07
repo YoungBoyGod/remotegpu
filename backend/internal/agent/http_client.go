@@ -94,6 +94,15 @@ func (c *HTTPClient) ResetSSH(ctx context.Context, req *ResetSSHRequest) (*Respo
 	return c.doRequest(ctx, http.MethodPost, url, req)
 }
 
+// SyncSSHKeys 同步SSH密钥（全量覆盖 authorized_keys）
+func (c *HTTPClient) SyncSSHKeys(ctx context.Context, req *SyncSSHKeysRequest) (*Response, error) {
+	url, err := c.getHostURL(req.HostID, "/api/v1/ssh/sync-keys")
+	if err != nil {
+		return nil, err
+	}
+	return c.doRequest(ctx, http.MethodPost, url, req)
+}
+
 // CleanupMachine 清理机器
 func (c *HTTPClient) CleanupMachine(ctx context.Context, req *CleanupRequest) (*Response, error) {
 	url, err := c.getHostURL(req.HostID, "/api/v1/machine/cleanup")

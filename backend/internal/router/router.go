@@ -26,6 +26,8 @@ import (
 	serviceSSHKey "github.com/YoungBoyGod/remotegpu/internal/service/sshkey"
 	serviceStorage "github.com/YoungBoyGod/remotegpu/internal/service/storage"
 	serviceSystemConfig "github.com/YoungBoyGod/remotegpu/internal/service/system_config"
+	serviceDocument "github.com/YoungBoyGod/remotegpu/internal/service/document"
+	serviceNotification "github.com/YoungBoyGod/remotegpu/internal/service/notification"
 	serviceTask "github.com/YoungBoyGod/remotegpu/internal/service/task"
 
 	// 控制器层
@@ -38,6 +40,9 @@ import (
 	ctrlTask "github.com/YoungBoyGod/remotegpu/internal/controller/v1/task"
 
 	ctrlAgent "github.com/YoungBoyGod/remotegpu/internal/controller/v1/agent"
+	ctrlDocument "github.com/YoungBoyGod/remotegpu/internal/controller/v1/document"
+	ctrlNotification "github.com/YoungBoyGod/remotegpu/internal/controller/v1/notification"
+	ctrlStorage "github.com/YoungBoyGod/remotegpu/internal/controller/v1/storage"
 )
 
 // agentAdapter 适配器，将 AgentService 转换为 AgentSystemInfoProvider 接口
@@ -96,6 +101,14 @@ func InitRouter(r *gin.Engine) {
 	// --- 服务层初始化 ---
 	authSvc := serviceAuth.NewAuthService(db, cache.GetCache())
 	machineSvc := serviceMachine.NewMachineService(db)
+	// 注入 Redis 设备状态缓存
+	if c := cache.GetCache(); c != nil {
+		hostStatusCache := serviceMachine.NewHostStatusCache(c)
+		machineSvc.SetStatusCache(hostStatusCache)
+		// 启动定时同步（每 5 分钟将 Redis 状态同步到 PostgreSQL）
+		syncer := serviceMachine.NewHostStatusSyncer(db, hostStatusCache, 5*time.Minute)
+		go syncer.Start(context.Background())
+	}
 	auditSvc := serviceAudit.NewAuditService(db)
 	agentSvc := serviceOps.NewAgentService(db, &config.GlobalConfig.Agent)
 	allocSvc := serviceAllocation.NewAllocationService(db, auditSvc, agentSvc)
@@ -104,6 +117,9 @@ func InitRouter(r *gin.Engine) {
 	opsSvc := serviceOps.NewOpsService(db)
 	taskSvc := serviceTask.NewTaskService(db, agentSvc)
 	datasetSvc := serviceDataset.NewDatasetService(db)
+	documentSvc := serviceDocument.NewDocumentService(db, storageMgr)
+	sseHub := serviceNotification.NewSSEHub()
+	notificationSvc := serviceNotification.NewNotificationService(db, sseHub)
 
 	// Prometheus 客户端
 	promClient := prometheus.NewClient(&prometheus.Config{
@@ -114,6 +130,7 @@ func InitRouter(r *gin.Engine) {
 	monitorSvc := serviceOps.NewMonitorService(machineSvc, cache.GetCache(), promClient)
 	storageSvc := serviceStorage.NewStorageService(storageMgr)
 	sshKeySvc := serviceSSHKey.NewSSHKeyService(db)
+	sshKeySvc.SetKeySyncer(allocSvc) // 注入密钥同步器，密钥变更时自动同步到已分配机器
 	imageSvc := serviceImage.NewImageService(db)
 	enrollmentSvc := serviceMachine.NewMachineEnrollmentService(db, machineSvc, &agentAdapter{svc: agentSvc})
 	enrollmentSvc.StartWorker(context.Background())
@@ -139,6 +156,7 @@ func InitRouter(r *gin.Engine) {
 	}
 
 	systemConfigSvc := serviceSystemConfig.NewSystemConfigService(db)
+	systemConfigSvc.SetAuditService(auditSvc) // 注入审计服务，配置变更时记录审计日志
 	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc, promClient)
 
 	// --- 控制器层初始化 ---
@@ -161,6 +179,9 @@ func InitRouter(r *gin.Engine) {
 	auditController := ctrlOps.NewAuditController(auditSvc)
 	imageController := ctrlOps.NewImageController(imageSvc)
 	systemConfigController := ctrlSystemConfig.NewSystemConfigController(systemConfigSvc)
+	documentController := ctrlDocument.NewDocumentController(documentSvc, storageSvc)
+	storageController := ctrlStorage.NewStorageController(storageSvc)
+	notificationController := ctrlNotification.NewNotificationController(notificationSvc)
 
 	// API v1 路由
 	apiV1 := r.Group("/api/v1")
@@ -169,10 +190,14 @@ func InitRouter(r *gin.Engine) {
 			c.JSON(200, gin.H{"status": "ok"})
 		})
 
+		// SSE 实时通知推送（匹配 Nginx 代理路径）
+		apiV1.GET("/notifications/stream", middleware.Auth(db), notificationController.SSE)
+
 		// 1. Auth Module
 		authGroup := apiV1.Group("/auth")
 		{
 			authGroup.POST("/login", authController.Login)
+			authGroup.POST("/admin/login", authController.AdminLogin)
 			authGroup.POST("/refresh", authController.Refresh)
 			authGroup.POST("/logout", authController.Logout)
 
@@ -205,6 +230,11 @@ func InitRouter(r *gin.Engine) {
 			adminGroup.POST("/machines/:id/maintenance", machineController.SetMaintenance)
 			adminGroup.GET("/machines/:id/usage", machineController.Usage)
 
+			// 机器批量操作
+			adminGroup.POST("/machines/batch/maintenance", machineController.BatchSetMaintenance)
+			adminGroup.POST("/machines/batch/allocate", machineController.BatchAllocate)
+			adminGroup.POST("/machines/batch/reclaim", machineController.BatchReclaim)
+
 			// 客户管理
 			adminGroup.GET("/customers", customerController.List)
 			adminGroup.GET("/customers/:id", customerController.Detail)
@@ -212,11 +242,20 @@ func InitRouter(r *gin.Engine) {
 			adminGroup.PUT("/customers/:id", customerController.Update)
 			adminGroup.POST("/customers/:id/disable", customerController.Disable)
 			adminGroup.POST("/customers/:id/enable", customerController.Enable)
+			adminGroup.PUT("/customers/:id/quota", customerController.UpdateQuota)
+			adminGroup.GET("/customers/:id/usage", customerController.ResourceUsage)
 
 			// 监控与运维
 			adminGroup.GET("/monitoring/realtime", monitorController.GetRealtime)
 			adminGroup.GET("/alerts", alertController.List)
 			adminGroup.POST("/alerts/:id/acknowledge", alertController.Acknowledge)
+
+			// 告警规则管理
+			adminGroup.GET("/alert-rules", alertController.ListRules)
+			adminGroup.GET("/alert-rules/:id", alertController.GetRule)
+			adminGroup.POST("/alert-rules", alertController.CreateRule)
+			adminGroup.PUT("/alert-rules/:id", alertController.UpdateRule)
+			adminGroup.DELETE("/alert-rules/:id", alertController.DeleteRule)
 
 			// 审计日志
 			adminGroup.GET("/audit/logs", auditController.List)
@@ -228,6 +267,11 @@ func InitRouter(r *gin.Engine) {
 			// 系统配置
 			adminGroup.GET("/settings/configs", systemConfigController.GetConfigs)
 			adminGroup.PUT("/settings/configs", systemConfigController.UpdateConfigs)
+			adminGroup.GET("/settings/configs/groups", systemConfigController.ListGroups)
+			adminGroup.GET("/settings/configs/:id", systemConfigController.GetConfig)
+			adminGroup.POST("/settings/configs", systemConfigController.CreateConfig)
+			adminGroup.PUT("/settings/configs/:id", systemConfigController.UpdateConfig)
+			adminGroup.DELETE("/settings/configs/:id", systemConfigController.DeleteConfig)
 
 			// 任务管理
 			adminGroup.GET("/tasks", adminTaskController.List)
@@ -241,6 +285,22 @@ func InitRouter(r *gin.Engine) {
 
 			// Agent 管理
 			adminGroup.GET("/agents", agentController.List)
+
+			// 文档中心
+			adminGroup.GET("/documents", documentController.List)
+			adminGroup.GET("/documents/categories", documentController.Categories)
+			adminGroup.GET("/documents/:id", documentController.Detail)
+			adminGroup.POST("/documents", documentController.Upload)
+			adminGroup.PUT("/documents/:id", documentController.Update)
+			adminGroup.DELETE("/documents/:id", documentController.Delete)
+			adminGroup.GET("/documents/:id/download", documentController.Download)
+
+			// 存储管理
+			adminGroup.GET("/storage/backends", storageController.ListBackends)
+			adminGroup.GET("/storage/stats", storageController.GetStats)
+			adminGroup.GET("/storage/files", storageController.ListFiles)
+			adminGroup.POST("/storage/files/delete", storageController.DeleteFile)
+			adminGroup.GET("/storage/files/download-url", storageController.GetDownloadURL)
 		}
 
 		// 3. Customer Module (Protected)
@@ -268,6 +328,8 @@ func InitRouter(r *gin.Engine) {
 			custGroup.POST("/datasets/init-multipart", datasetController.InitUpload)
 			custGroup.POST("/datasets/:id/complete", datasetController.CompleteUpload)
 			custGroup.POST("/datasets/:id/mount", datasetController.Mount)
+			custGroup.GET("/datasets/:id/mounts", datasetController.ListMounts)
+			custGroup.POST("/datasets/:id/mounts/:mount_id/unmount", datasetController.Unmount)
 
 			// SSH 密钥管理
 			custGroup.GET("/keys", sshKeyController.List)
@@ -278,17 +340,26 @@ func InitRouter(r *gin.Engine) {
 			custGroup.POST("/machines/enroll", enrollmentController.Create)
 			custGroup.GET("/machines/enrollments", enrollmentController.List)
 			custGroup.GET("/machines/enrollments/:id", enrollmentController.Detail)
+
+			// 通知管理
+			custGroup.GET("/notifications/sse", notificationController.SSE)
+			custGroup.GET("/notifications", notificationController.List)
+			custGroup.GET("/notifications/unread-count", notificationController.UnreadCount)
+			custGroup.POST("/notifications/:id/read", notificationController.MarkRead)
+			custGroup.POST("/notifications/read-all", notificationController.MarkAllRead)
 		}
 
 		// 4. Agent Module (Agent 专用 API，需要 Agent Token 认证)
 		agentGroup := apiV1.Group("/agent")
 		agentGroup.Use(middleware.AgentAuth())
 		{
+			agentGroup.POST("/register", agentHeartbeatController.Register)
 			agentGroup.POST("/heartbeat", agentHeartbeatController.Heartbeat)
 			agentGroup.POST("/tasks/claim", agentTaskController.ClaimTasks)
 			agentGroup.POST("/tasks/:id/start", agentTaskController.StartTask)
 			agentGroup.POST("/tasks/:id/lease/renew", agentTaskController.RenewLease)
 			agentGroup.POST("/tasks/:id/complete", agentTaskController.CompleteTask)
+			agentGroup.POST("/tasks/:id/progress", agentTaskController.ReportProgress)
 		}
 	}
 }

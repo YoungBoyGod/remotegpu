@@ -1,0 +1,71 @@
+# RemoteGPU 测试环境
+# 模拟多台 GPU 机器，支持 SSH/Jupyter 访问
+# 用法: docker-compose up -d --build
+
+services:
+  test-gpu-01:
+    build: .
+    container_name: test-gpu-01
+    hostname: gpu-node-01
+    ports:
+      - "2201:22"
+      - "8891:8888"
+      - "8901:8090"
+    environment:
+      - SSH_PASSWORD=remotegpu123
+      - JUPYTER_ENABLED=true
+      - JUPYTER_TOKEN=remotegpu
+      - JUPYTER_PORT=8888
+      - FAKE_GPU=true
+    volumes:
+      - workspace-01:/workspace
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+
+  test-gpu-02:
+    build: .
+    container_name: test-gpu-02
+    hostname: gpu-node-02
+    ports:
+      - "2202:22"
+      - "8892:8888"
+      - "8902:8090"
+    environment:
+      - SSH_PASSWORD=remotegpu123
+      - JUPYTER_ENABLED=true
+      - JUPYTER_TOKEN=remotegpu
+      - JUPYTER_PORT=8888
+      - FAKE_GPU=true
+    volumes:
+      - workspace-02:/workspace
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+
+  test-gpu-03:
+    build: .
+    container_name: test-gpu-03
+    hostname: gpu-node-03
+    ports:
+      - "2203:22"
+      - "8893:8888"
+      - "8903:8090"
+    environment:
+      - SSH_PASSWORD=remotegpu123
+      - JUPYTER_ENABLED=false
+      - FAKE_GPU=true
+    volumes:
+      - workspace-03:/workspace
+    networks:
+      - remotegpu-network
+    restart: unless-stopped
+
+volumes:
+  workspace-01:
+  workspace-02:
+  workspace-03:
+
+networks:
+  remotegpu-network:
+    external: true

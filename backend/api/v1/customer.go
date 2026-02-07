@@ -23,3 +23,9 @@ type UpdateCustomerRequest struct {
 	Phone       string `json:"phone"`
 	Role        string `json:"role"`
 }
+
+// UpdateQuotaRequest 更新客户配额请求
+type UpdateQuotaRequest struct {
+	QuotaGPU     int   `json:"quota_gpu" binding:"min=0"`      // GPU 数量配额，0 表示不限制
+	QuotaStorage int64 `json:"quota_storage" binding:"min=0"`  // 存储容量配额（MB），0 表示不限制
+}

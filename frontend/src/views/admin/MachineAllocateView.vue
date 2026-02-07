@@ -58,7 +58,7 @@ const getMachineLabel = (machine: Machine) => {
   if (machine.region) parts.push(machine.region)
   if (machine.gpuCount && machine.gpuModel) {
     parts.push(`${machine.gpuCount}x ${machine.gpuModel}`)
-  } else if (machine.gpus && machine.gpus.length > 0) {
+  } else if (machine.gpus && machine.gpus.length > 0 && machine.gpus[0]) {
     parts.push(`${machine.gpus.length}x ${machine.gpus[0].name}`)
   }
   return parts.join(' - ')
@@ -76,8 +76,8 @@ const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     loading.value = true
-    const startDate = new Date(formData.value.dateRange[0])
-    const endDate = new Date(formData.value.dateRange[1])
+    const startDate = new Date(formData.value.dateRange[0] || '')
+    const endDate = new Date(formData.value.dateRange[1] || '')
     const diffMonths = (endDate.getFullYear() - startDate.getFullYear()) * 12
       + (endDate.getMonth() - startDate.getMonth())
     const durationMonths = Math.max(diffMonths, 1)

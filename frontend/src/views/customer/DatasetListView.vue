@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Refresh, Upload } from '@element-plus/icons-vue'
+import { Refresh, Upload } from '@element-plus/icons-vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import {
   getDatasetList,
@@ -23,6 +23,9 @@ interface Dataset {
   created_at: string
   updated_at?: string
 }
+
+// 分片大小：5MB
+const CHUNK_SIZE = 5 * 1024 * 1024
 
 const datasets = ref<Dataset[]>([])
 const total = ref(0)
@@ -81,6 +84,17 @@ const statusLabel = (status: string) => {
   }
 }
 
+// 可见性标签
+const visibilityLabel = (v?: string) => {
+  const map: Record<string, string> = { private: '私有', workspace: '工作区', public: '公开' }
+  return map[v || ''] || '私有'
+}
+
+const visibilityTagType = (v?: string) => {
+  const map: Record<string, string> = { private: '', workspace: 'warning', public: 'success' }
+  return (map[v || ''] || '') as '' | 'success' | 'warning'
+}
+
 const formatDate = (value?: string) => {
   if (!value) return '-'
   return new Date(value).toLocaleString('zh-CN')
@@ -92,12 +106,24 @@ const uploadLoading = ref(false)
 const uploadFile = ref<File | null>(null)
 const uploadProgress = ref(0)
 const uploadName = ref('')
+const uploadDescription = ref('')
+const uploadAbortController = ref<AbortController | null>(null)
+
+// 上传状态文本
+const uploadStatusText = computed(() => {
+  if (!uploadLoading.value) return ''
+  if (uploadProgress.value === 0) return '初始化上传...'
+  if (uploadProgress.value < 100) return `上传中 ${uploadProgress.value}%`
+  return '完成上传...'
+})
 
 const openUploadDialog = () => {
   uploadDialogVisible.value = true
   uploadFile.value = null
   uploadProgress.value = 0
   uploadName.value = ''
+  uploadDescription.value = ''
+  uploadAbortController.value = null
 }
 
 const handleFileSelect = (file: { raw: File }) => {
@@ -106,6 +132,17 @@ const handleFileSelect = (file: { raw: File }) => {
     uploadName.value = file.raw.name.replace(/\.[^/.]+$/, '')
   }
   return false
+}
+
+// 上传单个分片到预签名 URL
+const uploadChunk = async (url: string, chunk: Blob, signal: AbortSignal): Promise<string> => {
+  const response = await fetch(url, {
+    method: 'PUT',
+    body: chunk,
+    signal,
+  })
+  // 返回 ETag 用于完成上传
+  return response.headers.get('ETag') || ''
 }
 
 const handleUpload = async () => {
@@ -120,34 +157,72 @@ const handleUpload = async () => {
 
   uploadLoading.value = true
   uploadProgress.value = 0
-  try {
-    // 初始化分片上传
-    const initRes = await initMultipartUpload({
-      filename: uploadFile.value.name,
-      size: uploadFile.value.size,
-    })
-    const { upload_id } = initRes.data
+  const abortController = new AbortController()
+  uploadAbortController.value = abortController
 
-    // 模拟上传进度（实际分片上传需要后端返回预签名 URL）
-    uploadProgress.value = 50
+  try {
+    const file = uploadFile.value
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
+
+    // 初始化分片上传，获取 upload_id 和预签名 URL 列表
+    const initRes = await initMultipartUpload({
+      filename: file.name,
+      size: file.size,
+    })
+    const { upload_id, urls } = initRes.data
+
+    if (abortController.signal.aborted) return
+
+    // 逐片上传
+    const etags: string[] = []
+    for (let i = 0; i < totalChunks; i++) {
+      if (abortController.signal.aborted) return
+
+      const start = i * CHUNK_SIZE
+      const end = Math.min(start + CHUNK_SIZE, file.size)
+      const chunk = file.slice(start, end)
+
+      // 如果后端返回了预签名 URL，使用预签名 URL 上传
+      if (urls && urls[i]) {
+        const etag = await uploadChunk(urls[i]!, chunk, abortController.signal)
+        etags.push(etag)
+      }
+
+      // 更新进度（保留 1-99 范围，0 和 100 用于初始化和完成阶段）
+      uploadProgress.value = Math.round(((i + 1) / totalChunks) * 98) + 1
+    }
+
+    if (abortController.signal.aborted) return
 
     // 完成上传
     await completeMultipartUpload(0, {
       upload_id,
       name: uploadName.value.trim(),
-      size: uploadFile.value.size,
+      size: file.size,
     })
 
     uploadProgress.value = 100
     ElMessage.success('数据集上传成功')
     uploadDialogVisible.value = false
     loadDatasets()
-  } catch (error) {
+  } catch (error: any) {
+    if (error?.name === 'AbortError') return
     ElMessage.error('上传失败')
     console.error('上传数据集失败:', error)
   } finally {
     uploadLoading.value = false
+    uploadAbortController.value = null
   }
+}
+
+// 取消上传
+const handleCancelUpload = () => {
+  if (uploadAbortController.value) {
+    uploadAbortController.value.abort()
+    uploadAbortController.value = null
+  }
+  uploadLoading.value = false
+  uploadProgress.value = 0
 }
 
 // 挂载数据集
@@ -226,6 +301,9 @@ onMounted(() => {
 
     <el-card>
       <el-table :data="datasets" v-loading="loading" stripe>
+        <template #empty>
+          <el-empty description="暂无数据集，点击上方「上传数据集」开始" />
+        </template>
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="name" label="名称" min-width="180">
           <template #default="{ row }">
@@ -243,6 +321,13 @@ onMounted(() => {
           <template #default="{ row }">
             <el-tag :type="statusTagType(row.status)" size="small">
               {{ statusLabel(row.status) }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column prop="visibility" label="可见性" width="100">
+          <template #default="{ row }">
+            <el-tag :type="visibilityTagType(row.visibility)" size="small">
+              {{ visibilityLabel(row.visibility) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -277,10 +362,13 @@ onMounted(() => {
     </el-card>
 
     <!-- 上传对话框 -->
-    <el-dialog v-model="uploadDialogVisible" title="上传数据集" width="520px" :close-on-click-modal="false">
+    <el-dialog v-model="uploadDialogVisible" title="上传数据集" width="520px" :close-on-click-modal="false" :close-on-press-escape="!uploadLoading">
       <el-form label-width="100px">
         <el-form-item label="数据集名称">
-          <el-input v-model="uploadName" placeholder="请输入数据集名称" />
+          <el-input v-model="uploadName" placeholder="请输入数据集名称" :disabled="uploadLoading" />
+        </el-form-item>
+        <el-form-item label="描述">
+          <el-input v-model="uploadDescription" type="textarea" :rows="2" placeholder="可选，简要描述数据集内容" :disabled="uploadLoading" />
         </el-form-item>
         <el-form-item label="选择文件">
           <el-upload
@@ -289,18 +377,33 @@ onMounted(() => {
             :limit="1"
             :on-change="handleFileSelect"
             :show-file-list="true"
+            :disabled="uploadLoading"
           >
             <el-icon class="el-icon--upload"><Upload /></el-icon>
             <div class="el-upload__text">拖拽文件到此处，或<em>点击上传</em></div>
+            <template #tip>
+              <div class="el-upload__tip">支持任意格式文件，大文件将自动分片上传</div>
+            </template>
           </el-upload>
+          <div v-if="uploadFile" class="file-info">
+            已选择：{{ uploadFile.name }}（{{ formatSize(uploadFile.size) }}）
+          </div>
         </el-form-item>
-        <el-form-item v-if="uploadProgress > 0" label="上传进度">
-          <el-progress :percentage="uploadProgress" :status="uploadProgress === 100 ? 'success' : undefined" />
+        <el-form-item v-if="uploadLoading || uploadProgress > 0" label="上传进度">
+          <div style="width: 100%">
+            <el-progress :percentage="uploadProgress" :status="uploadProgress === 100 ? 'success' : undefined" />
+            <div v-if="uploadStatusText" class="upload-status">{{ uploadStatusText }}</div>
+          </div>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="uploadDialogVisible = false">取消</el-button>
-        <el-button type="primary" :loading="uploadLoading" @click="handleUpload">上传</el-button>
+        <template v-if="uploadLoading">
+          <el-button type="danger" @click="handleCancelUpload">取消上传</el-button>
+        </template>
+        <template v-else>
+          <el-button @click="uploadDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleUpload">上传</el-button>
+        </template>
       </template>
     </el-dialog>
 
@@ -355,5 +458,17 @@ onMounted(() => {
   margin-top: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.file-info {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #606266;
+}
+
+.upload-status {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
 }
 </style>

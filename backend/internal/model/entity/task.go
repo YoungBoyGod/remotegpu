@@ -30,6 +30,12 @@ type Task struct {
 	Status   string `gorm:"type:varchar(20);default:'pending'" json:"status"`
 	ExitCode int    `json:"exit_code"`
 	ErrorMsg string `gorm:"type:text" json:"error_msg"`
+	Stdout   string `gorm:"type:text" json:"stdout,omitempty"`
+	Stderr   string `gorm:"type:text" json:"stderr,omitempty"`
+
+	// 进度
+	Progress        int    `gorm:"default:0" json:"progress"`
+	ProgressMessage string `gorm:"type:varchar(500)" json:"progress_message,omitempty"`
 
 	// 关联
 	MachineID string `gorm:"type:varchar(64)" json:"machine_id"`
