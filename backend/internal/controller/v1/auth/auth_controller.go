@@ -206,3 +206,44 @@ func (c *AuthController) ChangePassword(ctx *gin.Context) {
 
 	c.Success(ctx, gin.H{"message": "ok"})
 }
+
+// RequestPasswordReset 请求密码重置
+func (c *AuthController) RequestPasswordReset(ctx *gin.Context) {
+	var req apiV1.RequestPasswordResetRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, "Invalid request parameters")
+		return
+	}
+
+	token, err := c.authService.RequestPasswordReset(ctx, req.Username)
+	if err != nil {
+		if appErr := errors.GetAppError(err); appErr != nil {
+			c.Error(ctx, appErr.Code, appErr.Message)
+			return
+		}
+		c.Error(ctx, 500, "Failed to request password reset")
+		return
+	}
+
+	c.Success(ctx, gin.H{"reset_token": token})
+}
+
+// ConfirmPasswordReset 确认密码重置
+func (c *AuthController) ConfirmPasswordReset(ctx *gin.Context) {
+	var req apiV1.ConfirmPasswordResetRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, "Invalid request parameters")
+		return
+	}
+
+	if err := c.authService.ConfirmPasswordReset(ctx, req.Token, req.NewPassword); err != nil {
+		if appErr := errors.GetAppError(err); appErr != nil {
+			c.Error(ctx, appErr.Code, appErr.Message)
+			return
+		}
+		c.Error(ctx, 500, "Failed to reset password")
+		return
+	}
+
+	c.Success(ctx, gin.H{"message": "Password reset successfully"})
+}

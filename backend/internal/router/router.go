@@ -65,7 +65,7 @@ func InitRouter(r *gin.Engine) {
 
 	// Prometheus metrics 中间件和端点
 	r.Use(middleware.PrometheusMetrics())
-	r.GET("/metrics", gin.WrapH(promhttp.Handler()))
+	r.GET("/metrics", middleware.Auth(db), middleware.RequireAdmin(), gin.WrapH(promhttp.Handler()))
 
 	// 注册数据库连接池指标
 	if sqlDB, err := db.DB(); err == nil {
@@ -148,9 +148,11 @@ func InitRouter(r *gin.Engine) {
 	customerController := ctrlCustomer.NewCustomerController(custSvc)
 	monitorController := ctrlOps.NewMonitorController(monitorSvc)
 	alertController := ctrlOps.NewAlertController(opsSvc)
+	agentController := ctrlOps.NewAgentController(machineSvc)
 
 	myMachineController := ctrlCustomer.NewMyMachineController(machineSvc, agentSvc, allocSvc)
 	taskController := ctrlTask.NewTaskController(taskSvc)
+	adminTaskController := ctrlTask.NewAdminTaskController(taskSvc)
 	agentTaskController := ctrlTask.NewAgentTaskController(taskSvc)
 	agentHeartbeatController := ctrlAgent.NewHeartbeatController(machineSvc)
 	datasetController := ctrlDataset.NewDatasetController(datasetSvc, storageSvc, agentSvc, allocSvc)
@@ -177,6 +179,8 @@ func InitRouter(r *gin.Engine) {
 			// 受保护的个人资料
 			authGroup.GET("/profile", middleware.Auth(db), authController.GetProfile)
 			authGroup.POST("/password/change", middleware.Auth(db), authController.ChangePassword)
+			authGroup.POST("/password/request", authController.RequestPasswordReset)
+			authGroup.POST("/password/confirm", authController.ConfirmPasswordReset)
 		}
 
 		// 2. Admin Module (Protected + Role Check)
@@ -199,6 +203,7 @@ func InitRouter(r *gin.Engine) {
 			adminGroup.POST("/machines/:id/allocate", machineController.Allocate)
 			adminGroup.POST("/machines/:id/reclaim", machineController.Reclaim)
 			adminGroup.POST("/machines/:id/maintenance", machineController.SetMaintenance)
+			adminGroup.GET("/machines/:id/usage", machineController.Usage)
 
 			// 客户管理
 			adminGroup.GET("/customers", customerController.List)
@@ -223,6 +228,19 @@ func InitRouter(r *gin.Engine) {
 			// 系统配置
 			adminGroup.GET("/settings/configs", systemConfigController.GetConfigs)
 			adminGroup.PUT("/settings/configs", systemConfigController.UpdateConfigs)
+
+			// 任务管理
+			adminGroup.GET("/tasks", adminTaskController.List)
+			adminGroup.GET("/tasks/:id", adminTaskController.Detail)
+			adminGroup.POST("/tasks", adminTaskController.Create)
+			adminGroup.POST("/tasks/:id/stop", adminTaskController.Stop)
+			adminGroup.POST("/tasks/:id/cancel", adminTaskController.Cancel)
+			adminGroup.POST("/tasks/:id/retry", adminTaskController.Retry)
+			adminGroup.GET("/tasks/:id/logs", adminTaskController.Logs)
+			adminGroup.GET("/tasks/:id/result", adminTaskController.Result)
+
+			// Agent 管理
+			adminGroup.GET("/agents", agentController.List)
 		}
 
 		// 3. Customer Module (Protected)
@@ -240,6 +258,10 @@ func InitRouter(r *gin.Engine) {
 			custGroup.GET("/tasks/:id", taskController.Detail)
 			custGroup.POST("/tasks/training", taskController.CreateTraining)
 			custGroup.POST("/tasks/:id/stop", taskController.Stop)
+			custGroup.POST("/tasks/:id/cancel", taskController.Cancel)
+			custGroup.POST("/tasks/:id/retry", taskController.Retry)
+			custGroup.GET("/tasks/:id/logs", taskController.Logs)
+			custGroup.GET("/tasks/:id/result", taskController.Result)
 
 			// 数据集管理
 			custGroup.GET("/datasets", datasetController.List)

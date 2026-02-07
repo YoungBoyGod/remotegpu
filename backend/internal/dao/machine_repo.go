@@ -86,6 +86,12 @@ func (d *MachineDao) List(ctx context.Context, page, pageSize int, filters map[s
 	if status, ok := filters["status"]; ok && status != "" {
 		db = db.Where("status = ?", status)
 	}
+	if ds, ok := filters["device_status"]; ok && ds != "" {
+		db = db.Where("device_status = ?", ds)
+	}
+	if as, ok := filters["allocation_status"]; ok && as != "" {
+		db = db.Where("allocation_status = ?", as)
+	}
 	if region, ok := filters["region"]; ok && region != "" {
 		db = db.Where("region = ?", region)
 	}
@@ -108,17 +114,29 @@ func (d *MachineDao) UpdateStatus(ctx context.Context, id string, status string)
 	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", id).Update("status", status).Error
 }
 
+// UpdateDeviceStatus 更新设备在线状态
+func (d *MachineDao) UpdateDeviceStatus(ctx context.Context, id string, deviceStatus string) error {
+	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", id).Update("device_status", deviceStatus).Error
+}
+
+// UpdateAllocationStatus 更新分配状态
+func (d *MachineDao) UpdateAllocationStatus(ctx context.Context, id string, allocationStatus string) error {
+	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", id).Update("allocation_status", allocationStatus).Error
+}
+
 func (d *MachineDao) UpdateCollectFields(ctx context.Context, host *entity.Host) error {
 	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", host.ID).Updates(map[string]interface{}{
-		"hostname":        host.Hostname,
-		"name":            host.Name,
-		"cpu_info":        host.CPUInfo,
-		"total_cpu":       host.TotalCPU,
-		"total_memory_gb": host.TotalMemoryGB,
-		"total_disk_gb":   host.TotalDiskGB,
-		"needs_collect":   host.NeedsCollect,
-		"status":          host.Status,
-		"health_status":   host.HealthStatus,
+		"hostname":          host.Hostname,
+		"name":              host.Name,
+		"cpu_info":          host.CPUInfo,
+		"total_cpu":         host.TotalCPU,
+		"total_memory_gb":   host.TotalMemoryGB,
+		"total_disk_gb":     host.TotalDiskGB,
+		"needs_collect":     host.NeedsCollect,
+		"status":            host.Status,
+		"device_status":     host.DeviceStatus,
+		"allocation_status": host.AllocationStatus,
+		"health_status":     host.HealthStatus,
 	}).Error
 }
 
@@ -140,28 +158,55 @@ func (d *MachineDao) CountByStatus(ctx context.Context, status string) (int64, e
 }
 
 // GetStatusStats 获取各状态机器统计
-// @description 一次查询获取所有状态的机器数量统计
+// @description 一次查询获取设备状态和分配状态的机器数量统计
 // @return map[状态]数量
-// @modified 2026-02-04
 func (d *MachineDao) GetStatusStats(ctx context.Context) (map[string]int64, error) {
 	type StatusCount struct {
 		Status string
 		Count  int64
 	}
-	var results []StatusCount
 
+	stats := make(map[string]int64)
+
+	// 按设备状态统计
+	var deviceResults []StatusCount
 	err := d.db.WithContext(ctx).Model(&entity.Host{}).
-		Select("status, count(*) as count").
-		Group("status").
-		Scan(&results).Error
+		Select("device_status as status, count(*) as count").
+		Group("device_status").
+		Scan(&deviceResults).Error
 	if err != nil {
 		return nil, err
 	}
+	for _, r := range deviceResults {
+		stats["device:"+r.Status] = r.Count
+	}
 
-	stats := make(map[string]int64)
-	for _, r := range results {
+	// 按分配状态统计
+	var allocResults []StatusCount
+	err = d.db.WithContext(ctx).Model(&entity.Host{}).
+		Select("allocation_status as status, count(*) as count").
+		Group("allocation_status").
+		Scan(&allocResults).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range allocResults {
+		stats["allocation:"+r.Status] = r.Count
+	}
+
+	// 兼容旧字段
+	var legacyResults []StatusCount
+	err = d.db.WithContext(ctx).Model(&entity.Host{}).
+		Select("status, count(*) as count").
+		Group("status").
+		Scan(&legacyResults).Error
+	if err != nil {
+		return nil, err
+	}
+	for _, r := range legacyResults {
 		stats[r.Status] = r.Count
 	}
+
 	return stats, nil
 }
 
@@ -177,13 +222,13 @@ func (d *MachineDao) ListNeedCollect(ctx context.Context, limit int) ([]entity.H
 	return hosts, nil
 }
 
-// UpdateHeartbeat 更新机器心跳时间和状态
-func (d *MachineDao) UpdateHeartbeat(ctx context.Context, id string, status string) error {
+// UpdateHeartbeat 更新机器心跳时间和设备状态
+func (d *MachineDao) UpdateHeartbeat(ctx context.Context, id string, deviceStatus string) error {
 	now := time.Now()
 	return d.db.WithContext(ctx).Model(&entity.Host{}).Where("id = ?", id).
 		Updates(map[string]interface{}{
 			"last_heartbeat": now,
-			"status":         status,
+			"device_status":  deviceStatus,
 		}).Error
 }
 
@@ -197,11 +242,21 @@ func (d *MachineDao) Delete(ctx context.Context, id string) error {
 	return d.db.WithContext(ctx).Delete(&entity.Host{}, "id = ?", id).Error
 }
 
+// ListAll 获取所有机器（不分页）
+func (d *MachineDao) ListAll(ctx context.Context) ([]entity.Host, error) {
+	var hosts []entity.Host
+	err := d.db.WithContext(ctx).
+		Preload("GPUs").
+		Order("created_at desc").
+		Find(&hosts).Error
+	return hosts, err
+}
+
 // ListOnline 获取所有在线的机器
 func (d *MachineDao) ListOnline(ctx context.Context) ([]entity.Host, error) {
 	var hosts []entity.Host
 	err := d.db.WithContext(ctx).
-		Where("status IN ?", []string{"online", "idle", "allocated"}).
+		Where("device_status = ?", "online").
 		Find(&hosts).Error
 	return hosts, err
 }

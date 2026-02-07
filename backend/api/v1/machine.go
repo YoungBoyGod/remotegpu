@@ -16,26 +16,36 @@ type ReclaimRequest struct {
 
 // CreateMachineRequest 创建机器请求（基础信息 + 登录信息）
 type CreateMachineRequest struct {
-	Name        string `json:"name" binding:"required"`
-	Hostname    string `json:"hostname"`
-	Region      string `json:"region" binding:"required"`
-	IPAddress   string `json:"ip_address"`
-	PublicIP    string `json:"public_ip"`
-	SSHPort     int    `json:"ssh_port" binding:"required"`
-	SSHUsername string `json:"ssh_username" binding:"required"`
-	SSHPassword string `json:"ssh_password"`
-	SSHKey      string `json:"ssh_key"`
+	Name         string `json:"name" binding:"required"`
+	Hostname     string `json:"hostname"`
+	Region       string `json:"region" binding:"required"`
+	IPAddress    string `json:"ip_address"`
+	PublicIP     string `json:"public_ip"`
+	SSHHost      string `json:"ssh_host"`
+	SSHPort      int    `json:"ssh_port" binding:"required"`
+	SSHUsername  string `json:"ssh_username" binding:"required"`
+	SSHPassword  string `json:"ssh_password"`
+	SSHKey       string `json:"ssh_key"`
+	JupyterURL   string `json:"jupyter_url"`
+	JupyterToken string `json:"jupyter_token"`
+	VNCURL       string `json:"vnc_url"`
+	VNCPassword  string `json:"vnc_password"`
 }
 
 // UpdateMachineRequest 更新机器请求
 type UpdateMachineRequest struct {
-	Name        string `json:"name"`
-	Region      string `json:"region"`
-	PublicIP    string `json:"public_ip"`
-	SSHPort     int    `json:"ssh_port"`
-	SSHUsername string `json:"ssh_username"`
-	SSHPassword string `json:"ssh_password"`
-	SSHKey      string `json:"ssh_key"`
+	Name         string `json:"name"`
+	Region       string `json:"region"`
+	PublicIP     string `json:"public_ip"`
+	SSHHost      string `json:"ssh_host"`
+	SSHPort      int    `json:"ssh_port"`
+	SSHUsername  string `json:"ssh_username"`
+	SSHPassword  string `json:"ssh_password"`
+	SSHKey       string `json:"ssh_key"`
+	JupyterURL   string `json:"jupyter_url"`
+	JupyterToken string `json:"jupyter_token"`
+	VNCURL       string `json:"vnc_url"`
+	VNCPassword  string `json:"vnc_password"`
 }
 
 // ImportMachineItem 批量导入机器条目

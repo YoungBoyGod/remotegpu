@@ -246,12 +246,12 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 			}
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
-		if host.Status != "idle" && host.Status != "online" {
-			return errors.New(errors.ErrorMachineNotAvailable, "machine is not available for allocation, current status: "+host.Status)
+		if host.AllocationStatus != "idle" {
+			return errors.New(errors.ErrorMachineNotAvailable, "machine is not available for allocation, current allocation_status: "+host.AllocationStatus)
 		}
 
-		// 2. 更新机器状态
-		if err := machineDao.UpdateStatus(ctx, hostID, "allocated"); err != nil {
+		// 2. 更新机器分配状态
+		if err := machineDao.UpdateAllocationStatus(ctx, hostID, "allocated"); err != nil {
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
 
@@ -334,8 +334,8 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
 
-		// 3. 更新机器状态 (进入维护/清理状态)
-		if err := machineDao.UpdateStatus(ctx, hostID, "maintenance"); err != nil {
+		// 3. 更新机器分配状态为维护中
+		if err := machineDao.UpdateAllocationStatus(ctx, hostID, "maintenance"); err != nil {
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
 

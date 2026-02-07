@@ -162,6 +162,62 @@ func (d *TaskDao) CompleteTask(ctx context.Context, id, agentID, attemptID strin
 	return result.Error
 }
 
+// ListAll 管理员查询所有任务（支持分页和状态过滤）
+func (d *TaskDao) ListAll(ctx context.Context, status string, page, pageSize int) ([]entity.Task, int64, error) {
+	var tasks []entity.Task
+	var total int64
+
+	db := d.db.WithContext(ctx).Model(&entity.Task{})
+	if status != "" {
+		db = db.Where("status = ?", status)
+	}
+
+	if err := db.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	if err := db.Preload("Image").Offset((page - 1) * pageSize).Limit(pageSize).Order("created_at desc").Find(&tasks).Error; err != nil {
+		return nil, 0, err
+	}
+
+	return tasks, total, nil
+}
+
+// CancelTask 取消任务（仅限 queued/pending/assigned 状态）
+func (d *TaskDao) CancelTask(ctx context.Context, id string) error {
+	now := time.Now()
+	result := d.db.WithContext(ctx).Model(&entity.Task{}).
+		Where("id = ? AND status IN ?", id, []string{"queued", "pending", "assigned"}).
+		Updates(map[string]interface{}{
+			"status":   "cancelled",
+			"ended_at": now,
+		})
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return result.Error
+}
+
+// RetryTask 重试任务（重置状态为 queued，增加重试计数）
+func (d *TaskDao) RetryTask(ctx context.Context, id string) error {
+	result := d.db.WithContext(ctx).Model(&entity.Task{}).
+		Where("id = ? AND status IN ?", id, []string{"failed", "cancelled", "stopped"}).
+		Updates(map[string]interface{}{
+			"status":      "queued",
+			"retry_count": gorm.Expr("retry_count + 1"),
+			"exit_code":   0,
+			"error_msg":   "",
+			"ended_at":    nil,
+			"started_at":  nil,
+			"assigned_at": nil,
+			"attempt_id":  "",
+		})
+	if result.RowsAffected == 0 {
+		return gorm.ErrRecordNotFound
+	}
+	return result.Error
+}
+
 // CountRunningTasksByMachineID 统计指定机器上运行中的任务数量
 // @author Claude
 // @description 用于机器回收前检查是否有运行中的任务

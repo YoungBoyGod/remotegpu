@@ -62,18 +62,18 @@ func (m *HeartbeatMonitor) checkOfflineHosts(ctx context.Context) {
 	// 计算超时时间点
 	timeoutAt := time.Now().Add(-m.timeout)
 
-	// 查询所有在线但心跳超时的机器
+	// 查询所有设备在线但心跳超时的机器
 	var hosts []struct {
 		ID            string
 		Name          string
-		Status        string
+		DeviceStatus  string `gorm:"column:device_status"`
 		LastHeartbeat *time.Time
 	}
 
 	err = m.db.WithContext(ctx).
 		Model(&entity.Host{}).
-		Select("id, name, status, last_heartbeat").
-		Where("status IN ?", []string{"online", "idle"}).
+		Select("id, name, device_status, last_heartbeat").
+		Where("device_status = ?", "online").
 		Where("last_heartbeat IS NOT NULL AND last_heartbeat < ?", timeoutAt).
 		Find(&hosts).Error
 
@@ -88,14 +88,14 @@ func (m *HeartbeatMonitor) checkOfflineHosts(ctx context.Context) {
 
 	logger.GetLogger().Info(fmt.Sprintf("发现 %d 台心跳超时的机器", len(hosts)))
 
-	// 批量更新为 offline 状态
+	// 批量更新设备状态为 offline
 	for _, host := range hosts {
-		err := m.machineDao.UpdateStatus(ctx, host.ID, "offline")
+		err := m.machineDao.UpdateDeviceStatus(ctx, host.ID, "offline")
 		if err != nil {
-			logger.GetLogger().Error(fmt.Sprintf("更新机器 %s 状态失败: %v", host.ID, err))
+			logger.GetLogger().Error(fmt.Sprintf("更新机器 %s 设备状态失败: %v", host.ID, err))
 			continue
 		}
 
-		logger.GetLogger().Info(fmt.Sprintf("机器 %s (%s) 心跳超时，已标记为 offline", host.ID, host.Name))
+		logger.GetLogger().Info(fmt.Sprintf("机器 %s (%s) 心跳超时，device_status 已标记为 offline", host.ID, host.Name))
 	}
 }

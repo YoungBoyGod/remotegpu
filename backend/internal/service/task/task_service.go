@@ -110,6 +110,47 @@ func (s *TaskService) stopTaskProcess(ctx context.Context, task *entity.Task) er
 	return nil
 }
 
+// === Admin 专用 API ===
+
+// ListAllTasks 管理员查询所有任务
+func (s *TaskService) ListAllTasks(ctx context.Context, status string, page, pageSize int) ([]entity.Task, int64, error) {
+	return s.taskDao.ListAll(ctx, status, page, pageSize)
+}
+
+// CancelTask 取消任务
+func (s *TaskService) CancelTask(ctx context.Context, id string) error {
+	return s.taskDao.CancelTask(ctx, id)
+}
+
+// CancelTaskWithAuth 取消任务（带权限校验）
+func (s *TaskService) CancelTaskWithAuth(ctx context.Context, id string, customerID uint) error {
+	task, err := s.taskDao.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if task.CustomerID != customerID {
+		return entity.ErrUnauthorized
+	}
+	return s.taskDao.CancelTask(ctx, id)
+}
+
+// RetryTask 重试任务
+func (s *TaskService) RetryTask(ctx context.Context, id string) error {
+	return s.taskDao.RetryTask(ctx, id)
+}
+
+// RetryTaskWithAuth 重试任务（带权限校验）
+func (s *TaskService) RetryTaskWithAuth(ctx context.Context, id string, customerID uint) error {
+	task, err := s.taskDao.FindByID(ctx, id)
+	if err != nil {
+		return err
+	}
+	if task.CustomerID != customerID {
+		return entity.ErrUnauthorized
+	}
+	return s.taskDao.RetryTask(ctx, id)
+}
+
 // === Agent 专用 API ===
 
 // ClaimTasks Agent 认领任务

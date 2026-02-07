@@ -64,6 +64,17 @@ func (d *AllocationDao) FindActiveByHostAndCustomer(ctx context.Context, hostID 
 	return &allocation, nil
 }
 
+// FindAllActiveByCustomerID 查询客户所有活跃分配（带 Host 预加载，不分页）
+func (d *AllocationDao) FindAllActiveByCustomerID(ctx context.Context, customerID uint) ([]entity.Allocation, error) {
+	var allocations []entity.Allocation
+	err := d.db.WithContext(ctx).
+		Where("customer_id = ? AND status = ?", customerID, "active").
+		Preload("Host").
+		Order("created_at desc").
+		Find(&allocations).Error
+	return allocations, err
+}
+
 // FindActiveByCustomerID 根据客户ID查询活跃分配记录
 // @author Claude
 // @description 查询指定客户的所有活跃分配，用于客户端机器列表过滤

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"crypto/subtle"
 	"net/http"
 
 	"github.com/YoungBoyGod/remotegpu/config"
@@ -24,7 +25,7 @@ func AgentAuth() gin.HandlerFunc {
 			expectedToken = config.GlobalConfig.Agent.Token
 		}
 
-		if expectedToken == "" || token != expectedToken {
+		if expectedToken == "" || subtle.ConstantTimeCompare([]byte(token), []byte(expectedToken)) != 1 {
 			response.Error(c, http.StatusUnauthorized, "无效的 Agent 认证令牌")
 			c.Abort()
 			return

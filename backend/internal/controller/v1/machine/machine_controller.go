@@ -51,6 +51,12 @@ func (c *MachineController) List(ctx *gin.Context) {
 	if status := ctx.Query("status"); status != "" {
 		filters["status"] = status
 	}
+	if deviceStatus := ctx.Query("device_status"); deviceStatus != "" {
+		filters["device_status"] = deviceStatus
+	}
+	if allocationStatus := ctx.Query("allocation_status"); allocationStatus != "" {
+		filters["allocation_status"] = allocationStatus
+	}
 	if region := ctx.Query("region"); region != "" {
 		filters["region"] = region
 	}
@@ -84,12 +90,12 @@ func (c *MachineController) List(ctx *gin.Context) {
 // @Router /admin/machines/{id} [get]
 func (c *MachineController) Detail(ctx *gin.Context) {
 	hostID := ctx.Param("id")
-	host, err := c.machineService.GetHost(ctx, hostID)
+	detail, err := c.machineService.GetMachineDetail(ctx, hostID)
 	if err != nil {
 		c.Error(ctx, 404, "Machine not found")
 		return
 	}
-	c.Success(ctx, host)
+	c.Success(ctx, detail)
 }
 
 // Create 创建机器
@@ -125,17 +131,24 @@ func (c *MachineController) Create(ctx *gin.Context) {
 	}
 
 	host := entity.Host{
-		ID:          req.Hostname,
-		Name:        req.Name,
-		Hostname:    req.Hostname,
-		Region:      region,
-		IPAddress:   address,
-		PublicIP:    req.PublicIP,
-		SSHPort:     req.SSHPort,
-		SSHUsername: req.SSHUsername,
-		SSHPassword: req.SSHPassword,
-		SSHKey:      req.SSHKey,
-		Status:      "offline",
+		ID:           req.Hostname,
+		Name:         req.Name,
+		Hostname:     req.Hostname,
+		Region:       region,
+		IPAddress:    address,
+		PublicIP:     req.PublicIP,
+		SSHHost:      req.SSHHost,
+		SSHPort:      req.SSHPort,
+		SSHUsername:  req.SSHUsername,
+		SSHPassword:  req.SSHPassword,
+		SSHKey:       req.SSHKey,
+		JupyterURL:   req.JupyterURL,
+		JupyterToken: req.JupyterToken,
+		VNCURL:       req.VNCURL,
+		VNCPassword:  req.VNCPassword,
+		Status:           "offline",
+		DeviceStatus:     "offline",
+		AllocationStatus: "idle",
 	}
 	if host.ID == "" {
 		host.ID = address
@@ -234,6 +247,8 @@ func applySystemInfo(host *entity.Host, info *serviceOps.SystemInfoSnapshot) {
 	}
 	if info.Collected {
 		host.Status = "idle"
+		host.DeviceStatus = "online"
+		host.AllocationStatus = "idle"
 		host.HealthStatus = "healthy"
 	}
 }
@@ -332,7 +347,9 @@ func (c *MachineController) Import(ctx *gin.Context) {
 			TotalCPU:      m.CPUCores,
 			TotalMemoryGB: int64(m.RAMSize),
 			TotalDiskGB:   int64(m.DiskSize),
-			Status:        "idle",
+			Status:           "idle",
+			DeviceStatus:     "offline",
+			AllocationStatus: "idle",
 		})
 	}
 
@@ -367,6 +384,9 @@ func (c *MachineController) Update(ctx *gin.Context) {
 	if req.PublicIP != "" {
 		fields["public_ip"] = req.PublicIP
 	}
+	if req.SSHHost != "" {
+		fields["ssh_host"] = req.SSHHost
+	}
 	if req.SSHPort > 0 {
 		fields["ssh_port"] = req.SSHPort
 	}
@@ -378,6 +398,18 @@ func (c *MachineController) Update(ctx *gin.Context) {
 	}
 	if req.SSHKey != "" {
 		fields["ssh_key"] = req.SSHKey
+	}
+	if req.JupyterURL != "" {
+		fields["jupyter_url"] = req.JupyterURL
+	}
+	if req.JupyterToken != "" {
+		fields["jupyter_token"] = req.JupyterToken
+	}
+	if req.VNCURL != "" {
+		fields["vnc_url"] = req.VNCURL
+	}
+	if req.VNCPassword != "" {
+		fields["vnc_password"] = req.VNCPassword
 	}
 
 	if len(fields) == 0 {
@@ -438,15 +470,26 @@ func (c *MachineController) SetMaintenance(ctx *gin.Context) {
 		return
 	}
 
-	status := "idle"
+	allocationStatus := "idle"
 	if req.Maintenance {
-		status = "maintenance"
+		allocationStatus = "maintenance"
 	}
 
-	if err := c.machineService.UpdateStatus(ctx, hostID, status); err != nil {
+	if err := c.machineService.UpdateAllocationStatus(ctx, hostID, allocationStatus); err != nil {
 		c.Error(ctx, 500, err.Error())
 		return
 	}
 
 	c.Success(ctx, gin.H{"message": "Status updated"})
+}
+
+// Usage 获取机器使用情况
+func (c *MachineController) Usage(ctx *gin.Context) {
+	hostID := ctx.Param("id")
+	usage, err := c.machineService.GetMachineUsage(ctx, hostID)
+	if err != nil {
+		c.Error(ctx, 404, "Machine not found")
+		return
+	}
+	c.Success(ctx, usage)
 }

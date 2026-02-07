@@ -14,12 +14,16 @@ import (
 )
 
 type MachineService struct {
-	machineDao *dao.MachineDao
+	machineDao    *dao.MachineDao
+	hostMetricDao *dao.HostMetricDao
+	db            *gorm.DB
 }
 
 func NewMachineService(db *gorm.DB) *MachineService {
 	return &MachineService{
-		machineDao: dao.NewMachineDao(db),
+		machineDao:    dao.NewMachineDao(db),
+		hostMetricDao: dao.NewHostMetricDao(db),
+		db:            db,
 	}
 }
 
@@ -101,6 +105,8 @@ func (s *MachineService) CollectHostSpec(ctx context.Context, host *entity.Host,
 	}
 	if info.Collected {
 		host.Status = "idle"
+		host.DeviceStatus = "online"
+		host.AllocationStatus = "idle"
 		host.HealthStatus = "healthy"
 	}
 	host.NeedsCollect = false
@@ -208,15 +214,23 @@ func (s *MachineService) GetConnectionInfo(ctx context.Context, hostID string) (
 		return nil, err
 	}
 
-	// 判断使用公网 IP 还是内网 IP（例如，如果在 NAT 后面）
-	connectIP := host.PublicIP
-	if connectIP == "" {
-		connectIP = host.IPAddress
+	// SSH 连接主机优先级：ssh_host > public_ip > ip_address
+	connectHost := host.SSHHost
+	if connectHost == "" {
+		connectHost = host.PublicIP
+	}
+	if connectHost == "" {
+		connectHost = host.IPAddress
 	}
 
 	username := host.SSHUsername
 	if username == "" {
 		username = "root"
+	}
+
+	port := host.SSHPort
+	if port == 0 {
+		port = 22
 	}
 
 	// 解密 SSH 密码
@@ -228,13 +242,105 @@ func (s *MachineService) GetConnectionInfo(ctx context.Context, hostID string) (
 		}
 	}
 
+	// 生成 SSH 连接命令
+	sshCommand := fmt.Sprintf("ssh -p %d %s@%s", port, username, connectHost)
+
+	// 解密 VNC 密码
+	vncPassword := ""
+	if host.VNCPassword != "" {
+		decrypted, err := crypto.DecryptAES256GCM(host.VNCPassword)
+		if err == nil {
+			vncPassword = decrypted
+		}
+	}
+
 	return map[string]interface{}{
 		"ssh": map[string]interface{}{
 			"username": username,
-			"host":     connectIP,
-			"port":     host.SSHPort,
+			"host":     connectHost,
+			"port":     port,
 			"password": password,
 		},
+		"ssh_command": sshCommand,
+		"jupyter": map[string]interface{}{
+			"url":   host.JupyterURL,
+			"token": host.JupyterToken,
+		},
+		"vnc": map[string]interface{}{
+			"url":      host.VNCURL,
+			"password": vncPassword,
+		},
+	}, nil
+}
+
+// GetMachineDetail 获取机器详情（包含 SSH 连接信息）
+func (s *MachineService) GetMachineDetail(ctx context.Context, hostID string) (map[string]interface{}, error) {
+	host, err := s.machineDao.FindByID(ctx, hostID)
+	if err != nil {
+		return nil, err
+	}
+
+	// SSH 连接主机优先级：ssh_host > public_ip > ip_address
+	connectHost := host.SSHHost
+	if connectHost == "" {
+		connectHost = host.PublicIP
+	}
+	if connectHost == "" {
+		connectHost = host.IPAddress
+	}
+
+	username := host.SSHUsername
+	if username == "" {
+		username = "root"
+	}
+
+	port := host.SSHPort
+	if port == 0 {
+		port = 22
+	}
+
+	sshCommand := fmt.Sprintf("ssh -p %d %s@%s", port, username, connectHost)
+
+	// 解密 SSH 密码
+	password := ""
+	if host.SSHPassword != "" {
+		decrypted, err := crypto.DecryptAES256GCM(host.SSHPassword)
+		if err == nil {
+			password = decrypted
+		}
+	}
+
+	return map[string]interface{}{
+		"id":            host.ID,
+		"name":          host.Name,
+		"hostname":      host.Hostname,
+		"region":        host.Region,
+		"ip_address":    host.IPAddress,
+		"public_ip":     host.PublicIP,
+		"status":            host.Status,
+		"device_status":     host.DeviceStatus,
+		"allocation_status": host.AllocationStatus,
+		"health_status":     host.HealthStatus,
+		"os_type":       host.OSType,
+		"os_version":    host.OSVersion,
+		"cpu_info":      host.CPUInfo,
+		"total_cpu":     host.TotalCPU,
+		"total_memory_gb": host.TotalMemoryGB,
+		"total_disk_gb":   host.TotalDiskGB,
+		"ssh_host":      host.SSHHost,
+		"ssh_port":      port,
+		"ssh_username":  username,
+		"ssh_password":  password,
+		"ssh_command":   sshCommand,
+		"agent_port":    host.AgentPort,
+		"jupyter_url":   host.JupyterURL,
+		"jupyter_token": host.JupyterToken,
+		"vnc_url":       host.VNCURL,
+		"vnc_password":  host.VNCPassword,
+		"last_heartbeat": host.LastHeartbeat,
+		"created_at":    host.CreatedAt,
+		"updated_at":    host.UpdatedAt,
+		"gpus":          host.GPUs,
 	}, nil
 }
 
@@ -292,21 +398,117 @@ func (s *MachineService) DeleteMachine(ctx context.Context, hostID string) error
 	return s.machineDao.Delete(ctx, hostID)
 }
 
-// UpdateStatus 更新机器状态
+// UpdateStatus 更新机器状态（兼容旧接口）
 func (s *MachineService) UpdateStatus(ctx context.Context, hostID string, status string) error {
 	return s.machineDao.UpdateStatus(ctx, hostID, status)
 }
 
-// Heartbeat 处理 Agent 心跳上报，更新心跳时间并将非 allocated 状态的机器标记为 online
+// UpdateDeviceStatus 更新设备在线状态
+func (s *MachineService) UpdateDeviceStatus(ctx context.Context, hostID string, deviceStatus string) error {
+	return s.machineDao.UpdateDeviceStatus(ctx, hostID, deviceStatus)
+}
+
+// UpdateAllocationStatus 更新分配状态
+func (s *MachineService) UpdateAllocationStatus(ctx context.Context, hostID string, allocationStatus string) error {
+	return s.machineDao.UpdateAllocationStatus(ctx, hostID, allocationStatus)
+}
+
+// Heartbeat 处理 Agent 心跳上报，更新心跳时间和设备在线状态
 func (s *MachineService) Heartbeat(ctx context.Context, hostID string) error {
+	// 心跳只影响 device_status，不影响 allocation_status
+	return s.machineDao.UpdateHeartbeat(ctx, hostID, "online")
+}
+
+// ListAgents 获取 Agent 列表（基于 hosts 表构建 Agent 视图）
+func (s *MachineService) ListAgents(ctx context.Context) (map[string]interface{}, error) {
+	hosts, err := s.machineDao.ListAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	var online, offline int64
+	agents := make([]map[string]interface{}, 0, len(hosts))
+	for _, h := range hosts {
+		status := h.DeviceStatus
+		if status == "" {
+			status = "offline"
+		}
+		if status == "online" {
+			online++
+		} else {
+			offline++
+		}
+
+		agent := map[string]interface{}{
+			"agent_id":       h.ID,
+			"machine_id":     h.ID,
+			"machine_name":   h.Name,
+			"ip_address":     h.IPAddress,
+			"status":         status,
+			"last_heartbeat": h.LastHeartbeat,
+			"agent_port":     h.AgentPort,
+			"region":         h.Region,
+		}
+
+		// GPU 摘要
+		gpuNames := make([]string, 0, len(h.GPUs))
+		for _, gpu := range h.GPUs {
+			gpuNames = append(gpuNames, gpu.Name)
+		}
+		agent["gpu_count"] = len(h.GPUs)
+		agent["gpu_models"] = gpuNames
+
+		agents = append(agents, agent)
+	}
+
+	return map[string]interface{}{
+		"total":   len(hosts),
+		"online":  online,
+		"offline": offline,
+		"agents":  agents,
+	}, nil
+}
+
+// GetMachineUsage 获取机器使用情况
+func (s *MachineService) GetMachineUsage(ctx context.Context, hostID string) (map[string]interface{}, error) {
 	host, err := s.machineDao.FindByID(ctx, hostID)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	// 已分配的机器保持 allocated 状态不变
-	status := host.Status
-	if status != "allocated" {
-		status = "online"
+
+	result := map[string]interface{}{
+		"host_id":           host.ID,
+		"status":            host.Status,
+		"device_status":     host.DeviceStatus,
+		"allocation_status": host.AllocationStatus,
 	}
-	return s.machineDao.UpdateHeartbeat(ctx, hostID, status)
+
+	// 从 host_metrics 获取最新监控数据
+	metric, err := s.hostMetricDao.GetLatest(ctx, hostID)
+	if err == nil && metric != nil {
+		result["collected_at"] = metric.CollectedAt
+		if metric.CPUUsagePercent != nil {
+			result["cpu_usage"] = *metric.CPUUsagePercent
+		}
+		if metric.MemoryUsagePercent != nil {
+			result["memory_usage"] = *metric.MemoryUsagePercent
+		}
+		if metric.DiskUsagePercent != nil {
+			result["disk_usage"] = *metric.DiskUsagePercent
+		}
+	}
+
+	// GPU 使用情况（从 GPU 列表构建）
+	gpuUsage := make([]map[string]interface{}, 0, len(host.GPUs))
+	for _, gpu := range host.GPUs {
+		gpuUsage = append(gpuUsage, map[string]interface{}{
+			"index":           gpu.Index,
+			"name":            gpu.Name,
+			"memory_total_mb": gpu.MemoryTotalMB,
+			"status":          gpu.Status,
+		})
+	}
+	result["gpu_usage"] = gpuUsage
+
+	return result, nil
 }

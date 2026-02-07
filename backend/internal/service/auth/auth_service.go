@@ -22,6 +22,10 @@ const (
 	refreshTokenPrefix = "auth:refresh_token:"
 	// 刷新 token 过期时间 (7天)
 	refreshTokenTTL = 7 * 24 * time.Hour
+	// 密码重置 token key 前缀
+	passwordResetPrefix = "auth:password_reset:"
+	// 密码重置 token 过期时间 (30分钟)
+	passwordResetTTL = 30 * time.Minute
 )
 
 type AuthService struct {
@@ -226,4 +230,71 @@ func (s *AuthService) IsTokenBlacklisted(ctx context.Context, token string) bool
 		return false
 	}
 	return count > 0
+}
+
+// RequestPasswordReset 请求密码重置，生成重置 token
+func (s *AuthService) RequestPasswordReset(ctx context.Context, username string) (string, error) {
+	if s.cache == nil {
+		return "", errors.New(errors.ErrorServerError, "cache service not available")
+	}
+
+	customer, err := s.customerDao.FindByUsername(ctx, username)
+	if err != nil {
+		return "", errors.New(errors.ErrorUserNotFound, "user not found")
+	}
+	if customer.Status != "active" {
+		return "", errors.New(errors.ErrorUserDisabled, "account is disabled")
+	}
+
+	// 生成重置 token
+	token, err := auth.GenerateRefreshToken()
+	if err != nil {
+		return "", errors.WrapWithMessage(errors.ErrorServerError, "failed to generate reset token", err)
+	}
+
+	// 存储 token -> userID 映射
+	key := passwordResetPrefix + token
+	if err := s.cache.Set(ctx, key, customer.ID, passwordResetTTL); err != nil {
+		return "", errors.WrapWithMessage(errors.ErrorServerError, "failed to store reset token", err)
+	}
+
+	return token, nil
+}
+
+// ConfirmPasswordReset 确认密码重置
+func (s *AuthService) ConfirmPasswordReset(ctx context.Context, token, newPassword string) error {
+	if s.cache == nil {
+		return errors.New(errors.ErrorServerError, "cache service not available")
+	}
+
+	key := passwordResetPrefix + token
+	userIDStr, err := s.cache.Get(ctx, key)
+	if err != nil || userIDStr == "" {
+		return errors.New(errors.ErrorTokenInvalid, "invalid or expired reset token")
+	}
+
+	userID, err := strconv.ParseUint(userIDStr, 10, 64)
+	if err != nil {
+		return errors.New(errors.ErrorTokenInvalid, "invalid token data")
+	}
+
+	newHash, err := auth.HashPassword(newPassword)
+	if err != nil {
+		return errors.WrapWithMessage(errors.ErrorServerError, "failed to hash password", err)
+	}
+
+	err = s.db.WithContext(ctx).Model(&entity.Customer{}).
+		Where("id = ?", uint(userID)).
+		Updates(map[string]interface{}{
+			"password_hash":        newHash,
+			"must_change_password": false,
+		}).Error
+	if err != nil {
+		return errors.WrapWithMessage(errors.ErrorServerError, "failed to update password", err)
+	}
+
+	// 删除已使用的 token
+	_ = s.cache.Delete(ctx, key)
+
+	return nil
 }

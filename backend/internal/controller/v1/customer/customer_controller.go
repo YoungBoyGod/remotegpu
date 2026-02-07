@@ -76,7 +76,7 @@ func (c *CustomerController) Create(ctx *gin.Context) {
 	c.Success(ctx, customer)
 }
 
-// Detail 获取客户详情
+// Detail 获取客户详情（包含机器分配信息）
 func (c *CustomerController) Detail(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -85,12 +85,12 @@ func (c *CustomerController) Detail(ctx *gin.Context) {
 		return
 	}
 
-	customer, err := c.customerService.GetCustomer(ctx, uint(id))
+	detail, err := c.customerService.GetCustomerDetail(ctx, uint(id))
 	if err != nil {
 		c.Error(ctx, 404, "Customer not found")
 		return
 	}
-	c.Success(ctx, customer)
+	c.Success(ctx, detail)
 }
 
 // Update 更新客户信息

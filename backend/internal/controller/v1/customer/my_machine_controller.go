@@ -52,15 +52,17 @@ func (c *MyMachineController) List(ctx *gin.Context) {
 	machines := make([]any, 0, len(allocations))
 	for _, alloc := range allocations {
 		machines = append(machines, map[string]any{
-			"id":              alloc.Host.ID,
-			"hostname":        alloc.Host.Hostname,
-			"ip_address":      alloc.Host.IPAddress,
-			"public_ip":       alloc.Host.PublicIP,
-			"status":          alloc.Host.Status,
-			"total_cpu":       alloc.Host.TotalCPU,
-			"total_memory_gb": alloc.Host.TotalMemoryGB,
-			"start_time":      alloc.StartTime,
-			"end_time":        alloc.EndTime,
+			"id":                alloc.Host.ID,
+			"hostname":          alloc.Host.Hostname,
+			"ip_address":        alloc.Host.IPAddress,
+			"public_ip":         alloc.Host.PublicIP,
+			"status":            alloc.Host.Status,
+			"device_status":     alloc.Host.DeviceStatus,
+			"allocation_status": alloc.Host.AllocationStatus,
+			"total_cpu":         alloc.Host.TotalCPU,
+			"total_memory_gb":   alloc.Host.TotalMemoryGB,
+			"start_time":        alloc.StartTime,
+			"end_time":          alloc.EndTime,
 		})
 	}
 

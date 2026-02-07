@@ -24,3 +24,14 @@ type ChangePasswordRequest struct {
 	OldPassword string `json:"old_password" binding:"required"`
 	NewPassword string `json:"new_password" binding:"required"`
 }
+
+// RequestPasswordResetRequest 请求密码重置
+type RequestPasswordResetRequest struct {
+	Username string `json:"username" binding:"required"`
+}
+
+// ConfirmPasswordResetRequest 确认密码重置
+type ConfirmPasswordResetRequest struct {
+	Token       string `json:"token" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}

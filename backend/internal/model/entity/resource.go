@@ -14,11 +14,18 @@ type Host struct {
 	// Network
 	IPAddress   string `gorm:"type:varchar(64);not null" json:"ip_address"` // Internal IP
 	PublicIP    string `gorm:"type:varchar(64)" json:"public_ip"`           // External IP
+	SSHHost     string `gorm:"type:varchar(255)" json:"ssh_host"`
 	SSHPort     int    `gorm:"default:22" json:"ssh_port"`
 	AgentPort   int    `gorm:"default:8080" json:"agent_port"`
-	SSHUsername string `gorm:"type:varchar(128)" json:"ssh_username"`
+	SSHUsername string `gorm:"type:varchar(128);default:root" json:"ssh_username"`
 	SSHPassword string `gorm:"type:text" json:"-"`
 	SSHKey      string `gorm:"type:text" json:"-"`
+
+	// Jupyter & VNC
+	JupyterURL   string `gorm:"column:jupyter_url;type:varchar(255)" json:"jupyter_url"`
+	JupyterToken string `gorm:"column:jupyter_token;type:varchar(255)" json:"jupyter_token"`
+	VNCURL       string `gorm:"column:vnc_url;type:varchar(255)" json:"vnc_url"`
+	VNCPassword  string `gorm:"column:vnc_password;type:varchar(255)" json:"vnc_password"`
 
 	// Specs
 	OSType        string `gorm:"type:varchar(20);default:'linux'" json:"os_type"`
@@ -29,8 +36,10 @@ type Host struct {
 	TotalDiskGB   int64  `json:"total_disk_gb"`
 
 	// Status
-	Status         string `gorm:"type:varchar(20);default:'offline'" json:"status"` // offline, idle, allocated, maintenance
-	HealthStatus   string `gorm:"type:varchar(20);default:'unknown'" json:"health_status"`
+	Status           string `gorm:"type:varchar(20);default:'offline'" json:"status"`             // 兼容旧字段
+	DeviceStatus     string `gorm:"type:varchar(20);default:'offline'" json:"device_status"`      // online, offline
+	AllocationStatus string `gorm:"type:varchar(20);default:'idle'" json:"allocation_status"`     // idle, allocated, maintenance
+	HealthStatus     string `gorm:"type:varchar(20);default:'unknown'" json:"health_status"`
 	DeploymentMode string `gorm:"type:varchar(20);default:'traditional'" json:"deployment_mode"`
 	NeedsCollect   bool   `gorm:"default:false" json:"needs_collect"`
 

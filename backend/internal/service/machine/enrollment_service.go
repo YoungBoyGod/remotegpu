@@ -275,9 +275,11 @@ func (s *MachineEnrollmentService) processEnrollment(id uint) {
 			SSHUsername:  enrollment.SSHUsername,
 			SSHPassword:  decryptedPassword,
 			SSHKey:       decryptedKey,
-			Status:       "offline",
-			HealthStatus: "unknown",
-			NeedsCollect: true,
+			Status:           "offline",
+			DeviceStatus:     "offline",
+			AllocationStatus: "idle",
+			HealthStatus:     "unknown",
+			NeedsCollect:     true,
 		}
 		if host.Hostname == "" {
 			host.Hostname = enrollment.Address
@@ -326,8 +328,10 @@ func (s *MachineEnrollmentService) processEnrollment(id uint) {
 		SSHUsername:   enrollment.SSHUsername,
 		SSHPassword:   decryptedPassword,
 		SSHKey:        decryptedKey,
-		Status:        "idle",
-		TotalCPU:      spec.CPUCores,
+		Status:           "idle",
+		DeviceStatus:     "online",
+		AllocationStatus: "idle",
+		TotalCPU:         spec.CPUCores,
 		TotalMemoryGB: spec.MemoryGB,
 		TotalDiskGB:   spec.DiskGB,
 		HealthStatus:  "healthy",

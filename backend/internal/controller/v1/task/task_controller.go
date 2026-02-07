@@ -124,3 +124,97 @@ func (c *TaskController) Stop(ctx *gin.Context) {
 	}
 	c.Success(ctx, gin.H{"message": "任务已停止"})
 }
+
+// Cancel 取消任务（带权限校验）
+func (c *TaskController) Cancel(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	id := ctx.Param("id")
+	if err := c.taskService.CancelTaskWithAuth(ctx, id, userID.(uint)); err != nil {
+		if err == entity.ErrUnauthorized {
+			c.Error(ctx, 403, "无权限操作该任务")
+			return
+		}
+		c.Error(ctx, 500, "取消任务失败")
+		return
+	}
+	c.Success(ctx, gin.H{"message": "任务已取消"})
+}
+
+// Retry 重试任务（带权限校验）
+func (c *TaskController) Retry(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	id := ctx.Param("id")
+	if err := c.taskService.RetryTaskWithAuth(ctx, id, userID.(uint)); err != nil {
+		if err == entity.ErrUnauthorized {
+			c.Error(ctx, 403, "无权限操作该任务")
+			return
+		}
+		c.Error(ctx, 500, "重试任务失败")
+		return
+	}
+	c.Success(ctx, gin.H{"message": "任务已重新排队"})
+}
+
+// Logs 获取任务日志（带权限校验）
+func (c *TaskController) Logs(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	id := ctx.Param("id")
+	task, err := c.taskService.GetTask(ctx, id)
+	if err != nil {
+		c.Error(ctx, 404, "任务不存在")
+		return
+	}
+	if task.CustomerID != userID.(uint) {
+		c.Error(ctx, 403, "无权访问该任务")
+		return
+	}
+
+	c.Success(ctx, gin.H{
+		"task_id":   task.ID,
+		"status":    task.Status,
+		"error_msg": task.ErrorMsg,
+	})
+}
+
+// Result 获取任务结果（带权限校验）
+func (c *TaskController) Result(ctx *gin.Context) {
+	userID, exists := ctx.Get("userID")
+	if !exists {
+		c.Error(ctx, 401, "用户未认证")
+		return
+	}
+
+	id := ctx.Param("id")
+	task, err := c.taskService.GetTask(ctx, id)
+	if err != nil {
+		c.Error(ctx, 404, "任务不存在")
+		return
+	}
+	if task.CustomerID != userID.(uint) {
+		c.Error(ctx, 403, "无权访问该任务")
+		return
+	}
+
+	c.Success(ctx, gin.H{
+		"task_id":   task.ID,
+		"status":    task.Status,
+		"exit_code": task.ExitCode,
+		"error_msg": task.ErrorMsg,
+		"ended_at":  task.EndedAt,
+	})
+}
