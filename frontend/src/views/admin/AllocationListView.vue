@@ -1,13 +1,10 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
 import { getAllocationList, reclaimMachine } from '@/api/admin'
 import type { AllocationRecord } from '@/types/allocation'
 import type { PageRequest } from '@/types/common'
 import DataTable from '@/components/common/DataTable.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-
-const router = useRouter()
 
 const loading = ref(false)
 const allocations = ref<AllocationRecord[]>([])
@@ -62,10 +59,6 @@ const handleReset = () => {
   handleSearch()
 }
 
-const handleQuickAllocate = () => {
-  router.push('/admin/allocations/quick')
-}
-
 const handleReclaim = async (allocation: AllocationRecord) => {
   try {
     await ElMessageBox.confirm(
@@ -114,7 +107,6 @@ onMounted(() => {
   <div class="allocation-list">
     <div class="page-header">
       <h2 class="page-title">分配记录</h2>
-      <el-button type="primary" @click="handleQuickAllocate">快速分配</el-button>
     </div>
 
     <!-- 筛选栏 -->

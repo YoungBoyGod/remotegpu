@@ -7,6 +7,7 @@ import type { Customer } from '@/types/customer'
 import type { PageRequest } from '@/types/common'
 import DataTable from '@/components/common/DataTable.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { CopyDocument } from '@element-plus/icons-vue'
 
 const router = useRouter()
 
@@ -161,6 +162,24 @@ const getStatusText = (status: string) => {
 
 const getCollectType = (needsCollect?: boolean) => (needsCollect ? 'warning' : 'success')
 const getCollectText = (needsCollect?: boolean) => (needsCollect ? '待采集' : '已采集')
+
+const getSSHCommand = (machine: Machine) => {
+  if (machine.ssh_command) return machine.ssh_command
+  const host = machine.ssh_host || machine.public_ip || machine.ip_address || ''
+  const user = machine.ssh_username || 'root'
+  const port = machine.ssh_port || 22
+  if (!host) return ''
+  return `ssh -p ${port} ${user}@${host}`
+}
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
 
 // 跳转到机器详情
 const handleViewDetail = (machine: Machine) => {
@@ -320,6 +339,23 @@ onMounted(() => {
           {{ row.total_cpu || '-' }} 核 / {{ row.total_memory_gb ? row.total_memory_gb + ' GB' : '-' }}
         </template>
       </el-table-column>
+      <el-table-column label="SSH 连接" min-width="220">
+        <template #default="{ row }">
+          <template v-if="getSSHCommand(row)">
+            <el-tooltip :content="getSSHCommand(row)" placement="top">
+              <code class="ssh-cmd">{{ getSSHCommand(row) }}</code>
+            </el-tooltip>
+            <el-button
+              link
+              type="primary"
+              size="small"
+              :icon="CopyDocument"
+              @click.stop="copyToClipboard(getSSHCommand(row))"
+            />
+          </template>
+          <span v-else>-</span>
+        </template>
+      </el-table-column>
       <el-table-column label="分配状态" width="120">
         <template #default="{ row }">
           <el-tag v-if="row.status === 'allocated'" type="warning">已分配</el-tag>
@@ -439,5 +475,19 @@ onMounted(() => {
 
 .filter-card {
   margin-bottom: 20px;
+}
+
+.ssh-cmd {
+  font-size: 12px;
+  color: #606266;
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 3px;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: middle;
 }
 </style>

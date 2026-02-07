@@ -8,9 +8,7 @@ import {
   Connection,
   DataAnalysis,
   Box,
-  FolderOpened,
   List,
-  TrendCharts,
   Setting,
   ArrowRight,
   ArrowDown
@@ -61,7 +59,6 @@ const menuItems: MenuItem[] = [
     children: [
       { id: 'allocation-list', title: '分配记录', path: '/admin/allocations/list' },
       { id: 'machine-allocate', title: '机器分配', path: '/admin/allocations/assign' },
-      { id: 'quick-allocate', title: '快速分配', path: '/admin/allocations/quick' }
     ]
   },
   {
@@ -69,28 +66,15 @@ const menuItems: MenuItem[] = [
     title: '监控中心',
     icon: DataAnalysis,
     children: [
-      { id: 'realtime-monitor', title: '实时监控', path: '/admin/monitoring/realtime' },
-      { id: 'alerts', title: '告警管理', path: '/admin/monitoring/alerts' }
+      { id: 'realtime-monitor', title: '实时监控', path: '/admin/monitoring' },
+      { id: 'alerts', title: '告警管理', path: '/admin/alerts' }
     ]
   },
   {
     id: 'images',
     title: '镜像管理',
     icon: Box,
-    children: [
-      { id: 'image-list', title: '镜像库', path: '/admin/images/list' },
-      { id: 'upload-image', title: '上传镜像', path: '/admin/images/upload' }
-    ]
-  },
-  {
-    id: 'datasets',
-    title: '数据集管理',
-    icon: FolderOpened,
-    children: [
-      { id: 'dataset-list', title: '数据集库', path: '/admin/datasets/list' },
-      { id: 'upload-dataset', title: '上传数据集', path: '/admin/datasets/upload' },
-      { id: 'storage-manage', title: '存储管理', path: '/admin/storage/overview' }
-    ]
+    path: '/admin/images'
   },
   {
     id: 'tasks',
@@ -99,22 +83,12 @@ const menuItems: MenuItem[] = [
     path: '/admin/tasks/list'
   },
   {
-    id: 'statistics',
-    title: '数据统计',
-    icon: TrendCharts,
-    children: [
-      { id: 'resource-stats', title: '资源统计', path: '/admin/statistics/resources' },
-      { id: 'customer-stats', title: '客户统计', path: '/admin/statistics/customers' }
-    ]
-  },
-  {
     id: 'settings',
     title: '系统设置',
     icon: Setting,
     children: [
       { id: 'platform-config', title: '平台配置', path: '/admin/settings/platform' },
-      { id: 'permission-manage', title: '权限管理', path: '/admin/settings/permissions' },
-      { id: 'log-manage', title: '日志管理', path: '/admin/settings/logs' }
+      { id: 'audit-log', title: '审计日志', path: '/admin/audit' }
     ]
   }
 ]

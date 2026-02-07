@@ -1,8 +1,8 @@
 import request from '@/utils/request'
 import type { ApiResponse, PageRequest, PageResponse } from '@/types/common'
 import type { Machine } from '@/types/machine'
-import type { Customer, CustomerDetail, CustomerForm } from '@/types/customer'
-import type { AllocationRecord, QuickAllocateForm } from '@/types/allocation'
+import type { Customer, CustomerDetailResponse, CustomerForm } from '@/types/customer'
+import type { AllocationRecord } from '@/types/allocation'
 import type { Task, TaskLogResponse, TaskResultResponse } from '@/types/task'
 import type { SystemConfig, UpdateSystemConfigsPayload } from '@/types/systemConfig'
 
@@ -46,10 +46,15 @@ export interface CreateMachinePayload {
   region?: string
   ip_address: string
   public_ip?: string
+  ssh_host?: string
   ssh_port: number
   ssh_username?: string
   ssh_password?: string
   ssh_key?: string
+  jupyter_url?: string
+  jupyter_token?: string
+  vnc_url?: string
+  vnc_password?: string
 }
 
 export function addMachine(data: CreateMachinePayload): Promise<ApiResponse<Machine>> {
@@ -57,9 +62,24 @@ export function addMachine(data: CreateMachinePayload): Promise<ApiResponse<Mach
 }
 
 /**
+ * 批量导入机器条目
+ */
+export interface ImportMachineItem {
+  host_ip: string
+  ssh_port: number
+  region: string
+  gpu_model: string
+  gpu_count: number
+  cpu_cores: number
+  ram_size: number
+  disk_size: number
+  price_hourly: number
+}
+
+/**
  * 批量导入机器
  */
-export function batchImportMachines(data: { machines: Partial<Machine>[] }): Promise<ApiResponse<{ message: string; count: number }>> {
+export function batchImportMachines(data: { machines: ImportMachineItem[] }): Promise<ApiResponse<{ message: string; count: number }>> {
   return request.post('/admin/machines/import', data)
 }
 
@@ -134,7 +154,7 @@ export function addCustomer(data: CustomerForm): Promise<ApiResponse<Customer>> 
 /**
  * 获取客户详情
  */
-export function getCustomerDetail(id: number): Promise<ApiResponse<Customer>> {
+export function getCustomerDetail(id: number): Promise<ApiResponse<CustomerDetailResponse>> {
   return request.get(`/admin/customers/${id}`)
 }
 
@@ -313,6 +333,35 @@ export function getTaskResult(id: string): Promise<ApiResponse<TaskResultRespons
  */
 export function downloadTaskResult(id: string): Promise<Blob> {
   return request.get(`/admin/tasks/${id}/result`, { responseType: 'blob' })
+}
+
+// ==================== Agent 管理 ====================
+
+export interface AgentInfo {
+  agent_id: string
+  machine_id: string
+  machine_name: string
+  ip_address: string
+  status: string
+  last_heartbeat: string | null
+  agent_port: number
+  region: string
+  gpu_count: number
+  gpu_models: string[]
+}
+
+export interface AgentListResponse {
+  total: number
+  online: number
+  offline: number
+  agents: AgentInfo[]
+}
+
+/**
+ * 获取 Agent 列表
+ */
+export function getAgentList(): Promise<ApiResponse<AgentListResponse>> {
+  return request.get('/admin/agents')
 }
 
 // ==================== 系统配置 ====================

@@ -69,6 +69,12 @@ const router = createRouter({
           meta: { title: '添加机器' },
         },
         {
+          path: 'machines/import',
+          name: 'admin-machines-import',
+          component: () => import('@/views/admin/MachineImportView.vue'),
+          meta: { title: '批量导入' },
+        },
+        {
           path: 'machines/:id',
           name: 'admin-machines-detail',
           component: () => import('@/views/admin/MachineDetailView.vue'),
@@ -106,12 +112,6 @@ const router = createRouter({
           component: () => import('@/views/admin/MachineAllocateView.vue'),
           meta: { title: '机器分配' },
         },
-        {
-          path: 'allocations/quick',
-          name: 'admin-allocations-quick',
-          component: () => import('@/views/admin/QuickAllocateView.vue'),
-          meta: { title: '快速分配' },
-        },
         // 运维管理
         {
           path: 'images',
@@ -142,6 +142,12 @@ const router = createRouter({
           name: 'admin-audit',
           component: () => import('@/views/admin/AuditLogView.vue'),
           meta: { title: '审计日志' },
+        },
+        {
+          path: 'agents',
+          name: 'admin-agents',
+          component: () => import('@/views/admin/AgentListView.vue'),
+          meta: { title: 'Agent 管理' },
         },
         // 系统设置
         {

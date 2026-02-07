@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getMachineDetail } from '@/api/admin'
 import type { Machine } from '@/types/machine'
 import { ElMessage } from 'element-plus'
+import { CopyDocument, View, Hide } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -153,6 +154,43 @@ const handleBack = () => {
   router.push('/admin/machines/list')
 }
 
+const showPassword = ref(false)
+const showVncPassword = ref(false)
+const connectionTab = ref('ssh')
+
+const sshConnectHost = computed(() => {
+  if (!machine.value) return ''
+  return machine.value.ssh_host || machine.value.public_ip || machine.value.ip_address || ''
+})
+
+const sshCommand = computed(() => {
+  if (!machine.value) return ''
+  return machine.value.ssh_command || ''
+})
+
+const maskedPassword = computed(() => {
+  const pwd = machine.value?.ssh_password
+  if (!pwd) return ''
+  if (pwd.length <= 6) return pwd.slice(0, 2) + '...'
+  return pwd.slice(0, 6) + '...'
+})
+
+const maskedVncPassword = computed(() => {
+  const pwd = machine.value?.vnc_password
+  if (!pwd) return ''
+  if (pwd.length <= 6) return pwd.slice(0, 2) + '...'
+  return pwd.slice(0, 6) + '...'
+})
+
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
 const loadRemoteAccessConfig = () => {
   try {
     const raw = localStorage.getItem(remoteAccessKey.value)
@@ -299,6 +337,80 @@ watch(
           <el-descriptions-item label="SSH用户">{{ machine.ssh_username || '-' }}</el-descriptions-item>
           <el-descriptions-item label="Agent端口">{{ machine.agent_port || '-' }}</el-descriptions-item>
         </el-descriptions>
+      </el-card>
+
+      <!-- 连接信息 -->
+      <el-card class="info-card">
+        <template #header>
+          <span>连接信息</span>
+        </template>
+        <el-tabs v-model="connectionTab">
+          <el-tab-pane label="SSH" name="ssh">
+            <div class="connection-info">
+              <div class="info-item">
+                <span class="info-label">连接主机：</span>
+                <span class="info-value">{{ sshConnectHost || '-' }}</span>
+                <el-button v-if="sshConnectHost" link :icon="CopyDocument" @click="copyToClipboard(sshConnectHost)" />
+              </div>
+              <div class="info-item">
+                <span class="info-label">端口：</span>
+                <span class="info-value">{{ machine.ssh_port || 22 }}</span>
+                <el-button link :icon="CopyDocument" @click="copyToClipboard(String(machine.ssh_port || 22))" />
+              </div>
+              <div class="info-item">
+                <span class="info-label">用户：</span>
+                <span class="info-value">{{ machine.ssh_username || 'root' }}</span>
+                <el-button link :icon="CopyDocument" @click="copyToClipboard(machine.ssh_username || 'root')" />
+                <span class="info-label" style="margin-left: 24px">密码：</span>
+                <span class="info-value">{{ showPassword ? (machine.ssh_password || '-') : (maskedPassword || '-') }}</span>
+                <el-button v-if="machine.ssh_password" link :icon="showPassword ? Hide : View" @click="showPassword = !showPassword" />
+                <el-button v-if="machine.ssh_password" link :icon="CopyDocument" @click="copyToClipboard(machine.ssh_password!)" />
+              </div>
+              <div class="info-item">
+                <span class="info-label">连接命令：</span>
+                <code class="info-value ssh-cmd">{{ sshCommand || '-' }}</code>
+                <el-button v-if="sshCommand" link :icon="CopyDocument" @click="copyToClipboard(sshCommand)" />
+              </div>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="Jupyter" name="jupyter">
+            <div class="connection-info">
+              <template v-if="machine.jupyter_url">
+                <div class="info-item">
+                  <span class="info-label">访问地址：</span>
+                  <a class="info-value info-link" :href="machine.jupyter_url" target="_blank">{{ machine.jupyter_url }}</a>
+                  <el-button link :icon="CopyDocument" @click="copyToClipboard(machine.jupyter_url!)" />
+                </div>
+                <div class="info-item" v-if="machine.jupyter_token">
+                  <span class="info-label">Token：</span>
+                  <span class="info-value">{{ machine.jupyter_token }}</span>
+                  <el-button link :icon="CopyDocument" @click="copyToClipboard(machine.jupyter_token!)" />
+                </div>
+              </template>
+              <div v-else class="info-empty">暂未配置 Jupyter 信息</div>
+            </div>
+          </el-tab-pane>
+
+          <el-tab-pane label="VNC" name="vnc">
+            <div class="connection-info">
+              <template v-if="machine.vnc_url">
+                <div class="info-item">
+                  <span class="info-label">访问地址：</span>
+                  <a class="info-value info-link" :href="machine.vnc_url" target="_blank">{{ machine.vnc_url }}</a>
+                  <el-button link :icon="CopyDocument" @click="copyToClipboard(machine.vnc_url!)" />
+                </div>
+                <div class="info-item" v-if="machine.vnc_password">
+                  <span class="info-label">密码：</span>
+                  <span class="info-value">{{ showVncPassword ? machine.vnc_password : maskedVncPassword }}</span>
+                  <el-button link :icon="showVncPassword ? Hide : View" @click="showVncPassword = !showVncPassword" />
+                  <el-button link :icon="CopyDocument" @click="copyToClipboard(machine.vnc_password!)" />
+                </div>
+              </template>
+              <div v-else class="info-empty">暂未配置 VNC 信息</div>
+            </div>
+          </el-tab-pane>
+        </el-tabs>
       </el-card>
 
       <!-- 硬件配置 -->
@@ -478,6 +590,64 @@ watch(
 
 .info-card {
   margin-bottom: 20px;
+}
+
+.ssh-cmd {
+  font-size: 13px;
+  color: #606266;
+  background: #f5f7fa;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.connection-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 4px 0;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.info-item:last-child {
+  border-bottom: none;
+}
+
+.info-label {
+  color: #909399;
+  font-size: 14px;
+  white-space: nowrap;
+  min-width: 70px;
+}
+
+.info-value {
+  color: #303133;
+  font-size: 14px;
+  word-break: break-all;
+}
+
+.info-link {
+  color: #409eff;
+  text-decoration: none;
+}
+
+.info-link:hover {
+  text-decoration: underline;
+}
+
+.info-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: #909399;
+  font-size: 14px;
 }
 
 .remote-hint {

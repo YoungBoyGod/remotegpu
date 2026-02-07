@@ -29,9 +29,7 @@ const menuItems = ref<MenuItem[]>([
     children: [
       { id: 'machine-list', title: '机器列表', path: '/customer/machines/list', icon: '📋' },
       { id: 'machine-add', title: '添加机器', path: '/customer/machines/enroll', icon: '➕' },
-      { id: 'machine-enrollments', title: '添加进度', path: '/customer/machines/enrollments', icon: '⏳' },
-      { id: 'quick-connect', title: '快速连接', path: '/customer/machines/connect', icon: '🔗' },
-      { id: 'connect-history', title: '连接历史', path: '/customer/machines/history', icon: '🕐' }
+      { id: 'machine-enrollments', title: '添加进度', path: '/customer/machines/enrollments', icon: '⏳' }
     ]
   },
   {
@@ -46,63 +44,17 @@ const menuItems = ref<MenuItem[]>([
     ]
   },
   {
-    id: 'images',
-    title: '镜像市场',
-    icon: '🐳',
-    children: [
-      { id: 'image-market', title: '镜像市场', path: '/customer/images/market', icon: '🛒' },
-      { id: 'my-images', title: '我的镜像', path: '/customer/images/my', icon: '📦' }
-    ]
-  },
-  {
     id: 'datasets',
     title: '数据集管理',
     icon: '📁',
-    children: [
-      { id: 'dataset-list', title: '数据集列表', path: '/customer/datasets/list', icon: '📂' },
-      { id: 'upload-dataset', title: '上传数据集', path: '/customer/datasets/upload', icon: '📤' },
-      { id: 'mount-manage', title: '挂载管理', path: '/customer/datasets/mounts', icon: '🔗' }
-    ]
-  },
-  {
-    id: 'models',
-    title: '模型管理',
-    icon: '🤖',
-    path: '/customer/models/list'
-  },
-  {
-    id: 'monitoring',
-    title: '监控与分析',
-    icon: '📊',
-    children: [
-      { id: 'realtime-monitor', title: '实时监控', path: '/customer/monitoring/realtime', icon: '📈' },
-      { id: 'usage-stats', title: '使用统计', path: '/customer/statistics/usage', icon: '📉' }
-    ]
-  },
-  {
-    id: 'files',
-    title: '文件管理',
-    icon: '📂',
-    path: '/customer/files/browser'
-  },
-  {
-    id: 'tools',
-    title: '开发工具',
-    icon: '🔧',
-    children: [
-      { id: 'jupyter', title: 'Jupyter', path: '/customer/tools/jupyter', icon: '📓' },
-      { id: 'tensorboard', title: 'TensorBoard', path: '/customer/tools/tensorboard', icon: '📉' },
-      { id: 'terminal', title: 'Terminal', path: '/customer/tools/terminal', icon: '💻' }
-    ]
+    path: '/customer/datasets'
   },
   {
     id: 'settings',
     title: '设置',
     icon: '⚙️',
     children: [
-      { id: 'profile', title: '个人设置', path: '/customer/settings/profile', icon: '👤' },
-      { id: 'ssh-keys', title: 'SSH密钥', path: '/customer/settings/ssh-keys', icon: '🔑' },
-      { id: 'notifications', title: '通知设置', path: '/customer/settings/notifications', icon: '🔔' }
+      { id: 'ssh-keys', title: 'SSH密钥', path: '/customer/ssh-keys', icon: '🔑' }
     ]
   }
 ])

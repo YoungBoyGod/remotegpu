@@ -31,30 +31,24 @@ export interface Customer {
   lastLoginAt?: string
 }
 
-// 客户详情
-export interface CustomerDetail extends Customer {
-  machines: Array<{
-    id: number
-    name: string
-    gpuModel: string
-    allocatedAt: string
-    expiresAt: string
-  }>
-  usageStats: {
-    allocatedMachines: number  // 分配的机器数
-    runningTasks: number  // 运行中任务数
-    totalTasks: number  // 总任务数
-    storageUsed: number  // 存储使用（GB）
-    totalUsageHours: number
-    gpuUsageAvg: number
-  }
-  operationLogs: Array<{
-    id: number
-    action: string
-    operator: string
-    timestamp: string
-    details: string
-  }>
+// 客户分配的机器信息（来自后端 GetCustomerDetail）
+export interface CustomerAllocation {
+  allocation_id: string
+  machine_id: string
+  machine_name?: string
+  allocated_at?: string
+  end_time?: string
+  ssh_host?: string
+  ssh_port?: number
+  jupyter_url?: string
+  vnc_url?: string
+  status?: string
+}
+
+// 客户详情（后端返回 { customer, allocations }）
+export interface CustomerDetailResponse {
+  customer: Customer
+  allocations: CustomerAllocation[]
 }
 
 // 添加客户表单

@@ -6,11 +6,14 @@ import { getAuditLogs } from '@/api/admin'
 
 interface AuditLog {
   id: number
+  customer_id?: number
   username: string
   action: string
   resource_type: string
   resource_id: string
   ip_address: string
+  method: string
+  path: string
   status_code: number
   created_at: string
   detail: any
@@ -31,7 +34,7 @@ const loadLogs = async () => {
   try {
     const params: any = {
       page: page.value,
-      pageSize: pageSize.value
+      page_size: pageSize.value
     }
     if (searchUser.value) params.username = searchUser.value
     if (searchAction.value) params.action = searchAction.value

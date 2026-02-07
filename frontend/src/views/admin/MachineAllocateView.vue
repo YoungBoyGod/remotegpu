@@ -143,8 +143,6 @@ onMounted(() => {
             placeholder="请选择机器（可多选）"
             filterable
             multiple
-            collapse-tags
-            collapse-tags-tooltip
             style="width: 100%"
           >
             <el-option

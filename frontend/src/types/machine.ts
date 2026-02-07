@@ -2,8 +2,14 @@
  * 机器相关类型定义
  */
 
-// 机器状态
+// 机器状态（兼容旧字段）
 export type MachineStatus = 'idle' | 'allocated' | 'maintenance' | 'offline'
+
+// 设备在线状态
+export type DeviceStatus = 'online' | 'offline'
+
+// 机器分配状态
+export type MachineAllocationStatus = 'idle' | 'allocated' | 'maintenance'
 
 // 分配状态
 export type AllocationStatus = 'allocated' | 'unallocated' | 'expiring'
@@ -56,12 +62,22 @@ export interface Machine {
   name: string
   region: string
   status: MachineStatus
+  device_status?: DeviceStatus
+  allocation_status?: MachineAllocationStatus
   needs_collect?: boolean
   hostname?: string
   ip_address?: string
   public_ip?: string
   ssh_port?: number
+  ssh_host?: string
   ssh_username?: string
+  ssh_password?: string
+  ssh_key?: string
+  ssh_command?: string
+  jupyter_url?: string
+  jupyter_token?: string
+  vnc_url?: string
+  vnc_password?: string
   agent_port?: number
   start_time?: string
   end_time?: string

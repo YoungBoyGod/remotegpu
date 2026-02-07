@@ -14,6 +14,7 @@ const formData = ref<CreateMachinePayload>({
   region: '',
   ip_address: '',
   public_ip: '',
+  ssh_host: '',
   ssh_port: 22,
   ssh_username: '',
   ssh_password: '',
@@ -115,6 +116,10 @@ const handleCancel = () => {
 
         <el-form-item label="公网IP" prop="public_ip">
           <el-input v-model="formData.public_ip" placeholder="可选，公网访问IP" />
+        </el-form-item>
+
+        <el-form-item label="SSH主机" prop="ssh_host">
+          <el-input v-model="formData.ssh_host" placeholder="可选，SSH连接主机地址（留空则使用公网IP或连接地址）" />
         </el-form-item>
 
         <el-form-item label="SSH端口" prop="ssh_port">

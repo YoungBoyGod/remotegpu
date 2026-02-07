@@ -20,14 +20,6 @@ export interface AllocationRecord {
   operator: string
 }
 
-// 快速分配表单
-export interface QuickAllocateForm {
-  customerId: number | null
-  machineIds: number[]
-  duration: number
-  notes: string
-}
-
 // 续期表单
 export interface ExtendAllocationForm {
   allocationId: number
