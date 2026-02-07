@@ -54,6 +54,7 @@ func main() {
 	// 启动 Poller 和 Syncer（如果配置了 Server）
 	var p *poller.Poller
 	var sy *syncer.Syncer
+	var heartbeatTicker *time.Ticker
 	if cfg.ServerConfigured() {
 		serverClient := client.NewServerClient(&client.Config{
 			ServerURL: cfg.Server.URL,
@@ -81,6 +82,27 @@ func main() {
 		sy = syncer.NewSyncer(sched.GetStore(), serverClient, 30*time.Second)
 		sy.Start()
 		slog.Info("syncer started")
+
+		// 启动心跳定时器
+		heartbeatTicker = time.NewTicker(30 * time.Second)
+		go func() {
+			// 立即发送一次心跳
+			if err := serverClient.Heartbeat(); err != nil {
+				slog.Error("heartbeat error", "error", err)
+			} else {
+				slog.Info("heartbeat sent")
+			}
+
+			// 定时发送心跳
+			for range heartbeatTicker.C {
+				if err := serverClient.Heartbeat(); err != nil {
+					slog.Error("heartbeat error", "error", err)
+				} else {
+					slog.Debug("heartbeat sent")
+				}
+			}
+		}()
+		slog.Info("heartbeat started", "interval", "30s")
 	}
 
 	gin.SetMode(gin.ReleaseMode)
@@ -99,6 +121,9 @@ func main() {
 		signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
 		<-sigCh
 		slog.Info("shutting down...")
+		if heartbeatTicker != nil {
+			heartbeatTicker.Stop()
+		}
 		if sy != nil {
 			sy.Stop()
 		}

@@ -1,0 +1,23 @@
+# RemoteGPU Agent 配置文件
+
+port: 8090
+db_path: "/var/lib/remotegpu-agent/tasks.db"
+max_workers: 4
+
+server:
+  url: "http://101.43.50.104:60180"
+  agent_id: "agent-0e8787e5ffd9"
+  machine_id: "0e8787e5ffd9"
+  token: "6318ac01cc335df2a93104dd1332541dfaef88718a6032d46168e38243e4f2fa"
+  timeout: 30s
+
+poll:
+  interval: 5s
+  batch_size: 10
+
+limits:
+  max_output_size: 1048576  # 1MB
+
+security:
+  allowed_commands: []
+  blocked_patterns: []
