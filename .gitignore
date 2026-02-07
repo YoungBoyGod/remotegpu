@@ -30,3 +30,24 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# 数据库备份文件
+*.sql.bak
+backup_*.sql
+
+# 配置文件（包含敏感信息）
+**/config/config.yaml
+!**/config/config.yaml.example
+
+# 编译产物
+backend/remotegpu
+agent/agent
+
+# 日志文件
+*.log
+
+# 临时文件
+*.tmp
+*.swp
+*.swo
+*~

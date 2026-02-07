@@ -1,0 +1,8 @@
+.git
+.gitignore
+*.md
+logs/
+tmp/
+uploads/
+backup_*.sql
+config/config.yaml
