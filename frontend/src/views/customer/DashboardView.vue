@@ -2,29 +2,14 @@
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getDashboardOverview } from '@/api/customer'
+import type { DashboardOverview } from '@/api/customer'
+import type { Task } from '@/types/task'
 import StatCard from '@/components/common/StatCard.vue'
 
 const router = useRouter()
 
-interface RecentTask {
-  id: string
-  name: string
-  status: string
-  host_id?: string
-  created_at: string
-  host?: { name?: string }
-}
-
-interface DashboardData {
-  myMachines: number
-  runningTasks: number
-  totalTasks: number
-  datasetCount: number
-  recentTasks: RecentTask[]
-}
-
 const loading = ref(true)
-const dashboardData = ref<DashboardData>({
+const dashboardData = ref<DashboardOverview>({
   myMachines: 0,
   runningTasks: 0,
   totalTasks: 0,
@@ -47,8 +32,10 @@ const loadDashboardData = async () => {
 const quickActions = [
   { title: '我的机器', icon: '💻', path: '/customer/machines/list' },
   { title: '创建任务', icon: '🚀', path: '/customer/tasks/training' },
+  { title: '工作空间', icon: '📂', path: '/customer/workspaces' },
+  { title: '开发环境', icon: '🖥️', path: '/customer/environments' },
   { title: '数据集', icon: '📦', path: '/customer/datasets' },
-  { title: 'SSH 密钥', icon: '🔑', path: '/customer/keys' },
+  { title: 'SSH 密钥', icon: '🔑', path: '/customer/ssh-keys' },
 ]
 
 const handleQuickAction = (path: string) => {

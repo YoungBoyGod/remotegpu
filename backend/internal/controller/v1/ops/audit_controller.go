@@ -21,6 +21,21 @@ func NewAuditController(svc *audit.AuditService) *AuditController {
 }
 
 // List 获取审计日志列表
+// @Summary 获取审计日志列表
+// @Description 分页获取审计日志，支持按操作类型、资源类型、用户名和时间范围筛选
+// @Tags Admin - Audit
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(20)
+// @Param action query string false "操作类型筛选"
+// @Param resource_type query string false "资源类型筛选"
+// @Param username query string false "用户名筛选"
+// @Param start_time query string false "开始时间"
+// @Param end_time query string false "结束时间"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/audit/logs [get]
 func (c *AuditController) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "20"))

@@ -83,3 +83,29 @@ func (c *ImageController) Sync(ctx *gin.Context) {
 	}
 	c.Success(ctx, gin.H{"message": "同步任务已触发"})
 }
+
+// Delete 删除镜像
+// @Summary 删除镜像
+// @Description 根据ID删除指定镜像
+// @Tags Admin - Images
+// @Accept json
+// @Produce json
+// @Param id path int true "镜像ID"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/images/{id} [delete]
+func (c *ImageController) Delete(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的镜像ID")
+		return
+	}
+	if err := c.imageService.Delete(ctx, uint(id)); err != nil {
+		c.Error(ctx, 500, "删除镜像失败")
+		return
+	}
+	c.Success(ctx, gin.H{"message": "删除成功"})
+}

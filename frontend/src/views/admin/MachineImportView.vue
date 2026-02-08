@@ -2,7 +2,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Upload, Delete, Plus } from '@element-plus/icons-vue'
+import { Upload, Delete, Plus, Download } from '@element-plus/icons-vue'
 import { batchImportMachines } from '@/api/admin'
 import type { ImportMachineItem } from '@/api/admin'
 
@@ -13,12 +13,9 @@ const emptyRow = (): ImportMachineItem => ({
   host_ip: '',
   ssh_port: 22,
   region: '',
-  gpu_model: '',
-  gpu_count: 1,
-  cpu_cores: 0,
-  ram_size: 0,
-  disk_size: 0,
-  price_hourly: 0,
+  ssh_username: 'root',
+  ssh_password: '',
+  ssh_key: '',
 })
 
 const machines = ref<ImportMachineItem[]>([emptyRow()])
@@ -36,7 +33,7 @@ const validate = (): boolean => {
   for (let i = 0; i < machines.value.length; i++) {
     const m = machines.value[i]!
     if (!m.host_ip) {
-      ElMessage.error(`第 ${i + 1} 行：请填写 IP 地址`)
+      ElMessage.error(`第 ${i + 1} 行：请填写 IP 地址或主机名`)
       return false
     }
     if (!m.ssh_port || m.ssh_port < 1 || m.ssh_port > 65535) {
@@ -47,8 +44,8 @@ const validate = (): boolean => {
       ElMessage.error(`第 ${i + 1} 行：请填写区域`)
       return false
     }
-    if (!m.gpu_model) {
-      ElMessage.error(`第 ${i + 1} 行：请填写 GPU 型号`)
+    if (!m.ssh_password && !m.ssh_key) {
+      ElMessage.error(`第 ${i + 1} 行：密码和密钥至少填写一个`)
       return false
     }
   }
@@ -97,20 +94,30 @@ const parseCSV = (text: string): ImportMachineItem[] => {
     const line = lines[i]
     if (!line) continue
     const cols = line.split(',').map(s => s.trim())
-    if (cols.length < 9) continue
+    if (cols.length < 4) continue
     result.push({
       host_ip: cols[0] ?? '',
       ssh_port: Number(cols[1]) || 22,
       region: cols[2] ?? '',
-      gpu_model: cols[3] ?? '',
-      gpu_count: Number(cols[4]) || 1,
-      cpu_cores: Number(cols[5]) || 0,
-      ram_size: Number(cols[6]) || 0,
-      disk_size: Number(cols[7]) || 0,
-      price_hourly: Number(cols[8]) || 0,
+      ssh_username: cols[3] || 'root',
+      ssh_password: cols[4] ?? '',
+      ssh_key: cols[5] ?? '',
     })
   }
   return result
+}
+
+const downloadTemplate = () => {
+  const header = 'host_ip,ssh_port,region,ssh_username,ssh_password,ssh_key'
+  const example = '192.168.1.100,22,北京,root,your_password,'
+  const content = '\uFEFF' + header + '\n' + example + '\n'
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = url
+  link.download = '机器导入模板.csv'
+  link.click()
+  URL.revokeObjectURL(url)
 }
 
 const handleBack = () => {
@@ -132,16 +139,19 @@ const handleBack = () => {
         type="info"
         show-icon
         :closable="false"
-        title="支持 CSV 文件导入，格式：host_ip, ssh_port, region, gpu_model, gpu_count, cpu_cores, ram_size(GB), disk_size(GB), price_hourly(分)"
+        title="支持 CSV 文件导入，格式：host_ip, ssh_port, region, ssh_username, ssh_password, ssh_key"
         style="margin-bottom: 16px"
       />
-      <el-upload
-        accept=".csv"
-        :show-file-list="false"
-        :before-upload="handleFileUpload"
-      >
-        <el-button :icon="Upload">上传 CSV 文件</el-button>
-      </el-upload>
+      <div class="upload-row">
+        <el-upload
+          accept=".csv"
+          :show-file-list="false"
+          :before-upload="handleFileUpload"
+        >
+          <el-button :icon="Upload">上传 CSV 文件</el-button>
+        </el-upload>
+        <el-button :icon="Download" @click="downloadTemplate">下载模板</el-button>
+      </div>
     </el-card>
 
     <el-card>
@@ -152,9 +162,9 @@ const handleBack = () => {
 
       <el-table :data="machines" border stripe style="width: 100%">
         <el-table-column label="序号" width="60" type="index" />
-        <el-table-column label="IP 地址" min-width="150">
+        <el-table-column label="IP 地址 / 主机名" min-width="160">
           <template #default="{ row }">
-            <el-input v-model="row.host_ip" placeholder="192.168.1.100" size="small" />
+            <el-input v-model="row.host_ip" placeholder="192.168.1.100 或 hostname" size="small" />
           </template>
         </el-table-column>
         <el-table-column label="SSH 端口" width="100">
@@ -167,34 +177,19 @@ const handleBack = () => {
             <el-input v-model="row.region" placeholder="北京" size="small" />
           </template>
         </el-table-column>
-        <el-table-column label="GPU 型号" min-width="140">
+        <el-table-column label="用户名" width="120">
           <template #default="{ row }">
-            <el-input v-model="row.gpu_model" placeholder="A100" size="small" />
+            <el-input v-model="row.ssh_username" placeholder="root" size="small" />
           </template>
         </el-table-column>
-        <el-table-column label="GPU 数量" width="100">
+        <el-table-column label="密码" min-width="140">
           <template #default="{ row }">
-            <el-input-number v-model="row.gpu_count" :min="0" size="small" controls-position="right" />
+            <el-input v-model="row.ssh_password" type="password" show-password placeholder="SSH 密码" size="small" />
           </template>
         </el-table-column>
-        <el-table-column label="CPU 核数" width="100">
+        <el-table-column label="密钥" min-width="140">
           <template #default="{ row }">
-            <el-input-number v-model="row.cpu_cores" :min="0" size="small" controls-position="right" />
-          </template>
-        </el-table-column>
-        <el-table-column label="内存(GB)" width="100">
-          <template #default="{ row }">
-            <el-input-number v-model="row.ram_size" :min="0" size="small" controls-position="right" />
-          </template>
-        </el-table-column>
-        <el-table-column label="磁盘(GB)" width="100">
-          <template #default="{ row }">
-            <el-input-number v-model="row.disk_size" :min="0" size="small" controls-position="right" />
-          </template>
-        </el-table-column>
-        <el-table-column label="时价(分)" width="100">
-          <template #default="{ row }">
-            <el-input-number v-model="row.price_hourly" :min="0" size="small" controls-position="right" />
+            <el-input v-model="row.ssh_key" placeholder="SSH 密钥（可选）" size="small" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="70" fixed="right">
@@ -242,6 +237,12 @@ const handleBack = () => {
 
 .upload-card {
   margin-bottom: 16px;
+}
+
+.upload-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .table-header {

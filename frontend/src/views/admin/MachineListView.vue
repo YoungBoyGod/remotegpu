@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMachineList, deleteMachine, setMachineMaintenance, collectMachineSpec, allocateMachine, reclaimMachine, getCustomerList, batchImportMachines } from '@/api/admin'
+import { getMachineList, deleteMachine, setMachineMaintenance, collectMachineSpec, allocateMachine, reclaimMachine, getCustomerList, batchImportMachines, batchSetMaintenance, batchAllocate, batchReclaim } from '@/api/admin'
 import type { ImportMachineItem } from '@/api/admin'
 import type { Machine } from '@/types/machine'
 import type { Customer } from '@/types/customer'
 import type { PageRequest } from '@/types/common'
-import DataTable from '@/components/common/DataTable.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { CopyDocument } from '@element-plus/icons-vue'
 
@@ -32,12 +31,46 @@ const allocateForm = ref({
   remark: ''
 })
 
+// 密码显示状态
+const passwordVisible = ref<Record<string | number, boolean>>({})
+
 // 批量导入相关
 const importDialogVisible = ref(false)
 const importLoading = ref(false)
 const importText = ref('')
 const importPreview = ref<ImportMachineItem[]>([])
 const importError = ref('')
+
+// 批量操作相关
+const selectedMachines = ref<Machine[]>([])
+const batchAllocateDialogVisible = ref(false)
+const batchAllocateLoading = ref(false)
+const batchAllocateForm = ref({
+  customer_id: null as number | null,
+  duration_months: 1,
+  remark: ''
+})
+
+const hasSelection = computed(() => selectedMachines.value.length > 0)
+const isAllSelected = computed(() => machines.value.length > 0 && selectedMachines.value.length === machines.value.length)
+const isIndeterminate = computed(() => selectedMachines.value.length > 0 && selectedMachines.value.length < machines.value.length)
+
+const toggleSelectAll = (val: boolean) => {
+  selectedMachines.value = val ? [...machines.value] : []
+}
+
+const handleSelectionChange = (selection: Machine[]) => {
+  selectedMachines.value = selection
+}
+
+const toggleSelect = (machine: Machine) => {
+  const idx = selectedMachines.value.findIndex(m => m.id === machine.id)
+  if (idx >= 0) {
+    selectedMachines.value.splice(idx, 1)
+  } else {
+    selectedMachines.value.push(machine)
+  }
+}
 
 // 解析批量导入文本（CSV 格式）
 const parseImportText = () => {
@@ -56,21 +89,16 @@ const parseImportText = () => {
     if (i === 0 && trimmed.includes('host_ip')) continue
 
     const cols = trimmed.split(',').map(c => c.trim())
-    if (cols.length < 9) {
-      importError.value = `第 ${i + 1} 行格式错误：需要至少 9 列`
+    if (cols.length < 3) {
+      importError.value = `第 ${i + 1} 行格式错误：需要至少 3 列（IP, 端口, 用户名）`
       return
     }
 
     items.push({
       host_ip: cols[0] ?? '',
       ssh_port: parseInt(cols[1] ?? '') || 22,
-      region: cols[2] ?? '',
-      gpu_model: cols[3] ?? '',
-      gpu_count: parseInt(cols[4] ?? '') || 0,
-      cpu_cores: parseInt(cols[5] ?? '') || 0,
-      ram_size: parseInt(cols[6] ?? '') || 0,
-      disk_size: parseInt(cols[7] ?? '') || 0,
-      price_hourly: parseFloat(cols[8] ?? '') || 0,
+      ssh_username: cols[2] ?? 'root',
+      ssh_password: cols[3] ?? '',
     })
   }
 
@@ -162,6 +190,10 @@ const handleAdd = () => {
 }
 
 const handleDelete = async (machine: Machine) => {
+  if (machine.allocation_status === 'allocated') {
+    ElMessage.warning('已分配的机器不能删除，请先回收')
+    return
+  }
   try {
     await ElMessageBox.confirm(
       `确定要删除机器 "${machine.name}" 吗?`,
@@ -184,7 +216,7 @@ const handleDelete = async (machine: Machine) => {
 
 const handleToggleMaintenance = async (machine: Machine) => {
   try {
-    const newStatus = (machine as any).allocation_status !== 'maintenance'
+    const newStatus = machine.allocation_status !== 'maintenance'
     await setMachineMaintenance(String(machine.id), newStatus)
     ElMessage.success(newStatus ? '已设置为维护状态' : '已取消维护状态')
     loadMachines()
@@ -331,6 +363,86 @@ const handleReclaim = async (machine: Machine) => {
   }
 }
 
+// 批量设为维护
+const handleBatchMaintenance = async (maintenance: boolean) => {
+  const ids = selectedMachines.value.map(m => String(m.id))
+  const action = maintenance ? '设为维护' : '取消维护'
+  try {
+    await ElMessageBox.confirm(
+      `确定要将选中的 ${ids.length} 台机器${action}吗？`,
+      '批量操作确认',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    const res = await batchSetMaintenance(ids, maintenance)
+    ElMessage.success(`${action}成功，影响 ${res.data.affected} 台机器`)
+    loadMachines()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.msg || `批量${action}失败`)
+    }
+  }
+}
+
+// 批量分配 - 打开弹窗
+const handleBatchAllocate = async () => {
+  batchAllocateForm.value = { customer_id: null, duration_months: 1, remark: '' }
+  batchAllocateDialogVisible.value = true
+  try {
+    const response = await getCustomerList({ page: 1, pageSize: 100 })
+    customers.value = response.data.list || []
+  } catch (error) {
+    console.error('加载客户列表失败:', error)
+  }
+}
+
+// 确认批量分配
+const handleConfirmBatchAllocate = async () => {
+  if (!batchAllocateForm.value.customer_id) {
+    ElMessage.warning('请选择客户')
+    return
+  }
+  const ids = selectedMachines.value.map(m => String(m.id))
+  try {
+    batchAllocateLoading.value = true
+    const res = await batchAllocate(
+      ids,
+      batchAllocateForm.value.customer_id,
+      batchAllocateForm.value.duration_months,
+      batchAllocateForm.value.remark
+    )
+    const successCount = res.data.success?.length ?? 0
+    const failedCount = res.data.failed?.length ?? 0
+    ElMessage.success(`批量分配完成：成功 ${successCount}，失败 ${failedCount}`)
+    batchAllocateDialogVisible.value = false
+    loadMachines()
+  } catch (error: any) {
+    ElMessage.error(error?.msg || '批量分配失败')
+  } finally {
+    batchAllocateLoading.value = false
+  }
+}
+
+// 批量回收
+const handleBatchReclaim = async () => {
+  const ids = selectedMachines.value.map(m => String(m.id))
+  try {
+    await ElMessageBox.confirm(
+      `确定要批量回收选中的 ${ids.length} 台机器吗？回收后客户将无法继续使用。`,
+      '批量回收确认',
+      { confirmButtonText: '确定回收', cancelButtonText: '取消', type: 'warning' }
+    )
+    const res = await batchReclaim(ids)
+    const successCount = res.data.success?.length ?? 0
+    const failedCount = res.data.failed?.length ?? 0
+    ElMessage.success(`批量回收完成：成功 ${successCount}，失败 ${failedCount}`)
+    loadMachines()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.msg || '批量回收失败')
+    }
+  }
+}
+
 onMounted(() => {
   loadMachines()
 })
@@ -341,6 +453,12 @@ onMounted(() => {
     <div class="page-header">
       <h2 class="page-title">机器列表</h2>
       <div class="header-actions">
+        <template v-if="hasSelection">
+          <el-button type="warning" @click="handleBatchMaintenance(true)">批量维护</el-button>
+          <el-button type="success" @click="handleBatchAllocate">批量分配</el-button>
+          <el-button type="danger" @click="handleBatchReclaim">批量回收</el-button>
+          <span class="selection-count">已选 {{ selectedMachines.length }} 台</span>
+        </template>
         <el-button @click="handleImport">批量导入</el-button>
         <el-button type="primary" @click="handleAdd">添加机器</el-button>
       </div>
@@ -373,169 +491,153 @@ onMounted(() => {
       </el-form>
     </el-card>
 
-    <!-- 数据表格 -->
-    <DataTable
-      :data="machines"
-      :total="total"
-      :loading="loading"
-      :current-page="pageRequest.page"
-      :page-size="pageRequest.pageSize"
-      :show-pagination="true"
-      @page-change="handlePageChange"
-      @size-change="handleSizeChange"
-    >
-      <el-table-column type="expand">
-        <template #default="{ row }">
-          <div class="expand-connection">
-            <div class="conn-section">
-              <span class="conn-title">SSH</span>
-              <template v-if="getSSHCommand(row)">
-                <div class="conn-row">
-                  <span class="conn-label">主机：</span>
-                  <span>{{ row.ssh_host || row.public_ip || row.ip_address || '-' }}</span>
-                </div>
-                <div class="conn-row">
-                  <span class="conn-label">端口：</span>
-                  <span>{{ row.ssh_port || 22 }}</span>
-                </div>
-                <div class="conn-row">
-                  <span class="conn-label">用户：</span>
-                  <span>{{ row.ssh_username || 'root' }}</span>
-                </div>
-                <div class="conn-row">
-                  <span class="conn-label">命令：</span>
-                  <code class="ssh-cmd">{{ getSSHCommand(row) }}</code>
-                  <el-button link :icon="CopyDocument" @click="copyToClipboard(getSSHCommand(row))" />
-                </div>
-              </template>
-              <span v-else class="conn-empty">未配置</span>
+    <!-- 机器列表 -->
+    <div v-loading="loading" class="machine-items">
+      <!-- 列表头：全选 -->
+      <div class="list-header" v-if="machines.length > 0">
+        <el-checkbox
+          :model-value="isAllSelected"
+          :indeterminate="isIndeterminate"
+          @change="toggleSelectAll"
+        />
+        <span class="select-all-label">
+          {{ hasSelection ? `已选 ${selectedMachines.length} / ${machines.length} 台` : '全选' }}
+        </span>
+      </div>
+
+      <div
+        v-for="(machine, index) in machines"
+        :key="machine.id"
+        class="machine-row"
+        :class="{ 'is-selected': selectedMachines.some(m => m.id === machine.id) }"
+      >
+        <!-- 顶栏：序号 + 勾选 + 名称 + 状态 + 操作 -->
+        <div class="row-header">
+          <span class="row-index">{{ getRowIndex(index) }}</span>
+          <el-checkbox
+            :model-value="selectedMachines.some(m => m.id === machine.id)"
+            @change="toggleSelect(machine)"
+          />
+          <el-link type="primary" class="row-name" @click="handleViewDetail(machine)">
+            {{ machine.name || machine.hostname || machine.id }}
+          </el-link>
+          <el-tag :type="getDeviceStatusType(machine.device_status)">{{ getDeviceStatusText(machine.device_status) }}</el-tag>
+          <el-tag :type="getAllocStatusType(machine.allocation_status)">{{ getAllocStatusText(machine.allocation_status) }}</el-tag>
+          <div class="row-actions">
+            <el-button v-if="machine.allocation_status === 'idle'" type="success" size="small" plain @click="handleAllocate(machine)">分配</el-button>
+            <el-button v-if="machine.allocation_status === 'allocated'" type="danger" size="small" plain @click="handleReclaim(machine)">回收</el-button>
+            <el-button v-if="machine.needs_collect" type="warning" size="small" plain @click="handleCollectSpec(machine)">补采</el-button>
+            <el-button v-if="machine.allocation_status !== 'allocated'" size="small" plain @click="handleToggleMaintenance(machine)">{{ machine.allocation_status === 'maintenance' ? '取消维护' : '维护' }}</el-button>
+            <el-button type="danger" size="small" text :disabled="machine.allocation_status === 'allocated'" @click="handleDelete(machine)">删除</el-button>
+          </div>
+        </div>
+
+        <!-- 三栏：配置 | 对内 | 对外 -->
+        <div class="row-body">
+          <div class="body-col">
+            <div class="col-title">配置信息</div>
+            <div class="spec-row">
+              <span class="spec-label">地域</span>
+              <span class="spec-value">{{ machine.region || '-' }}</span>
             </div>
-            <div class="conn-section">
-              <span class="conn-title">Jupyter</span>
-              <template v-if="row.jupyter_url">
-                <div class="conn-row">
-                  <a class="conn-link" :href="row.jupyter_url" target="_blank">{{ row.jupyter_url }}</a>
-                  <el-button link :icon="CopyDocument" @click="copyToClipboard(row.jupyter_url)" />
-                </div>
-              </template>
-              <span v-else class="conn-empty">未配置</span>
+            <div class="spec-row">
+              <span class="spec-label">GPU</span>
+              <span class="spec-value" v-if="machine.gpus && machine.gpus.length > 0">{{ machine.gpus.length }}x {{ machine.gpus[0]?.name }} ({{ Math.round((machine.gpus[0]?.memory_total_mb ?? 0) / 1024) }}GB)</span>
+              <span class="spec-value text-muted" v-else>-</span>
             </div>
-            <div class="conn-section">
-              <span class="conn-title">VNC</span>
-              <template v-if="row.vnc_url">
-                <div class="conn-row">
-                  <a class="conn-link" :href="row.vnc_url" target="_blank">{{ row.vnc_url }}</a>
-                  <el-button link :icon="CopyDocument" @click="copyToClipboard(row.vnc_url)" />
-                </div>
-              </template>
-              <span v-else class="conn-empty">未配置</span>
+            <div class="spec-row">
+              <span class="spec-label">CPU</span>
+              <span class="spec-value">{{ machine.cpu_info || '-' }}{{ machine.total_cpu ? ' / ' + machine.total_cpu + ' 核' : '' }}</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-label">内存</span>
+              <span class="spec-value">{{ machine.total_memory_gb ? machine.total_memory_gb + ' GB' : '-' }}</span>
+            </div>
+            <div class="spec-row">
+              <span class="spec-label">硬盘</span>
+              <span class="spec-value">{{ machine.total_disk_gb ? machine.total_disk_gb + ' GB' : '-' }}</span>
             </div>
           </div>
-        </template>
-      </el-table-column>
-      <el-table-column label="序号" width="70" align="center">
-        <template #default="{ $index }">
-          {{ getRowIndex($index) }}
-        </template>
-      </el-table-column>
-      <el-table-column prop="id" label="ID" width="150" show-overflow-tooltip />
-      <el-table-column label="机器名称" min-width="150">
-        <template #default="{ row }">
-          <el-link type="primary" @click="handleViewDetail(row)">
-            {{ row.name || row.hostname || row.id }}
-          </el-link>
-        </template>
-      </el-table-column>
-      <el-table-column prop="region" label="区域" width="100" />
-      <el-table-column label="设备状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="getDeviceStatusType(row.device_status)">
-            {{ getDeviceStatusText(row.device_status) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="分配状态" width="100">
-        <template #default="{ row }">
-          <el-tag :type="getAllocStatusType(row.allocation_status)">
-            {{ getAllocStatusText(row.allocation_status) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="采集状态" width="120">
-        <template #default="{ row }">
-          <el-tag :type="getCollectType(row.needs_collect)">
-            {{ getCollectText(row.needs_collect) }}
-          </el-tag>
-        </template>
-      </el-table-column>
-      <el-table-column label="GPU信息" min-width="200">
-        <template #default="{ row }">
-          <template v-if="row.gpus && row.gpus.length > 0">
-            {{ row.gpus.length }}x {{ row.gpus[0].name }} ({{ Math.round(row.gpus[0].memory_total_mb / 1024) }}GB)
-          </template>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="CPU/内存" min-width="150">
-        <template #default="{ row }">
-          {{ row.total_cpu || '-' }} 核 / {{ row.total_memory_gb ? row.total_memory_gb + ' GB' : '-' }}
-        </template>
-      </el-table-column>
-      <el-table-column label="SSH 连接" min-width="220">
-        <template #default="{ row }">
-          <template v-if="getSSHCommand(row)">
-            <el-tooltip :content="getSSHCommand(row)" placement="top">
-              <code class="ssh-cmd">{{ getSSHCommand(row) }}</code>
-            </el-tooltip>
-            <el-button
-              link
-              type="primary"
-              size="small"
-              :icon="CopyDocument"
-              @click.stop="copyToClipboard(getSSHCommand(row))"
-            />
-          </template>
-          <span v-else>-</span>
-        </template>
-      </el-table-column>
-      <el-table-column label="操作" width="280" fixed="right">
-        <template #default="{ row }">
-          <el-button
-            v-if="row.allocation_status !== 'allocated'"
-            link
-            type="success"
-            size="small"
-            @click="handleAllocate(row)"
-          >
-            分配
-          </el-button>
-          <el-button
-            v-if="row.allocation_status === 'allocated'"
-            link
-            type="danger"
-            size="small"
-            @click="handleReclaim(row)"
-          >
-            回收
-          </el-button>
-          <el-button
-            v-if="row.needs_collect"
-            link
-            type="warning"
-            size="small"
-            @click="handleCollectSpec(row)"
-          >
-            补采
-          </el-button>
-          <el-button link type="primary" size="small" @click="handleToggleMaintenance(row)">
-            {{ row.allocation_status === 'maintenance' ? '取消维护' : '设为维护' }}
-          </el-button>
-          <el-button link type="danger" size="small" @click="handleDelete(row)">
-            删除
-          </el-button>
-        </template>
-      </el-table-column>
-    </DataTable>
+
+          <div class="body-col">
+            <div class="col-title">对内连接</div>
+            <div class="conn-line">
+              <span class="conn-tag">SSH</span>
+              <template v-if="machine.ssh_host || machine.ip_address">
+                <span class="conn-field"><span class="conn-label">IP:</span> {{ machine.ip_address || '-' }}</span>
+                <span class="conn-field"><span class="conn-label">端口:</span> {{ machine.ssh_port || 22 }}</span>
+                <span class="conn-field"><span class="conn-label">用户:</span> {{ machine.ssh_username || 'root' }}</span>
+                <span class="conn-field" v-if="machine.ssh_password">
+                  <span class="conn-label">密码:</span>
+                  <span class="password-text">{{ machine.ssh_password }}</span>
+                  <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(machine.ssh_password)" />
+                </span>
+              </template>
+              <span v-else class="text-muted">未配置</span>
+            </div>
+            <div class="conn-line">
+              <span class="conn-tag conn-tag-jupyter">Jupyter</span>
+              <template v-if="machine.jupyter_url">
+                <a class="conn-link" :href="machine.jupyter_url" target="_blank">{{ machine.jupyter_url }}</a>
+                <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(machine.jupyter_url)" />
+              </template>
+              <span v-else class="text-muted">未配置</span>
+            </div>
+            <div class="conn-line">
+              <span class="conn-tag conn-tag-vnc">VNC</span>
+              <template v-if="machine.vnc_url">
+                <a class="conn-link" :href="machine.vnc_url" target="_blank">{{ machine.vnc_url }}</a>
+                <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(machine.vnc_url)" />
+              </template>
+              <span v-else class="text-muted">未配置</span>
+            </div>
+          </div>
+
+          <div class="body-col">
+            <div class="col-title">对外连接</div>
+            <div class="conn-line">
+              <span class="conn-tag conn-tag-ext">SSH</span>
+              <template v-if="machine.nginx_domain || machine.external_ip">
+                <span class="conn-field">{{ machine.nginx_domain || machine.external_ip }}:{{ machine.external_ssh_port || '-' }}</span>
+                <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(`ssh -p ${machine.external_ssh_port || 22} ${machine.ssh_username || 'root'}@${machine.nginx_domain || machine.external_ip}`)" />
+              </template>
+              <span v-else class="text-muted">未配置</span>
+            </div>
+            <div class="conn-line">
+              <span class="conn-tag conn-tag-ext">Jupyter</span>
+              <template v-if="machine.external_jupyter_port && (machine.nginx_domain || machine.external_ip)">
+                <span class="conn-field">{{ machine.nginx_domain || machine.external_ip }}:{{ machine.external_jupyter_port }}</span>
+                <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(`${machine.nginx_domain || machine.external_ip}:${machine.external_jupyter_port}`)" />
+              </template>
+              <span v-else class="text-muted">未配置</span>
+            </div>
+            <div class="conn-line">
+              <span class="conn-tag conn-tag-ext">VNC</span>
+              <template v-if="machine.external_vnc_port && (machine.nginx_domain || machine.external_ip)">
+                <span class="conn-field">{{ machine.nginx_domain || machine.external_ip }}:{{ machine.external_vnc_port }}</span>
+                <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(`${machine.nginx_domain || machine.external_ip}:${machine.external_vnc_port}`)" />
+              </template>
+              <span v-else class="text-muted">未配置</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <el-empty v-if="!loading && machines.length === 0" description="暂无机器数据" />
+    </div>
+
+    <!-- 分页 -->
+    <div class="pagination-wrapper">
+      <el-pagination
+        v-model:current-page="pageRequest.page"
+        v-model:page-size="pageRequest.pageSize"
+        :total="total"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @current-change="handlePageChange"
+        @size-change="handleSizeChange"
+      />
+    </div>
 
     <!-- 分配弹窗 -->
     <el-dialog
@@ -597,13 +699,13 @@ onMounted(() => {
     >
       <div class="import-hint">
         请输入 CSV 格式数据，每行一台机器，字段顺序：<br />
-        <code>host_ip, ssh_port, region, gpu_model, gpu_count, cpu_cores, ram_size, disk_size, price_hourly</code>
+        <code>IP地址, SSH端口, 用户名, 密码</code>
       </div>
       <el-input
         v-model="importText"
         type="textarea"
         :rows="8"
-        placeholder="192.168.1.10, 22, cn-east, A100, 8, 64, 512, 2000, 50.0"
+        placeholder="192.168.1.10, 22, root, password123"
       />
       <div class="import-actions">
         <el-button @click="parseImportText">解析预览</el-button>
@@ -619,15 +721,10 @@ onMounted(() => {
         max-height="250"
         style="margin-top: 12px"
       >
-        <el-table-column prop="host_ip" label="IP" width="140" />
-        <el-table-column prop="ssh_port" label="SSH端口" width="80" />
-        <el-table-column prop="region" label="区域" width="90" />
-        <el-table-column prop="gpu_model" label="GPU型号" width="90" />
-        <el-table-column prop="gpu_count" label="GPU数" width="70" />
-        <el-table-column prop="cpu_cores" label="CPU核" width="70" />
-        <el-table-column prop="ram_size" label="内存GB" width="80" />
-        <el-table-column prop="disk_size" label="磁盘GB" width="80" />
-        <el-table-column prop="price_hourly" label="时价" width="70" />
+        <el-table-column prop="host_ip" label="IP地址" width="160" />
+        <el-table-column prop="ssh_port" label="SSH端口" width="100" />
+        <el-table-column prop="ssh_username" label="用户名" width="120" />
+        <el-table-column prop="ssh_password" label="密码" width="140" />
       </el-table>
       <template #footer>
         <el-button @click="importDialogVisible = false">取消</el-button>
@@ -638,6 +735,57 @@ onMounted(() => {
           @click="handleConfirmImport"
         >
           确认导入
+        </el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 批量分配弹窗 -->
+    <el-dialog
+      v-model="batchAllocateDialogVisible"
+      title="批量分配机器"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form :model="batchAllocateForm" label-width="100px">
+        <el-form-item label="已选机器">
+          <span>{{ selectedMachines.length }} 台</span>
+        </el-form-item>
+        <el-form-item label="选择客户" required>
+          <el-select
+            v-model="batchAllocateForm.customer_id"
+            placeholder="请选择客户"
+            filterable
+            style="width: 100%"
+          >
+            <el-option
+              v-for="customer in customers"
+              :key="customer.id"
+              :label="customer.company || customer.username"
+              :value="customer.id"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="租用时长">
+          <el-input-number
+            v-model="batchAllocateForm.duration_months"
+            :min="1"
+            :max="36"
+          />
+          <span style="margin-left: 8px">个月</span>
+        </el-form-item>
+        <el-form-item label="备注">
+          <el-input
+            v-model="batchAllocateForm.remark"
+            type="textarea"
+            :rows="2"
+            placeholder="可选备注"
+          />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="batchAllocateDialogVisible = false">取消</el-button>
+        <el-button type="primary" :loading="batchAllocateLoading" @click="handleConfirmBatchAllocate">
+          确认分配
         </el-button>
       </template>
     </el-dialog>
@@ -667,72 +815,242 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.selection-count {
+  font-size: 13px;
+  color: #409eff;
+  margin-left: 4px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* 勾选框放大 */
+.machine-items :deep(.el-checkbox__inner) {
+  width: 18px;
+  height: 18px;
+}
+
+.machine-items :deep(.el-checkbox__inner::after) {
+  height: 9px;
+  left: 6px;
+  top: 2px;
+  width: 4px;
+}
+
+/* 机器列表 */
+.machine-items {
+  min-height: 200px;
+}
+
+/* 列表头：全选栏 */
+.list-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px;
+  margin-bottom: 8px;
+  background: #f5f7fa;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+}
+
+.select-all-label {
+  font-size: 13px;
+  color: #606266;
+  user-select: none;
+}
+
+.machine-row {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 12px;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.machine-row:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border-color: #c0c4cc;
+}
+
+.machine-row.is-selected {
+  border-color: #409eff;
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.15);
+}
+
+/* 顶栏 */
+.row-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+}
+
+.row-index {
+  font-size: 13px;
+  color: #909399;
+  min-width: 20px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.row-name {
+  font-weight: 600;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.row-actions {
+  margin-left: auto;
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+/* 三栏布局 */
+.row-body {
+  display: flex;
+  border-top: 1px solid #ebeef5;
+}
+
+.body-col {
+  flex: 1;
+  padding: 10px 20px;
+}
+
+.body-col + .body-col {
+  border-left: 1px solid #ebeef5;
+}
+
+.col-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.spec-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+.spec-label {
+  color: #909399;
+  font-size: 12px;
+  min-width: 32px;
+  flex-shrink: 0;
+}
+
+.spec-value {
+  color: #303133;
+}
+
+/* 连接信息行 */
+.conn-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #606266;
+  padding: 4px 0;
+  border-top: 1px dashed #f0f0f0;
+}
+
+.conn-line:first-child {
+  border-top: 1px solid #f0f0f0;
+}
+
+.conn-tag {
+  display: inline-block;
+  min-width: 52px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+  background: #ecf5ff;
+  padding: 2px 8px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.conn-tag-jupyter {
+  color: #e6a23c;
+  background: #fdf6ec;
+}
+
+.conn-tag-vnc {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+
+.conn-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.conn-label {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.conn-empty {
+  color: #c0c4cc;
+  font-size: 13px;
+  border-top: 1px solid #f0f0f0;
+  padding: 4px 0;
+}
+
 .ssh-cmd {
   font-size: 12px;
   color: #606266;
   background: #f5f7fa;
   padding: 2px 6px;
   border-radius: 3px;
-  max-width: 180px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
   display: inline-block;
   vertical-align: middle;
-}
-
-.expand-connection {
-  display: flex;
-  gap: 32px;
-  padding: 12px 24px;
-  background: #f9fafb;
-}
-
-.conn-section {
-  flex: 1;
-}
-
-.conn-title {
-  display: block;
-  font-weight: 600;
-  font-size: 13px;
-  color: #303133;
-  margin-bottom: 8px;
-}
-
-.conn-row {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #606266;
-  margin-bottom: 4px;
-}
-
-.conn-label {
-  color: #909399;
-  min-width: 40px;
 }
 
 .conn-link {
   color: #409eff;
   text-decoration: none;
+  font-size: 13px;
 }
 
 .conn-link:hover {
   text-decoration: underline;
 }
 
-.conn-empty {
+.conn-tag-ext {
+  color: #f56c6c;
+  background: #fef0f0;
+}
+
+.password-text {
+  font-family: monospace;
   font-size: 13px;
+  color: #303133;
+}
+
+.text-muted {
   color: #c0c4cc;
 }
 
-.header-actions {
+/* 分页 */
+.pagination-wrapper {
   display: flex;
-  gap: 8px;
+  justify-content: flex-end;
+  margin-top: 20px;
 }
 
+/* 导入弹窗 */
 .import-hint {
   margin-bottom: 12px;
   font-size: 13px;

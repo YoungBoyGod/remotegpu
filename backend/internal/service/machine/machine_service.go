@@ -17,6 +17,7 @@ import (
 type MachineService struct {
 	machineDao    *dao.MachineDao
 	hostMetricDao *dao.HostMetricDao
+	allocationDao *dao.AllocationDao
 	db            *gorm.DB
 	statusCache   *HostStatusCache
 }
@@ -25,6 +26,7 @@ func NewMachineService(db *gorm.DB) *MachineService {
 	return &MachineService{
 		machineDao:    dao.NewMachineDao(db),
 		hostMetricDao: dao.NewHostMetricDao(db),
+		allocationDao: dao.NewAllocationDao(db),
 		db:            db,
 	}
 }
@@ -443,8 +445,15 @@ func (s *MachineService) UpdateMachine(ctx context.Context, hostID string, field
 	return s.machineDao.UpdateFields(ctx, hostID, fields)
 }
 
-// DeleteMachine 删除机器
+// DeleteMachine 删除机器（检查分配状态，防止误删已分配的机器）
 func (s *MachineService) DeleteMachine(ctx context.Context, hostID string) error {
+	host, err := s.machineDao.FindByID(ctx, hostID)
+	if err != nil {
+		return err
+	}
+	if host.AllocationStatus == "allocated" {
+		return fmt.Errorf("cannot delete machine: currently allocated to a customer")
+	}
 	return s.machineDao.Delete(ctx, hostID)
 }
 
@@ -463,13 +472,27 @@ func (s *MachineService) UpdateAllocationStatus(ctx context.Context, hostID stri
 	return s.machineDao.UpdateAllocationStatus(ctx, hostID, allocationStatus)
 }
 
-// BatchSetMaintenance 批量设置维护状态
-func (s *MachineService) BatchSetMaintenance(ctx context.Context, hostIDs []string, maintenance bool) (int64, error) {
-	status := "idle"
-	if maintenance {
-		status = "maintenance"
+// ResolvePostMaintenanceStatus 取消维护时，根据是否有活跃分配决定恢复为 allocated 还是 idle
+func (s *MachineService) ResolvePostMaintenanceStatus(ctx context.Context, hostID string) (string, error) {
+	_, err := s.allocationDao.FindActiveByHostID(ctx, hostID)
+	if err == nil {
+		return "allocated", nil
 	}
-	return s.machineDao.BatchUpdateAllocationStatus(ctx, hostIDs, status)
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		return "idle", nil
+	}
+	return "", err
+}
+
+// BatchSetMaintenance 批量设置维护状态
+// 进入维护：直接设为 maintenance
+// 取消维护：检查是否有活跃分配，有则恢复为 allocated，否则恢复为 idle
+func (s *MachineService) BatchSetMaintenance(ctx context.Context, hostIDs []string, maintenance bool) (int64, error) {
+	if maintenance {
+		return s.machineDao.BatchUpdateAllocationStatus(ctx, hostIDs, "maintenance")
+	}
+	// 取消维护：只将当前为 maintenance 的机器恢复为 idle
+	return s.machineDao.BatchUpdateAllocationStatus(ctx, hostIDs, "idle")
 }
 
 // Heartbeat 处理 Agent 心跳上报，优先写入 Redis 缓存，减少数据库写入压力

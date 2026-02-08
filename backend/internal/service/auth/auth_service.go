@@ -95,6 +95,14 @@ func (s *AuthService) GetProfile(ctx context.Context, userID uint) (*entity.Cust
 	return s.customerDao.FindByID(ctx, userID)
 }
 
+// UpdateProfile 更新用户个人资料
+func (s *AuthService) UpdateProfile(ctx context.Context, userID uint, fields map[string]interface{}) (*entity.Customer, error) {
+	if err := s.customerDao.UpdateFields(ctx, userID, fields); err != nil {
+		return nil, errors.Wrap(errors.ErrorDatabase, err)
+	}
+	return s.customerDao.FindByID(ctx, userID)
+}
+
 // AdminLogin Admin 专用登录，验证角色
 func (s *AuthService) AdminLogin(ctx context.Context, username, password string) (string, string, int64, bool, error) {
 	customer, err := s.customerDao.FindByUsername(ctx, username)

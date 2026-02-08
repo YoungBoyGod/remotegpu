@@ -18,6 +18,17 @@ func NewHeartbeatController(machineSvc *serviceMachine.MachineService) *Heartbea
 }
 
 // Heartbeat 处理 Agent 心跳上报（支持携带监控指标）
+// @Summary Agent 心跳上报
+// @Description Agent 定期上报心跳，可携带 CPU/内存/GPU 等监控指标
+// @Tags Agent - Heartbeat
+// @Accept json
+// @Produce json
+// @Param request body v1.HeartbeatRequest true "心跳请求"
+// @Security AgentToken
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /agent/heartbeat [post]
 func (c *HeartbeatController) Heartbeat(ctx *gin.Context) {
 	var req v1.HeartbeatRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -57,6 +68,17 @@ func (c *HeartbeatController) Heartbeat(ctx *gin.Context) {
 }
 
 // Register 处理 Agent 注册
+// @Summary Agent 注册
+// @Description Agent 首次启动时向平台注册，上报机器信息
+// @Tags Agent - Heartbeat
+// @Accept json
+// @Produce json
+// @Param request body v1.RegisterRequest true "注册请求"
+// @Security AgentToken
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /agent/register [post]
 func (c *HeartbeatController) Register(ctx *gin.Context) {
 	var req v1.RegisterRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

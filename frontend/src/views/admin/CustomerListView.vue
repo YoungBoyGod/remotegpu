@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCustomerList, disableCustomer, enableCustomer } from '@/api/admin'
 import type { Customer } from '@/types/customer'
@@ -21,23 +21,6 @@ const pageRequest = ref<PageRequest>({
 const filters = ref({
   status: '',
   keyword: ''
-})
-
-const filteredCustomers = computed(() => {
-  let result = customers.value
-  if (filters.value.status) {
-    result = result.filter((c) => c.status === filters.value.status)
-  }
-  const kw = filters.value.keyword.trim().toLowerCase()
-  if (kw) {
-    result = result.filter((c) =>
-      (c.company_code || '').toLowerCase().includes(kw) ||
-      (c.username || '').toLowerCase().includes(kw) ||
-      (c.company || '').toLowerCase().includes(kw) ||
-      (c.email || '').toLowerCase().includes(kw)
-    )
-  }
-  return result
 })
 
 const loadCustomers = async () => {
@@ -154,6 +137,14 @@ const formatDateTime = (value?: string | null) => {
   return date.toLocaleString()
 }
 
+const maskPhone = (phone?: string | null) => {
+  if (!phone) return '-'
+  if (phone.length >= 7) {
+    return phone.slice(0, 3) + '****' + phone.slice(-4)
+  }
+  return phone
+}
+
 const getCustomerName = (customer: Customer) => {
   return customer.company_code || customer.company || customer.display_name || customer.username || customer.name || '-'
 }
@@ -184,7 +175,7 @@ onMounted(() => {
         <el-form-item label="状态">
           <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 120px">
             <el-option label="正常" value="active" />
-            <el-option label="已停用" value="suspended" />
+            <el-option label="已禁用" value="disabled" />
             <el-option label="已删除" value="deleted" />
           </el-select>
         </el-form-item>
@@ -200,8 +191,8 @@ onMounted(() => {
 
     <!-- 数据表格 -->
     <DataTable
-      :data="filteredCustomers"
-      :total="filteredCustomers.length"
+      :data="customers"
+      :total="total"
       :loading="loading"
       :current-page="pageRequest.page"
       :page-size="pageRequest.pageSize"
@@ -212,7 +203,7 @@ onMounted(() => {
       <el-table-column type="index" label="序号" width="70" :index="getRowIndex" />
       <el-table-column label="公司代号" min-width="160">
         <template #default="{ row }">
-          {{ getCustomerName(row) }}
+          {{ row.company_code || '-' }}
         </template>
       </el-table-column>
       <el-table-column label="联系人" width="140">
@@ -221,7 +212,11 @@ onMounted(() => {
         </template>
       </el-table-column>
       <el-table-column prop="email" label="联系邮箱" min-width="200" />
-      <el-table-column prop="phone" label="联系电话" width="140" />
+      <el-table-column label="联系电话" width="140">
+        <template #default="{ row }">
+          {{ maskPhone(row.phone) }}
+        </template>
+      </el-table-column>
       <el-table-column label="状态" width="100">
         <template #default="{ row }">
           <el-tag :type="getStatusType(row.status)">
@@ -242,7 +237,7 @@ onMounted(() => {
           <el-button v-if="row.status === 'active'" link type="warning" size="small" @click="handleDisable(row)">
             禁用
           </el-button>
-          <el-button v-if="row.status === 'suspended'" link type="success" size="small" @click="handleEnable(row)">
+          <el-button v-if="row.status === 'disabled'" link type="success" size="small" @click="handleEnable(row)">
             启用
           </el-button>
         </template>

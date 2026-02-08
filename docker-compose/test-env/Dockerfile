@@ -1,3 +1,16 @@
+# 第一阶段：编译 Agent（build context 为项目根目录）
+FROM golang:1.23-alpine AS agent-builder
+
+WORKDIR /build
+
+COPY agent/go.mod agent/go.sum ./
+RUN go mod download
+
+COPY agent/ .
+
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o remotegpu-agent ./cmd/
+
+# 第二阶段：测试环境
 FROM ubuntu:22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -28,8 +41,11 @@ RUN pip3 install --no-cache-dir \
 # 创建目录
 RUN mkdir -p /workspace /run/sshd /opt/remotegpu-agent
 
-# 复制启动脚本
-COPY start.sh /start.sh
+# 从构建阶段复制 Agent 二进制
+COPY --from=agent-builder /build/remotegpu-agent /opt/remotegpu-agent/remotegpu-agent
+
+# 复制启动脚本（build context 为项目根目录）
+COPY docker-compose/test-env/start.sh /start.sh
 RUN chmod +x /start.sh
 
 EXPOSE 22 8888 8090

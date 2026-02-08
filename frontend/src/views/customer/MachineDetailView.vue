@@ -98,8 +98,8 @@ onMounted(async () => {
             <el-descriptions-item label="机器名称">{{ machine?.name || machine?.hostname || '-' }}</el-descriptions-item>
             <el-descriptions-item label="主机名">{{ machine?.hostname || '-' }}</el-descriptions-item>
             <el-descriptions-item label="状态">
-              <el-tag :type="statusTagType(machine?.status)">
-                {{ machine?.status || '-' }}
+              <el-tag :type="statusTagType(machine?.device_status)">
+                {{ machine?.device_status === 'online' ? '在线' : '离线' }}
               </el-tag>
             </el-descriptions-item>
             <el-descriptions-item label="内网IP">{{ machine?.ip_address || '-' }}</el-descriptions-item>
@@ -117,9 +117,9 @@ onMounted(async () => {
           <el-descriptions :column="1" border v-loading="loading">
             <el-descriptions-item label="CPU(核)">{{ machine?.total_cpu || '-' }}</el-descriptions-item>
             <el-descriptions-item label="内存(GB)">{{ machine?.total_memory_gb || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="GPU型号">{{ machine?.gpuModel || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="GPU数量">{{ machine?.gpuCount || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="GPU显存(GB)">{{ machine?.gpuMemory || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="GPU型号">{{ machine?.gpus?.[0]?.name || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="GPU数量">{{ machine?.gpus?.length || '-' }}</el-descriptions-item>
+            <el-descriptions-item label="GPU显存(GB)">{{ machine?.gpus?.[0]?.memory_total_mb ? Math.round(machine.gpus[0].memory_total_mb / 1024) : '-' }}</el-descriptions-item>
           </el-descriptions>
         </el-card>
       </el-col>

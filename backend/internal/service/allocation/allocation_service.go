@@ -52,6 +52,7 @@ type AllocationService struct {
 	allocationDao *dao.AllocationDao
 	machineDao    *dao.MachineDao
 	sshKeyDao     *dao.SSHKeyDao
+	customerDao   *dao.CustomerDao
 	auditService  *audit.AuditService
 	agentClient   AgentClient
 	redisClient   *redis.Client
@@ -75,6 +76,7 @@ func NewAllocationService(db *gorm.DB, auditSvc *audit.AuditService, agentClient
 		allocationDao: dao.NewAllocationDao(db),
 		machineDao:    dao.NewMachineDao(db),
 		sshKeyDao:     dao.NewSSHKeyDao(db),
+		customerDao:   dao.NewCustomerDao(db),
 		auditService:  auditSvc,
 		agentClient:   agentClient,
 		redisClient:   cache.GetRedis(),
@@ -246,6 +248,11 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 		return nil, errors.New(errors.ErrorInvalidParams, "lease duration must be at least 1 month")
 	}
 
+	// 配额校验：检查客户 GPU 配额是否允许新增分配
+	if err := s.checkGPUQuota(ctx, customerID, hostID); err != nil {
+		return nil, err
+	}
+
 	// 使用事务确保原子性
 	var allocation *entity.Allocation
 
@@ -295,6 +302,20 @@ func (s *AllocationService) AllocateMachine(ctx context.Context, customerID uint
 	if err != nil {
 		return nil, err
 	}
+
+	// 记录审计日志
+	_ = s.auditService.CreateLog(
+		ctx,
+		&customerID,
+		"system", "127.0.0.1", "POST", fmt.Sprintf("/admin/machines/%s/allocate", hostID),
+		"allocate_machine", "machine", hostID,
+		map[string]interface{}{
+			"allocation_id":   allocation.ID,
+			"customer_id":     customerID,
+			"duration_months": durationMonths,
+		},
+		200,
+	)
 
 	// 记录 Prometheus 指标
 	middleware.MachineAllocationsTotal.Inc()
@@ -355,8 +376,8 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
 
-		// 3. 更新机器分配状态为维护中
-		if err := machineDao.UpdateAllocationStatus(ctx, hostID, "maintenance"); err != nil {
+		// 3. 更新机器分配状态为空闲
+		if err := machineDao.UpdateAllocationStatus(ctx, hostID, "idle"); err != nil {
 			return errors.Wrap(errors.ErrorDatabase, err)
 		}
 
@@ -394,6 +415,11 @@ func (s *AllocationService) ReclaimMachine(ctx context.Context, hostID string) e
 
 func (s *AllocationService) GetRecent(ctx context.Context) ([]entity.Allocation, error) {
 	return s.allocationDao.FindRecent(ctx, 5)
+}
+
+// ListAllocations 分页查询分配记录（管理端）
+func (s *AllocationService) ListAllocations(ctx context.Context, page, pageSize int, filters map[string]interface{}) ([]entity.Allocation, int64, error) {
+	return s.allocationDao.List(ctx, page, pageSize, filters)
 }
 
 // ValidateHostOwnership 确认机器归属当前用户
@@ -488,4 +514,37 @@ func (s *AllocationService) syncCustomerKeysToHost(ctx context.Context, customer
 	if err := s.EnqueueSyncKeys(ctx, hostID, publicKeys, ""); err != nil {
 		logger.GetLogger().Warn(fmt.Sprintf("入队 SSH 密钥同步失败: %v", err))
 	}
+}
+
+// checkGPUQuota 检查客户 GPU 配额是否允许新增分配
+func (s *AllocationService) checkGPUQuota(ctx context.Context, customerID uint, hostID string) error {
+	customer, err := s.customerDao.FindByID(ctx, customerID)
+	if err != nil {
+		return errors.Wrap(errors.ErrorDatabase, err)
+	}
+
+	// quota_gpu 为 0 表示不限制
+	if customer.QuotaGPU == 0 {
+		return nil
+	}
+
+	// 统计该机器上的 GPU 数量
+	var gpuCount int64
+	if err := s.db.WithContext(ctx).Model(&entity.GPU{}).
+		Where("host_id = ?", hostID).Count(&gpuCount).Error; err != nil {
+		return errors.Wrap(errors.ErrorDatabase, err)
+	}
+
+	// 统计客户已分配的 GPU 数量
+	currentGPUs, err := s.allocationDao.CountGPUsByCustomerID(ctx, customerID)
+	if err != nil {
+		return errors.Wrap(errors.ErrorDatabase, err)
+	}
+
+	if currentGPUs+gpuCount > int64(customer.QuotaGPU) {
+		return errors.New(errors.ErrorQuotaExceeded,
+			fmt.Sprintf("GPU 配额不足：当前已分配 %d 个，本次需新增 %d 个，配额上限 %d 个",
+				currentGPUs, gpuCount, customer.QuotaGPU))
+	}
+	return nil
 }

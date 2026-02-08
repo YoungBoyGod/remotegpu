@@ -201,12 +201,6 @@ const router = createRouter({
           meta: { title: '机器列表' },
         },
         {
-          path: 'machines/:id',
-          name: 'customer-machines-detail',
-          component: () => import('@/views/customer/MachineDetailView.vue'),
-          meta: { title: '机器详情' },
-        },
-        {
           path: 'machines/enroll',
           name: 'customer-machines-enroll',
           component: () => import('@/views/customer/MachineEnrollView.vue'),
@@ -217,6 +211,12 @@ const router = createRouter({
           name: 'customer-machines-enrollments',
           component: () => import('@/views/customer/MachineEnrollmentListView.vue'),
           meta: { title: '添加进度' },
+        },
+        {
+          path: 'machines/:id',
+          name: 'customer-machines-detail',
+          component: () => import('@/views/customer/MachineDetailView.vue'),
+          meta: { title: '机器详情' },
         },
         // 资源管理
         {
@@ -266,6 +266,44 @@ const router = createRouter({
           name: 'customer-notifications',
           component: () => import('@/views/customer/NotificationListView.vue'),
           meta: { title: '消息通知' },
+        },
+        {
+          path: 'profile',
+          name: 'customer-profile',
+          component: () => import('@/views/customer/ProfileView.vue'),
+          meta: { title: '个人信息' },
+        },
+        // 环境管理
+        {
+          path: 'environments',
+          name: 'customer-environments',
+          component: () => import('@/views/customer/EnvironmentListView.vue'),
+          meta: { title: '开发环境' },
+        },
+        {
+          path: 'environments/create',
+          name: 'customer-environments-create',
+          component: () => import('@/views/customer/EnvironmentCreateView.vue'),
+          meta: { title: '创建环境' },
+        },
+        {
+          path: 'environments/:id',
+          name: 'customer-environments-detail',
+          component: () => import('@/views/customer/EnvironmentDetailView.vue'),
+          meta: { title: '环境详情' },
+        },
+        // 工作空间管理
+        {
+          path: 'workspaces',
+          name: 'customer-workspaces',
+          component: () => import('@/views/customer/WorkspaceView.vue'),
+          meta: { title: '工作空间管理' },
+        },
+        {
+          path: 'workspaces/:id',
+          name: 'customer-workspaces-detail',
+          component: () => import('@/views/customer/WorkspaceDetailView.vue'),
+          meta: { title: '工作空间详情' },
         },
         {
           path: ':pathMatch(.*)*',

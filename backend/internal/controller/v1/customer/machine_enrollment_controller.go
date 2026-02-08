@@ -20,6 +20,18 @@ func NewMachineEnrollmentController(svc *serviceMachine.MachineEnrollmentService
 }
 
 // Create 创建用户机器添加任务
+// @Summary 创建机器添加任务
+// @Description 用户提交机器信息，系统异步完成 Agent 部署和机器注册
+// @Tags Customer - Machine Enrollment
+// @Accept json
+// @Produce json
+// @Param request body v1.CreateMachineEnrollmentRequest true "机器添加请求"
+// @Security Bearer
+// @Success 200 {object} entity.MachineEnrollment
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /customer/machines/enroll [post]
 func (c *MachineEnrollmentController) Create(ctx *gin.Context) {
 	userID := ctx.GetUint("userID")
 	if userID == 0 {
@@ -67,6 +79,17 @@ func (c *MachineEnrollmentController) Create(ctx *gin.Context) {
 }
 
 // List 列出用户机器添加任务
+// @Summary 获取机器添加任务列表
+// @Description 分页获取当前用户的机器添加任务列表
+// @Tags Customer - Machine Enrollment
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /customer/machines/enrollments [get]
 func (c *MachineEnrollmentController) List(ctx *gin.Context) {
 	userID := ctx.GetUint("userID")
 	if userID == 0 {
@@ -92,6 +115,18 @@ func (c *MachineEnrollmentController) List(ctx *gin.Context) {
 }
 
 // Detail 获取单个任务
+// @Summary 获取机器添加任务详情
+// @Description 根据任务 ID 获取机器添加任务的详细信息
+// @Tags Customer - Machine Enrollment
+// @Produce json
+// @Param id path int true "任务 ID"
+// @Security Bearer
+// @Success 200 {object} entity.MachineEnrollment
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Failure 403 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Router /customer/machines/enrollments/{id} [get]
 func (c *MachineEnrollmentController) Detail(ctx *gin.Context) {
 	userID := ctx.GetUint("userID")
 	if userID == 0 {

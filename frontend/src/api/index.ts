@@ -9,10 +9,6 @@
 export * as authApi from './auth'
 export * as adminApi from './admin'
 export * as customerApi from './customer'
-export * as hostApi from './host'
-export * as environmentApi from './environment'
-export * as workspaceApi from './workspace'
-export * as quotaApi from './quota'
 
 // 导出公共类型
 export * from './common/types'

@@ -10,9 +10,10 @@ import {
   createAlertRule,
   updateAlertRule,
   deleteAlertRule,
-  toggleAlertRule,
+  getMachineList,
 } from '@/api/admin'
 import type { AlertRule, AlertRuleForm } from '@/api/admin'
+import type { Machine } from '@/types/machine'
 
 interface Alert {
   id: number
@@ -155,7 +156,7 @@ const ruleForm = ref<AlertRuleForm>({
   condition: '>',
   threshold: 90,
   severity: 'warning',
-  duration_seconds: 300,
+  duration: 300,
   enabled: true,
   description: '',
 })
@@ -176,7 +177,7 @@ const openAddRuleDialog = () => {
     condition: '>',
     threshold: 90,
     severity: 'warning',
-    duration_seconds: 300,
+    duration: 300,
     enabled: true,
     description: '',
   }
@@ -193,7 +194,7 @@ const openEditRuleDialog = (rule: AlertRule) => {
     condition: rule.condition,
     threshold: rule.threshold,
     severity: rule.severity,
-    duration_seconds: rule.duration_seconds,
+    duration: rule.duration_seconds,
     enabled: rule.enabled,
     description: rule.description || '',
   }
@@ -236,7 +237,7 @@ const handleDeleteRule = async (rule: AlertRule) => {
 
 const handleToggleRule = async (rule: AlertRule) => {
   try {
-    await toggleAlertRule(rule.id, !rule.enabled)
+    await updateAlertRule(rule.id, { enabled: !rule.enabled })
     ElMessage.success(rule.enabled ? '规则已禁用' : '规则已启用')
     loadRules()
   } catch (error) {
@@ -244,10 +245,52 @@ const handleToggleRule = async (rule: AlertRule) => {
   }
 }
 
+// ==================== 离线机器 ====================
+
+const offlineMachines = ref<Machine[]>([])
+const offlineLoading = ref(false)
+
+const loadOfflineMachines = async () => {
+  offlineLoading.value = true
+  try {
+    const res = await getMachineList({
+      page: 1,
+      pageSize: 100,
+      status: 'offline',
+    })
+    offlineMachines.value = res.data.list || []
+  } catch (error) {
+    console.error(error)
+  } finally {
+    offlineLoading.value = false
+  }
+}
+
+const getOfflineDuration = (lastHeartbeat?: string | null) => {
+  if (!lastHeartbeat) return '未知'
+  const last = new Date(lastHeartbeat).getTime()
+  if (Number.isNaN(last)) return '未知'
+  const diff = Date.now() - last
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 60) return `${minutes} 分钟`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} 小时 ${minutes % 60} 分钟`
+  const days = Math.floor(hours / 24)
+  return `${days} 天 ${hours % 24} 小时`
+}
+
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '-'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return date.toLocaleString('zh-CN')
+}
+
 // Tab 切换时加载对应数据
 watch(activeTab, (tab) => {
   if (tab === 'alerts') loadAlerts()
   else if (tab === 'rules') loadRules()
+  else if (tab === 'offline') loadOfflineMachines()
 })
 
 onMounted(() => {
@@ -397,6 +440,50 @@ onMounted(() => {
           </div>
         </el-card>
       </el-tab-pane>
+
+      <!-- ==================== 离线机器 Tab ==================== -->
+      <el-tab-pane label="离线机器" name="offline">
+        <el-card>
+          <div class="offline-toolbar">
+            <el-button type="primary" :icon="Search" @click="loadOfflineMachines">刷新</el-button>
+            <span class="offline-count" v-if="offlineMachines.length > 0">
+              共 {{ offlineMachines.length }} 台离线
+            </span>
+          </div>
+
+          <div v-loading="offlineLoading" class="offline-list">
+            <div
+              v-for="machine in offlineMachines"
+              :key="machine.id"
+              class="offline-item"
+            >
+              <div class="offline-header">
+                <div class="offline-title-section">
+                  <el-tag type="danger" size="small">离线</el-tag>
+                  <h4 class="offline-name">{{ machine.name || machine.hostname || machine.id }}</h4>
+                </div>
+                <el-tag type="warning" size="small">
+                  已离线 {{ getOfflineDuration(machine.last_heartbeat) }}
+                </el-tag>
+              </div>
+
+              <div class="offline-meta">
+                <span class="meta-item">IP: {{ machine.ip_address || '-' }}</span>
+                <span class="meta-item">区域: {{ machine.region || '-' }}</span>
+                <span class="meta-item">最后心跳: {{ formatDateTime(machine.last_heartbeat) }}</span>
+              </div>
+
+              <div class="offline-reason">
+                <span class="reason-label">可能原因：</span>
+                <span v-if="!machine.last_heartbeat">从未上报心跳，Agent 可能未部署或未启动</span>
+                <span v-else>心跳超时，机器可能关机、网络中断或 Agent 进程异常</span>
+              </div>
+            </div>
+
+            <el-empty v-if="!offlineLoading && offlineMachines.length === 0" description="当前没有离线机器" />
+          </div>
+        </el-card>
+      </el-tab-pane>
     </el-tabs>
 
     <!-- 规则编辑对话框 -->
@@ -426,7 +513,7 @@ onMounted(() => {
           </div>
         </el-form-item>
         <el-form-item label="持续时间">
-          <el-input-number v-model="ruleForm.duration_seconds" :min="0" :step="60" />
+          <el-input-number v-model="ruleForm.duration" :min="0" :step="60" />
           <span style="margin-left: 8px; color: #909399">秒</span>
         </el-form-item>
         <el-form-item label="告警级别" prop="severity">
@@ -525,5 +612,71 @@ onMounted(() => {
   margin-bottom: 16px;
   display: flex;
   justify-content: flex-end;
+}
+
+.offline-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.offline-count {
+  font-size: 14px;
+  color: #f56c6c;
+  font-weight: 600;
+}
+
+.offline-list {
+  min-height: 200px;
+}
+
+.offline-item {
+  padding: 16px 20px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+  border-left: 4px solid #f56c6c;
+  background: #fef0f0;
+}
+
+.offline-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.offline-title-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.offline-name {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.offline-meta {
+  display: flex;
+  gap: 16px;
+  color: #909399;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.offline-reason {
+  font-size: 13px;
+  color: #606266;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+}
+
+.offline-reason .reason-label {
+  color: #e6a23c;
+  font-weight: 600;
 }
 </style>

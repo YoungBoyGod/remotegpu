@@ -22,6 +22,15 @@ func NewSystemConfigController(cs *serviceConfig.SystemConfigService) *SystemCon
 }
 
 // GetConfigs 获取所有系统配置（支持按分组过滤）
+// @Summary 获取系统配置列表
+// @Description 获取所有系统配置，支持按分组筛选
+// @Tags Admin - System Config
+// @Produce json
+// @Param group query string false "配置分组筛选"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/settings/configs [get]
 func (c *SystemConfigController) GetConfigs(ctx *gin.Context) {
 	group := ctx.Query("group")
 	if group != "" {
@@ -43,6 +52,17 @@ func (c *SystemConfigController) GetConfigs(ctx *gin.Context) {
 }
 
 // UpdateConfigs 批量更新系统配置
+// @Summary 批量更新系统配置
+// @Description 批量更新多个系统配置项的值
+// @Tags Admin - System Config
+// @Accept json
+// @Produce json
+// @Param request body v1.UpdateSystemConfigsRequest true "批量更新配置请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/settings/configs [put]
 func (c *SystemConfigController) UpdateConfigs(ctx *gin.Context) {
 	var req apiV1.UpdateSystemConfigsRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -59,6 +79,14 @@ func (c *SystemConfigController) UpdateConfigs(ctx *gin.Context) {
 }
 
 // ListGroups 获取所有配置分组
+// @Summary 获取配置分组列表
+// @Description 获取系统配置的所有分组名称
+// @Tags Admin - System Config
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/settings/configs/groups [get]
 func (c *SystemConfigController) ListGroups(ctx *gin.Context) {
 	groups, err := c.configService.ListGroups(ctx)
 	if err != nil {
@@ -69,6 +97,16 @@ func (c *SystemConfigController) ListGroups(ctx *gin.Context) {
 }
 
 // GetConfig 获取单条配置
+// @Summary 获取单条系统配置
+// @Description 根据配置 ID 获取单条系统配置详情
+// @Tags Admin - System Config
+// @Produce json
+// @Param id path int true "配置 ID"
+// @Security Bearer
+// @Success 200 {object} entity.SystemConfig
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Router /admin/settings/configs/{id} [get]
 func (c *SystemConfigController) GetConfig(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -86,6 +124,18 @@ func (c *SystemConfigController) GetConfig(ctx *gin.Context) {
 }
 
 // CreateConfig 创建配置项
+// @Summary 创建系统配置
+// @Description 创建新的系统配置项
+// @Tags Admin - System Config
+// @Accept json
+// @Produce json
+// @Param request body v1.CreateSystemConfigRequest true "创建配置请求"
+// @Security Bearer
+// @Success 200 {object} entity.SystemConfig
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 409 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/settings/configs [post]
 func (c *SystemConfigController) CreateConfig(ctx *gin.Context) {
 	var req apiV1.CreateSystemConfigRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -115,6 +165,19 @@ func (c *SystemConfigController) CreateConfig(ctx *gin.Context) {
 }
 
 // UpdateConfig 更新单条配置
+// @Summary 更新单条系统配置
+// @Description 根据配置 ID 更新系统配置项的值
+// @Tags Admin - System Config
+// @Accept json
+// @Produce json
+// @Param id path int true "配置 ID"
+// @Param request body v1.UpdateSystemConfigRequest true "更新配置请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/settings/configs/{id} [put]
 func (c *SystemConfigController) UpdateConfig(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -164,6 +227,17 @@ func (c *SystemConfigController) UpdateConfig(ctx *gin.Context) {
 }
 
 // DeleteConfig 删除配置项
+// @Summary 删除系统配置
+// @Description 根据配置 ID 删除系统配置项
+// @Tags Admin - System Config
+// @Produce json
+// @Param id path int true "配置 ID"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/settings/configs/{id} [delete]
 func (c *SystemConfigController) DeleteConfig(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)

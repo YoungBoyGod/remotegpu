@@ -345,17 +345,30 @@ func (c *MachineController) Import(ctx *gin.Context) {
 
 	var hosts []entity.Host
 	for _, m := range req.Machines {
+		// 根据 gpu_count 创建 GPU 关联记录
+		var gpus []entity.GPU
+		for i := 0; i < m.GPUCount; i++ {
+			gpus = append(gpus, entity.GPU{
+				HostID: m.HostIP,
+				Index:  i,
+				Name:   m.GPUModel,
+				Status: "available",
+			})
+		}
+
 		hosts = append(hosts, entity.Host{
-			IPAddress:     m.HostIP,
-			SSHPort:       m.SSHPort,
-			Region:        m.Region,
-			CPUInfo:       m.GPUModel, // 暂存 GPU 型号信息
-			TotalCPU:      m.CPUCores,
-			TotalMemoryGB: int64(m.RAMSize),
-			TotalDiskGB:   int64(m.DiskSize),
-			Status:           "idle",
+			ID:               m.HostIP,
+			IPAddress:        m.HostIP,
+			SSHPort:          m.SSHPort,
+			Region:           m.Region,
+			TotalCPU:         m.CPUCores,
+			TotalMemoryGB:    int64(m.RAMSize),
+			TotalDiskGB:      int64(m.DiskSize),
+			Status:           "offline",
 			DeviceStatus:     "offline",
 			AllocationStatus: "idle",
+			NeedsCollect:     true,
+			GPUs:             gpus,
 		})
 	}
 
@@ -371,6 +384,18 @@ func (c *MachineController) Import(ctx *gin.Context) {
 }
 
 // Update 更新机器信息
+// @Summary 更新机器信息
+// @Description 根据机器 ID 更新机器的基本信息字段
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param id path string true "机器 ID"
+// @Param request body v1.UpdateMachineRequest true "更新机器请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/{id} [put]
 func (c *MachineController) Update(ctx *gin.Context) {
 	hostID := ctx.Param("id")
 
@@ -464,6 +489,17 @@ func (c *MachineController) Update(ctx *gin.Context) {
 func (c *MachineController) Delete(ctx *gin.Context) {
 	hostID := ctx.Param("id")
 
+	// 检查机器分配状态，已分配的机器不允许删除
+	host, err := c.machineService.GetHost(ctx, hostID)
+	if err != nil {
+		c.Error(ctx, 404, "Machine not found")
+		return
+	}
+	if host.AllocationStatus == "allocated" {
+		c.Error(ctx, 400, "无法删除已分配的机器，请先回收后再删除")
+		return
+	}
+
 	if err := c.machineService.DeleteMachine(ctx, hostID); err != nil {
 		c.Error(ctx, 500, err.Error())
 		return
@@ -495,20 +531,38 @@ func (c *MachineController) SetMaintenance(ctx *gin.Context) {
 		return
 	}
 
-	allocationStatus := "idle"
 	if req.Maintenance {
-		allocationStatus = "maintenance"
-	}
-
-	if err := c.machineService.UpdateAllocationStatus(ctx, hostID, allocationStatus); err != nil {
-		c.Error(ctx, 500, err.Error())
-		return
+		// 进入维护模式
+		if err := c.machineService.UpdateAllocationStatus(ctx, hostID, "maintenance"); err != nil {
+			c.Error(ctx, 500, err.Error())
+			return
+		}
+	} else {
+		// 取消维护：检查是否有活跃分配，有则恢复为 allocated，否则恢复为 idle
+		restoreStatus, err := c.machineService.ResolvePostMaintenanceStatus(ctx, hostID)
+		if err != nil {
+			c.Error(ctx, 500, err.Error())
+			return
+		}
+		if err := c.machineService.UpdateAllocationStatus(ctx, hostID, restoreStatus); err != nil {
+			c.Error(ctx, 500, err.Error())
+			return
+		}
 	}
 
 	c.Success(ctx, gin.H{"message": "Status updated"})
 }
 
 // Usage 获取机器使用情况
+// @Summary 获取机器使用情况
+// @Description 获取指定机器的资源使用统计信息
+// @Tags Admin - Machines
+// @Produce json
+// @Param id path string true "机器 ID"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/{id}/usage [get]
 func (c *MachineController) Usage(ctx *gin.Context) {
 	hostID := ctx.Param("id")
 	usage, err := c.machineService.GetMachineUsage(ctx, hostID)
@@ -520,6 +574,17 @@ func (c *MachineController) Usage(ctx *gin.Context) {
 }
 
 // BatchSetMaintenance 批量启用/禁用机器（设置维护状态）
+// @Summary 批量设置机器维护状态
+// @Description 批量启用或禁用指定机器的维护模式
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param request body v1.BatchSetMaintenanceRequest true "批量维护请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/batch/maintenance [post]
 func (c *MachineController) BatchSetMaintenance(ctx *gin.Context) {
 	var req apiV1.BatchSetMaintenanceRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -540,6 +605,17 @@ func (c *MachineController) BatchSetMaintenance(ctx *gin.Context) {
 }
 
 // BatchAllocate 批量分配机器给客户
+// @Summary 批量分配机器
+// @Description 将多台机器批量分配给指定客户
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param request body v1.BatchAllocateRequest true "批量分配请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/batch/allocate [post]
 func (c *MachineController) BatchAllocate(ctx *gin.Context) {
 	var req apiV1.BatchAllocateRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -557,6 +633,17 @@ func (c *MachineController) BatchAllocate(ctx *gin.Context) {
 }
 
 // BatchReclaim 批量回收机器
+// @Summary 批量回收机器
+// @Description 批量回收已分配给客户的机器
+// @Tags Admin - Machines
+// @Accept json
+// @Produce json
+// @Param request body v1.BatchReclaimRequest true "批量回收请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/machines/batch/reclaim [post]
 func (c *MachineController) BatchReclaim(ctx *gin.Context) {
 	var req apiV1.BatchReclaimRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

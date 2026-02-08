@@ -110,14 +110,28 @@ export function getCurrentUser(): Promise<ApiResponse<UserInfo>> {
  * 请求密码重置
  */
 export function requestPasswordReset(data: ResetPasswordRequest): Promise<ApiResponse<void>> {
-  return request.post('/auth/password-reset/request', data)
+  return request.post('/auth/password/request', data)
 }
 
 /**
  * 提交新密码
  */
 export function confirmPasswordReset(data: ConfirmPasswordResetRequest): Promise<ApiResponse<void>> {
-  return request.post('/auth/password-reset/confirm', data)
+  return request.post('/auth/password/confirm', data)
+}
+
+/**
+ * 更新个人资料
+ */
+export interface UpdateProfileRequest {
+  display_name?: string
+  full_name?: string
+  phone?: string
+  company?: string
+}
+
+export function updateProfile(data: UpdateProfileRequest): Promise<ApiResponse<UserInfo>> {
+  return request.put('/auth/profile', data)
 }
 
 /**

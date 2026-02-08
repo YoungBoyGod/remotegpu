@@ -44,6 +44,18 @@ const menuItems = ref<MenuItem[]>([
     ]
   },
   {
+    id: 'environments',
+    title: '开发环境',
+    icon: '🖥️',
+    path: '/customer/environments'
+  },
+  {
+    id: 'workspaces',
+    title: '工作空间',
+    icon: '📂',
+    path: '/customer/workspaces'
+  },
+  {
     id: 'datasets',
     title: '数据集管理',
     icon: '📁',
@@ -60,6 +72,7 @@ const menuItems = ref<MenuItem[]>([
     title: '设置',
     icon: '⚙️',
     children: [
+      { id: 'profile', title: '个人信息', path: '/customer/profile', icon: '👤' },
       { id: 'ssh-keys', title: 'SSH密钥', path: '/customer/ssh-keys', icon: '🔑' }
     ]
   }

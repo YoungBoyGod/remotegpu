@@ -31,6 +31,16 @@ groups:
           summary: "磁盘空间不足 ({{ $labels.instance }})"
           description: "挂载点 {{ $labels.mountpoint }} 使用率超过 85%，当前值: {{ $value | printf \"%.1f\" }}%"
 
+      # 磁盘空间紧张
+      - alert: DiskSpaceHigh
+        expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 > 90
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "磁盘使用率超过 90% ({{ $labels.instance }})"
+          description: "挂载点 {{ $labels.mountpoint }} 使用率超过 90%，当前值: {{ $value | printf \"%.1f\" }}%"
+
       # 磁盘空间严重不足
       - alert: DiskSpaceCritical
         expr: (1 - node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"} / node_filesystem_size_bytes) * 100 > 95

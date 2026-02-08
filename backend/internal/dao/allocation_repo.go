@@ -45,6 +45,8 @@ func (d *AllocationDao) FindRecent(ctx context.Context, limit int) ([]entity.All
 func (d *AllocationDao) FindActiveByHostID(ctx context.Context, hostID string) (*entity.Allocation, error) {
 	var allocation entity.Allocation
 	err := d.db.WithContext(ctx).
+		Preload("Customer").
+		Preload("Host").
 		Where("host_id = ? AND status = ?", hostID, "active").
 		First(&allocation).Error
 	if err != nil {
@@ -56,6 +58,8 @@ func (d *AllocationDao) FindActiveByHostID(ctx context.Context, hostID string) (
 func (d *AllocationDao) FindActiveByHostAndCustomer(ctx context.Context, hostID string, customerID uint) (*entity.Allocation, error) {
 	var allocation entity.Allocation
 	err := d.db.WithContext(ctx).
+		Preload("Customer").
+		Preload("Host").
 		Where("host_id = ? AND customer_id = ? AND status = ?", hostID, customerID, "active").
 		First(&allocation).Error
 	if err != nil {
@@ -69,6 +73,7 @@ func (d *AllocationDao) FindAllActiveByCustomerID(ctx context.Context, customerI
 	var allocations []entity.Allocation
 	err := d.db.WithContext(ctx).
 		Where("customer_id = ? AND status = ?", customerID, "active").
+		Preload("Customer").
 		Preload("Host").
 		Order("created_at desc").
 		Find(&allocations).Error
@@ -96,6 +101,7 @@ func (d *AllocationDao) FindActiveByCustomerID(ctx context.Context, customerID u
 
 	offset := (page - 1) * pageSize
 	err := query.
+		Preload("Customer").
 		Preload("Host").
 		Order("created_at desc").
 		Offset(offset).
@@ -112,6 +118,39 @@ func (d *AllocationDao) CountActiveByCustomerID(ctx context.Context, customerID 
 		Where("customer_id = ? AND status = ?", customerID, "active").
 		Count(&count).Error
 	return count, err
+}
+
+// List 分页查询分配记录（管理端），支持按客户/机器/状态筛选
+func (d *AllocationDao) List(ctx context.Context, page, pageSize int, filters map[string]interface{}) ([]entity.Allocation, int64, error) {
+	var allocations []entity.Allocation
+	var total int64
+
+	query := d.db.WithContext(ctx).Model(&entity.Allocation{})
+
+	if customerID, ok := filters["customer_id"]; ok {
+		query = query.Where("customer_id = ?", customerID)
+	}
+	if hostID, ok := filters["host_id"]; ok {
+		query = query.Where("host_id = ?", hostID)
+	}
+	if status, ok := filters["status"]; ok {
+		query = query.Where("status = ?", status)
+	}
+
+	if err := query.Count(&total).Error; err != nil {
+		return nil, 0, err
+	}
+
+	offset := (page - 1) * pageSize
+	err := query.
+		Preload("Customer").
+		Preload("Host").
+		Order("created_at desc").
+		Offset(offset).
+		Limit(pageSize).
+		Find(&allocations).Error
+
+	return allocations, total, err
 }
 
 // CountGPUsByCustomerID 统计客户已分配的 GPU 数量（通过活跃分配关联的主机上的 GPU）

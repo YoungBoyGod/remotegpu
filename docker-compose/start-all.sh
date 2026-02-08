@@ -59,8 +59,21 @@ for service in "${services_layer3[@]}"; do
 done
 echo ""
 
-# 第四层：可选服务
-echo ">>> 第四层：启动可选服务..."
+# 第四层：测试环境
+echo ">>> 第四层：启动测试环境..."
+read -p "是否启动测试环境 (test-env)? (y/n): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    echo "启动 test-env（含 Agent 构建，首次可能较慢）..."
+    cd "test-env"
+    docker-compose up -d --build
+    cd ..
+    sleep 5
+fi
+echo ""
+
+# 第五层：可选服务
+echo ">>> 第五层：启动可选服务..."
 echo "注意: JumpServer 使用外部服务，不在此启动"
 read -p "是否启动 Guacamole, Harbor? (y/n): " -n 1 -r
 echo

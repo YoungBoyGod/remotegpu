@@ -71,6 +71,8 @@ func setupTestEnv(t *testing.T) *testEnv {
 		quota_storage INTEGER DEFAULT 0,
 		balance REAL DEFAULT 0,
 		currency TEXT DEFAULT 'CNY',
+		credit_limit REAL DEFAULT 0,
+		billing_plan_id INTEGER,
 		last_login_at DATETIME
 	)`).Error
 	require.NoError(t, err)

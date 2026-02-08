@@ -170,6 +170,62 @@ func (c *AuthController) AdminLogin(ctx *gin.Context) {
 	})
 }
 
+// UpdateProfile 更新个人资料
+// @Summary 更新个人资料
+// @Description 更新当前登录用户的个人资料信息
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security Bearer
+// @Param request body v1.UpdateProfileRequest true "更新资料请求"
+// @Success 200 {object} entity.Customer
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Router /auth/profile [put]
+func (c *AuthController) UpdateProfile(ctx *gin.Context) {
+	userID := ctx.GetUint("userID")
+	if userID == 0 {
+		c.Error(ctx, 401, "Unauthorized")
+		return
+	}
+
+	var req apiV1.UpdateProfileRequest
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		c.Error(ctx, 400, "Invalid request parameters")
+		return
+	}
+
+	// 构建更新字段（仅更新非空字段）
+	fields := make(map[string]interface{})
+	if req.DisplayName != "" {
+		fields["display_name"] = req.DisplayName
+	}
+	if req.Phone != "" {
+		fields["phone"] = req.Phone
+	}
+	if req.Company != "" {
+		fields["company"] = req.Company
+	}
+	if req.FullName != "" {
+		fields["full_name"] = req.FullName
+	}
+	if req.AvatarURL != "" {
+		fields["avatar_url"] = req.AvatarURL
+	}
+
+	if len(fields) == 0 {
+		c.Error(ctx, 400, "No fields to update")
+		return
+	}
+
+	profile, err := c.authService.UpdateProfile(ctx, userID, fields)
+	if err != nil {
+		c.Error(ctx, 500, "Failed to update profile")
+		return
+	}
+	c.Success(ctx, profile)
+}
+
 // ChangePassword 修改密码
 // @Summary 修改密码
 // @Description 使用旧密码修改为新密码
@@ -208,6 +264,15 @@ func (c *AuthController) ChangePassword(ctx *gin.Context) {
 }
 
 // RequestPasswordReset 请求密码重置
+// @Summary 请求密码重置
+// @Description 通过邮箱发送密码重置链接
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body v1.RequestPasswordResetRequest true "密码重置请求"
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Router /auth/password/request [post]
 func (c *AuthController) RequestPasswordReset(ctx *gin.Context) {
 	var req apiV1.RequestPasswordResetRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -229,6 +294,15 @@ func (c *AuthController) RequestPasswordReset(ctx *gin.Context) {
 }
 
 // ConfirmPasswordReset 确认密码重置
+// @Summary 确认密码重置
+// @Description 使用重置令牌设置新密码
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body v1.ConfirmPasswordResetRequest true "确认密码重置请求"
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Router /auth/password/confirm [post]
 func (c *AuthController) ConfirmPasswordReset(ctx *gin.Context) {
 	var req apiV1.ConfirmPasswordResetRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {

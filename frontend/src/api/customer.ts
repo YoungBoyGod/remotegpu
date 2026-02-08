@@ -5,10 +5,18 @@ import type { Task, TaskLogResponse, TaskResultResponse } from '@/types/task'
 
 // ==================== 仪表盘 ====================
 
+export interface DashboardOverview {
+  myMachines: number
+  runningTasks: number
+  totalTasks: number
+  datasetCount: number
+  recentTasks: Task[]
+}
+
 /**
  * 聚合客户端仪表盘数据（前端并行调用已有 API）
  */
-export async function getDashboardOverview(): Promise<ApiResponse<any>> {
+export async function getDashboardOverview(): Promise<ApiResponse<DashboardOverview>> {
   const [machinesRes, tasksRes, datasetsRes] = await Promise.all([
     request.get('/customer/machines', { params: { page: 1, pageSize: 1 } }),
     request.get('/customer/tasks', { params: { page: 1, pageSize: 5 } }),
@@ -16,9 +24,9 @@ export async function getDashboardOverview(): Promise<ApiResponse<any>> {
   ])
 
   const totalMachines = machinesRes?.data?.total || 0
-  const taskList: any[] = tasksRes?.data?.list || []
+  const taskList: Task[] = tasksRes?.data?.list || []
   const totalTasks = tasksRes?.data?.total || 0
-  const runningTasks = taskList.filter((t: any) => t.status === 'running').length
+  const runningTasks = taskList.filter((t) => t.status === 'running').length
   const datasetTotal = datasetsRes?.data?.total || 0
 
   return {
@@ -31,7 +39,7 @@ export async function getDashboardOverview(): Promise<ApiResponse<any>> {
       datasetCount: datasetTotal,
       recentTasks: taskList,
     },
-  } as ApiResponse<any>
+  }
 }
 
 // ==================== 我的机器 ====================
@@ -44,9 +52,30 @@ export function getMyMachines(params?: PageRequest): Promise<ApiResponse<PageRes
 }
 
 /**
+ * 机器连接信息
+ */
+export interface MachineConnectionInfo {
+  ssh?: {
+    host?: string
+    port?: number
+    username?: string
+    password?: string
+    command?: string
+  }
+  jupyter?: {
+    url?: string
+    token?: string
+  }
+  vnc?: {
+    url?: string
+    password?: string
+  }
+}
+
+/**
  * 获取机器连接信息
  */
-export function getMachineConnection(id: string | number): Promise<ApiResponse<any>> {
+export function getMachineConnection(id: string | number): Promise<ApiResponse<MachineConnectionInfo>> {
   return request.get(`/customer/machines/${id}/connection`)
 }
 
@@ -173,10 +202,22 @@ export function downloadTaskResult(id: string): Promise<Blob> {
 
 // ==================== 数据集管理 ====================
 
+export interface Dataset {
+  id: number
+  name: string
+  description?: string
+  total_size: number
+  file_count: number
+  status: string
+  visibility?: string
+  created_at: string
+  updated_at?: string
+}
+
 /**
  * 获取数据集列表
  */
-export function getDatasetList(params: PageRequest): Promise<ApiResponse<PageResponse<any>>> {
+export function getDatasetList(params: PageRequest): Promise<ApiResponse<PageResponse<Dataset>>> {
   return request.get('/customer/datasets', { params })
 }
 
@@ -190,14 +231,14 @@ export function initMultipartUpload(data: { filename: string; size: number; md5?
 /**
  * 完成分片上传
  */
-export function completeMultipartUpload(id: number, data: { upload_id: string; name: string; size: number }): Promise<ApiResponse<any>> {
+export function completeMultipartUpload(id: number, data: { upload_id: string; name: string; size: number }): Promise<ApiResponse<Dataset>> {
   return request.post(`/customer/datasets/${id}/complete`, data)
 }
 
 /**
  * 挂载数据集
  */
-export function mountDataset(id: number, data: { machine_id: string; mount_path: string; read_only?: boolean }): Promise<ApiResponse<any>> {
+export function mountDataset(id: number, data: { machine_id: string; mount_path: string; read_only?: boolean }): Promise<ApiResponse<void>> {
   return request.post(`/customer/datasets/${id}/mount`, data)
 }
 
@@ -247,17 +288,27 @@ export function markAllNotificationsRead(): Promise<ApiResponse<void>> {
 
 // ==================== SSH 密钥管理 ====================
 
+export interface SSHKey {
+  id: number
+  customer_id: number
+  name: string
+  fingerprint: string
+  key_type?: string
+  public_key?: string
+  created_at: string
+}
+
 /**
  * 获取SSH密钥列表
  */
-export function getSshKeys(): Promise<ApiResponse<any[]>> {
+export function getSshKeys(): Promise<ApiResponse<SSHKey[]>> {
   return request.get('/customer/keys')
 }
 
 /**
  * 添加SSH密钥
  */
-export function addSshKey(data: { name: string; publicKey: string }): Promise<ApiResponse<any>> {
+export function addSshKey(data: { name: string; publicKey: string }): Promise<ApiResponse<SSHKey>> {
   return request.post('/customer/keys', data)
 }
 

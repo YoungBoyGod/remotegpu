@@ -40,5 +40,11 @@ if [ "${JUPYTER_ENABLED:-true}" = "true" ]; then
         --notebook-dir=/workspace &
 fi
 
+# 启动 Agent（如果二进制存在）
+if [ -x /opt/remotegpu-agent/remotegpu-agent ]; then
+    echo "启动 RemoteGPU Agent..."
+    /opt/remotegpu-agent/remotegpu-agent &
+fi
+
 # 保持容器运行
 exec tail -f /dev/null

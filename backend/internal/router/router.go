@@ -29,6 +29,8 @@ import (
 	serviceDocument "github.com/YoungBoyGod/remotegpu/internal/service/document"
 	serviceNotification "github.com/YoungBoyGod/remotegpu/internal/service/notification"
 	serviceTask "github.com/YoungBoyGod/remotegpu/internal/service/task"
+	serviceWorkspace "github.com/YoungBoyGod/remotegpu/internal/service/workspace"
+	serviceEnvironment "github.com/YoungBoyGod/remotegpu/internal/service/environment"
 
 	// 控制器层
 	ctrlAuth "github.com/YoungBoyGod/remotegpu/internal/controller/v1/auth"
@@ -43,6 +45,9 @@ import (
 	ctrlDocument "github.com/YoungBoyGod/remotegpu/internal/controller/v1/document"
 	ctrlNotification "github.com/YoungBoyGod/remotegpu/internal/controller/v1/notification"
 	ctrlStorage "github.com/YoungBoyGod/remotegpu/internal/controller/v1/storage"
+	ctrlWorkspace "github.com/YoungBoyGod/remotegpu/internal/controller/v1/workspace"
+	ctrlEnvironment "github.com/YoungBoyGod/remotegpu/internal/controller/v1/environment"
+	ctrlAllocation "github.com/YoungBoyGod/remotegpu/internal/controller/v1/allocation"
 )
 
 // agentAdapter 适配器，将 AgentService 转换为 AgentSystemInfoProvider 接口
@@ -105,8 +110,8 @@ func InitRouter(r *gin.Engine) {
 	if c := cache.GetCache(); c != nil {
 		hostStatusCache := serviceMachine.NewHostStatusCache(c)
 		machineSvc.SetStatusCache(hostStatusCache)
-		// 启动定时同步（每 5 分钟将 Redis 状态同步到 PostgreSQL）
-		syncer := serviceMachine.NewHostStatusSyncer(db, hostStatusCache, 5*time.Minute)
+		// 启动定时同步（每 1 分钟将 Redis 状态同步到 PostgreSQL）
+		syncer := serviceMachine.NewHostStatusSyncer(db, hostStatusCache, 1*time.Minute)
 		go syncer.Start(context.Background())
 	}
 	auditSvc := serviceAudit.NewAuditService(db)
@@ -158,6 +163,8 @@ func InitRouter(r *gin.Engine) {
 	systemConfigSvc := serviceSystemConfig.NewSystemConfigService(db)
 	systemConfigSvc.SetAuditService(auditSvc) // 注入审计服务，配置变更时记录审计日志
 	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc, promClient)
+	workspaceSvc := serviceWorkspace.NewWorkspaceService(db)
+	environmentSvc := serviceEnvironment.NewEnvironmentService(db)
 
 	// --- 控制器层初始化 ---
 	authController := ctrlAuth.NewAuthController(authSvc)
@@ -182,6 +189,9 @@ func InitRouter(r *gin.Engine) {
 	documentController := ctrlDocument.NewDocumentController(documentSvc, storageSvc)
 	storageController := ctrlStorage.NewStorageController(storageSvc)
 	notificationController := ctrlNotification.NewNotificationController(notificationSvc)
+	workspaceController := ctrlWorkspace.NewWorkspaceController(workspaceSvc)
+	environmentController := ctrlEnvironment.NewEnvironmentController(environmentSvc)
+	allocationController := ctrlAllocation.NewAllocationController(allocSvc)
 
 	// API v1 路由
 	apiV1 := r.Group("/api/v1")
@@ -203,6 +213,7 @@ func InitRouter(r *gin.Engine) {
 
 			// 受保护的个人资料
 			authGroup.GET("/profile", middleware.Auth(db), authController.GetProfile)
+			authGroup.PUT("/profile", middleware.Auth(db), authController.UpdateProfile)
 			authGroup.POST("/password/change", middleware.Auth(db), authController.ChangePassword)
 			authGroup.POST("/password/request", authController.RequestPasswordReset)
 			authGroup.POST("/password/confirm", authController.ConfirmPasswordReset)
@@ -216,6 +227,7 @@ func InitRouter(r *gin.Engine) {
 			adminGroup.GET("/dashboard/stats", dashboardController.GetStats)
 			adminGroup.GET("/dashboard/gpu-trend", dashboardController.GetGPUTrend)
 			adminGroup.GET("/allocations/recent", dashboardController.GetRecentAllocations)
+			adminGroup.GET("/allocations", allocationController.List)
 
 			// 机器管理
 			adminGroup.GET("/machines", machineController.List)
@@ -263,6 +275,7 @@ func InitRouter(r *gin.Engine) {
 			// 镜像管理
 			adminGroup.GET("/images", imageController.List)
 			adminGroup.POST("/images/sync", imageController.Sync)
+			adminGroup.DELETE("/images/:id", imageController.Delete)
 
 			// 系统配置
 			adminGroup.GET("/settings/configs", systemConfigController.GetConfigs)
@@ -347,6 +360,25 @@ func InitRouter(r *gin.Engine) {
 			custGroup.GET("/notifications/unread-count", notificationController.UnreadCount)
 			custGroup.POST("/notifications/:id/read", notificationController.MarkRead)
 			custGroup.POST("/notifications/read-all", notificationController.MarkAllRead)
+
+			// 工作空间管理
+			custGroup.POST("/workspaces", workspaceController.Create)
+			custGroup.GET("/workspaces", workspaceController.List)
+			custGroup.GET("/workspaces/:id", workspaceController.Detail)
+			custGroup.PUT("/workspaces/:id", workspaceController.Update)
+			custGroup.DELETE("/workspaces/:id", workspaceController.Delete)
+			custGroup.POST("/workspaces/:id/members", workspaceController.AddMember)
+			custGroup.DELETE("/workspaces/:id/members/:userId", workspaceController.RemoveMember)
+			custGroup.GET("/workspaces/:id/members", workspaceController.ListMembers)
+
+			// 环境管理
+			custGroup.POST("/environments", environmentController.Create)
+			custGroup.GET("/environments", environmentController.List)
+			custGroup.GET("/environments/:id", environmentController.Detail)
+			custGroup.POST("/environments/:id/start", environmentController.Start)
+			custGroup.POST("/environments/:id/stop", environmentController.Stop)
+			custGroup.DELETE("/environments/:id", environmentController.Delete)
+			custGroup.GET("/environments/:id/access", environmentController.AccessInfo)
 		}
 
 		// 4. Agent Module (Agent 专用 API，需要 Agent Token 认证)

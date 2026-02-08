@@ -14,7 +14,7 @@ echo "========================================="
 echo ""
 
 # 获取所有服务目录（排除外部服务）
-all_services=("harbor" "guacamole" "uptime-kuma" "grafana" "prometheus" "nginx" "rustfs" "etcd" "redis" "postgresql")
+all_services=("test-env" "harbor" "guacamole" "uptime-kuma" "grafana" "prometheus" "nginx" "rustfs" "etcd" "redis" "postgresql")
 
 echo "注意: JumpServer 使用外部服务，不在此停止"
 echo "停止所有本地服务..."

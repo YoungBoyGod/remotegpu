@@ -1,10 +1,13 @@
 # RemoteGPU 测试环境
 # 模拟多台 GPU 机器，支持 SSH/Jupyter 访问
 # 用法: docker-compose up -d --build
+# 前置条件: docker network create remotegpu-network
 
 services:
   test-gpu-01:
-    build: .
+    build:
+      context: ../..
+      dockerfile: docker-compose/test-env/Dockerfile
     container_name: test-gpu-01
     hostname: gpu-node-01
     ports:
@@ -12,19 +15,26 @@ services:
       - "8891:8888"
       - "8901:8090"
     environment:
-      - SSH_PASSWORD=remotegpu123
+      - SSH_PASSWORD=${SSH_PASSWORD:-remotegpu123}
       - JUPYTER_ENABLED=true
-      - JUPYTER_TOKEN=remotegpu
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-remotegpu}
       - JUPYTER_PORT=8888
       - FAKE_GPU=true
     volumes:
       - workspace-01:/workspace
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep sshd || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - remotegpu-network
     restart: unless-stopped
 
   test-gpu-02:
-    build: .
+    build:
+      context: ../..
+      dockerfile: docker-compose/test-env/Dockerfile
     container_name: test-gpu-02
     hostname: gpu-node-02
     ports:
@@ -32,19 +42,26 @@ services:
       - "8892:8888"
       - "8902:8090"
     environment:
-      - SSH_PASSWORD=remotegpu123
+      - SSH_PASSWORD=${SSH_PASSWORD:-remotegpu123}
       - JUPYTER_ENABLED=true
-      - JUPYTER_TOKEN=remotegpu
+      - JUPYTER_TOKEN=${JUPYTER_TOKEN:-remotegpu}
       - JUPYTER_PORT=8888
       - FAKE_GPU=true
     volumes:
       - workspace-02:/workspace
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep sshd || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - remotegpu-network
     restart: unless-stopped
 
   test-gpu-03:
-    build: .
+    build:
+      context: ../..
+      dockerfile: docker-compose/test-env/Dockerfile
     container_name: test-gpu-03
     hostname: gpu-node-03
     ports:
@@ -52,11 +69,16 @@ services:
       - "8893:8888"
       - "8903:8090"
     environment:
-      - SSH_PASSWORD=remotegpu123
+      - SSH_PASSWORD=${SSH_PASSWORD:-remotegpu123}
       - JUPYTER_ENABLED=false
       - FAKE_GPU=true
     volumes:
       - workspace-03:/workspace
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep sshd || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
     networks:
       - remotegpu-network
     restart: unless-stopped

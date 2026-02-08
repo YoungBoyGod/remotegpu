@@ -32,6 +32,15 @@ func (c *SSHKeyController) getUserID(ctx *gin.Context) (uint, bool) {
 }
 
 // List 列出当前用户的所有 SSH 密钥
+// @Summary 获取 SSH 密钥列表
+// @Description 列出当前登录用户的所有 SSH 公钥
+// @Tags Customer - SSH Keys
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 401 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /customer/keys [get]
 func (c *SSHKeyController) List(ctx *gin.Context) {
 	userID, ok := c.getUserID(ctx)
 	if !ok {
@@ -48,6 +57,19 @@ func (c *SSHKeyController) List(ctx *gin.Context) {
 }
 
 // Create 创建新的 SSH 密钥
+// @Summary 创建 SSH 密钥
+// @Description 为当前用户添加新的 SSH 公钥
+// @Tags Customer - SSH Keys
+// @Accept json
+// @Produce json
+// @Param request body v1.CreateSSHKeyRequest true "创建 SSH 密钥请求"
+// @Security Bearer
+// @Success 200 {object} entity.SSHKey
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 401 {object} common.ErrorResponse
+// @Failure 409 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /customer/keys [post]
 func (c *SSHKeyController) Create(ctx *gin.Context) {
 	userID, ok := c.getUserID(ctx)
 	if !ok {
@@ -78,6 +100,18 @@ func (c *SSHKeyController) Create(ctx *gin.Context) {
 }
 
 // Delete 删除 SSH 密钥
+// @Summary 删除 SSH 密钥
+// @Description 删除当前用户指定的 SSH 公钥
+// @Tags Customer - SSH Keys
+// @Produce json
+// @Param id path int true "密钥 ID"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 403 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /customer/keys/{id} [delete]
 func (c *SSHKeyController) Delete(ctx *gin.Context) {
 	userID, ok := c.getUserID(ctx)
 	if !ok {

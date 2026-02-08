@@ -25,6 +25,18 @@ func NewDocumentController(ds *serviceDocument.DocumentService, ss *serviceStora
 }
 
 // List 获取文档列表
+// @Summary 获取文档列表
+// @Description 分页获取文档列表，支持按分类和关键词筛选
+// @Tags Admin - Documents
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param category query string false "分类筛选"
+// @Param keyword query string false "关键词搜索"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/documents [get]
 func (c *DocumentController) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
@@ -46,6 +58,16 @@ func (c *DocumentController) List(ctx *gin.Context) {
 }
 
 // Detail 获取文档详情
+// @Summary 获取文档详情
+// @Description 根据文档 ID 获取文档详细信息
+// @Tags Admin - Documents
+// @Produce json
+// @Param id path int true "文档 ID"
+// @Security Bearer
+// @Success 200 {object} entity.Document
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Router /admin/documents/{id} [get]
 func (c *DocumentController) Detail(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -63,6 +85,19 @@ func (c *DocumentController) Detail(ctx *gin.Context) {
 }
 
 // Upload 上传文档（multipart/form-data）
+// @Summary 上传文档
+// @Description 通过 multipart/form-data 上传文档文件
+// @Tags Admin - Documents
+// @Accept multipart/form-data
+// @Produce json
+// @Param title formData string true "文档标题"
+// @Param category formData string false "文档分类" default(general)
+// @Param file formData file true "文档文件"
+// @Security Bearer
+// @Success 200 {object} entity.Document
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/documents [post]
 func (c *DocumentController) Upload(ctx *gin.Context) {
 	title := ctx.PostForm("title")
 	category := ctx.PostForm("category")
@@ -103,6 +138,18 @@ func (c *DocumentController) Upload(ctx *gin.Context) {
 }
 
 // Update 更新文档信息
+// @Summary 更新文档信息
+// @Description 根据文档 ID 更新文档的标题或分类
+// @Tags Admin - Documents
+// @Accept json
+// @Produce json
+// @Param id path int true "文档 ID"
+// @Param request body v1.UpdateDocumentRequest true "更新文档请求"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/documents/{id} [put]
 func (c *DocumentController) Update(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -137,6 +184,16 @@ func (c *DocumentController) Update(ctx *gin.Context) {
 }
 
 // Delete 删除文档
+// @Summary 删除文档
+// @Description 根据文档 ID 删除文档
+// @Tags Admin - Documents
+// @Produce json
+// @Param id path int true "文档 ID"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/documents/{id} [delete]
 func (c *DocumentController) Delete(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -153,6 +210,14 @@ func (c *DocumentController) Delete(ctx *gin.Context) {
 }
 
 // Categories 获取分类列表
+// @Summary 获取文档分类列表
+// @Description 获取所有可用的文档分类
+// @Tags Admin - Documents
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/documents/categories [get]
 func (c *DocumentController) Categories(ctx *gin.Context) {
 	categories, err := c.documentSvc.ListCategories(ctx)
 	if err != nil {
@@ -163,6 +228,16 @@ func (c *DocumentController) Categories(ctx *gin.Context) {
 }
 
 // Download 获取文档下载链接
+// @Summary 获取文档下载链接
+// @Description 根据文档 ID 获取文档的下载 URL
+// @Tags Admin - Documents
+// @Produce json
+// @Param id path int true "文档 ID"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/documents/{id}/download [get]
 func (c *DocumentController) Download(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)

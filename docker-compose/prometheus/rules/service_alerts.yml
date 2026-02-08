@@ -19,3 +19,23 @@ groups:
           severity: warning
         annotations:
           summary: "Prometheus 配置重载失败"
+
+      # Agent 离线超过 5 分钟
+      - alert: AgentOffline
+        expr: up{job="node-exporter"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Agent 离线 ({{ $labels.instance }})"
+          description: "节点 {{ $labels.instance }} 的 Agent 已离线超过 5 分钟"
+
+      # 后端服务离线
+      - alert: BackendServiceDown
+        expr: up{job="remotegpu-backend"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "RemoteGPU 后端服务离线"
+          description: "后端服务 {{ $labels.instance }} 已离线超过 2 分钟"

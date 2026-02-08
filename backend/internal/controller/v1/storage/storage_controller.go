@@ -17,12 +17,28 @@ func NewStorageController(svc *serviceStorage.StorageService) *StorageController
 }
 
 // ListBackends 获取存储池列表
+// @Summary 获取存储后端列表
+// @Description 获取系统配置的所有存储后端信息
+// @Tags Admin - Storage
+// @Produce json
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Router /admin/storage/backends [get]
 func (c *StorageController) ListBackends(ctx *gin.Context) {
 	backends := c.storageSvc.ListBackends()
 	c.Success(ctx, gin.H{"backends": backends})
 }
 
 // GetStats 获取存储使用统计
+// @Summary 获取存储使用统计
+// @Description 获取指定存储后端的使用统计信息
+// @Tags Admin - Storage
+// @Produce json
+// @Param backend query string false "存储后端名称"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/storage/stats [get]
 func (c *StorageController) GetStats(ctx *gin.Context) {
 	backendName := ctx.Query("backend")
 	stats, err := c.storageSvc.GetBackendStats(ctx, backendName)
@@ -34,6 +50,16 @@ func (c *StorageController) GetStats(ctx *gin.Context) {
 }
 
 // ListFiles 列出存储文件
+// @Summary 列出存储文件
+// @Description 列出指定存储后端和前缀下的文件
+// @Tags Admin - Storage
+// @Produce json
+// @Param backend query string false "存储后端名称"
+// @Param prefix query string false "文件路径前缀"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/storage/files [get]
 func (c *StorageController) ListFiles(ctx *gin.Context) {
 	backendName := ctx.Query("backend")
 	prefix := ctx.Query("prefix")
@@ -50,6 +76,17 @@ func (c *StorageController) ListFiles(ctx *gin.Context) {
 }
 
 // DeleteFile 删除文件
+// @Summary 删除存储文件
+// @Description 删除指定存储后端中的文件
+// @Tags Admin - Storage
+// @Accept json
+// @Produce json
+// @Param request body object true "删除文件请求（backend, path）"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/storage/files/delete [post]
 func (c *StorageController) DeleteFile(ctx *gin.Context) {
 	var req struct {
 		Backend string `json:"backend"`
@@ -68,6 +105,17 @@ func (c *StorageController) DeleteFile(ctx *gin.Context) {
 }
 
 // GetDownloadURL 获取文件下载链接
+// @Summary 获取文件下载链接
+// @Description 获取指定存储后端中文件的下载 URL
+// @Tags Admin - Storage
+// @Produce json
+// @Param backend query string false "存储后端名称"
+// @Param path query string true "文件路径"
+// @Security Bearer
+// @Success 200 {object} map[string]string
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/storage/files/download-url [get]
 func (c *StorageController) GetDownloadURL(ctx *gin.Context) {
 	backendName := ctx.Query("backend")
 	path := ctx.Query("path")

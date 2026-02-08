@@ -18,7 +18,15 @@ const formData = ref<CreateMachinePayload>({
   ssh_port: 22,
   ssh_username: '',
   ssh_password: '',
-  ssh_key: ''
+  ssh_key: '',
+  jupyter_port: 8888,
+  vnc_port: 5900,
+  external_ip: '',
+  external_ssh_port: 22,
+  external_jupyter_port: 8888,
+  external_vnc_port: 5900,
+  nginx_domain: '',
+  nginx_config: ''
 })
 
 const validateConnectionAddress = (_: any, _value: string, callback: (error?: Error) => void) => {
@@ -122,10 +130,6 @@ const handleCancel = () => {
           <el-input v-model="formData.ssh_host" placeholder="可选，SSH连接主机地址（留空则使用公网IP或连接地址）" />
         </el-form-item>
 
-        <el-form-item label="SSH端口" prop="ssh_port">
-          <el-input-number v-model="formData.ssh_port" :min="1" :max="65535" />
-        </el-form-item>
-
         <el-form-item label="用户名" prop="ssh_username">
           <el-input v-model="formData.ssh_username" placeholder="请输入SSH用户名" />
         </el-form-item>
@@ -148,13 +152,13 @@ const handleCancel = () => {
           />
         </el-form-item>
 
-        <el-divider content-position="left">外映射配置（可选）</el-divider>
+        <el-divider content-position="left">端口映射配置（可选）</el-divider>
 
         <el-alert
           type="info"
           show-icon
           :closable="false"
-          title="配置 Nginx 反向代理或端口映射，用于外部访问 SSH、Jupyter、VNC 等服务。"
+          title="配置端口映射，内部端口为机器上实际运行的端口，外部端口为对外暴露的映射端口。"
           class="machine-tip"
         />
 
@@ -162,27 +166,64 @@ const handleCancel = () => {
           <el-input v-model="formData.external_ip" placeholder="可选，对外访问的IP或域名" />
         </el-form-item>
 
-        <el-form-item label="SSH映射端口">
-          <el-input-number v-model="formData.external_ssh_port" :min="0" :max="65535" />
-          <span class="form-tip">对外暴露的SSH端口，0表示不映射</span>
+        <el-form-item label="SSH 端口">
+          <div class="port-mapping-row">
+            <div class="port-item">
+              <span class="port-label">内部端口</span>
+              <el-input-number v-model="formData.ssh_port" :min="1" :max="65535" />
+            </div>
+            <span class="port-arrow">→</span>
+            <div class="port-item">
+              <span class="port-label">外部端口</span>
+              <el-input-number v-model="formData.external_ssh_port" :min="0" :max="65535" />
+            </div>
+          </div>
         </el-form-item>
 
-        <el-form-item label="Jupyter映射端口">
-          <el-input-number v-model="formData.external_jupyter_port" :min="0" :max="65535" />
-          <span class="form-tip">对外暴露的Jupyter端口，0表示不映射</span>
+        <el-form-item label="Jupyter 端口">
+          <div class="port-mapping-row">
+            <div class="port-item">
+              <span class="port-label">内部端口</span>
+              <el-input-number v-model="formData.jupyter_port" :min="0" :max="65535" />
+            </div>
+            <span class="port-arrow">→</span>
+            <div class="port-item">
+              <span class="port-label">外部端口</span>
+              <el-input-number v-model="formData.external_jupyter_port" :min="0" :max="65535" />
+            </div>
+          </div>
         </el-form-item>
 
-        <el-form-item label="VNC映射端口">
-          <el-input-number v-model="formData.external_vnc_port" :min="0" :max="65535" />
-          <span class="form-tip">对外暴露的VNC端口，0表示不映射</span>
+        <el-form-item label="VNC 端口">
+          <div class="port-mapping-row">
+            <div class="port-item">
+              <span class="port-label">内部端口</span>
+              <el-input-number v-model="formData.vnc_port" :min="0" :max="65535" />
+            </div>
+            <span class="port-arrow">→</span>
+            <div class="port-item">
+              <span class="port-label">外部端口</span>
+              <el-input-number v-model="formData.external_vnc_port" :min="0" :max="65535" />
+            </div>
+          </div>
         </el-form-item>
 
         <el-form-item label="Nginx域名">
           <el-input v-model="formData.nginx_domain" placeholder="可选，如 gpu-001.example.com" />
         </el-form-item>
 
-        <el-form-item label="Nginx配置路径">
-          <el-input v-model="formData.nginx_config_path" placeholder="可选，如 /etc/nginx/conf.d/gpu-001.conf" />
+        <el-form-item label="Nginx配置">
+          <el-input
+            v-model="formData.nginx_config"
+            type="textarea"
+            :rows="10"
+            placeholder="可选，直接编写 Nginx 配置内容，例如：
+server {
+    listen 80;
+    server_name gpu-001.example.com;
+    ...
+}"
+          />
         </el-form-item>
 
         <el-form-item>
@@ -220,5 +261,29 @@ const handleCancel = () => {
   margin-left: 12px;
   color: #909399;
   font-size: 12px;
+}
+
+.port-mapping-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.port-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.port-label {
+  color: #606266;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.port-arrow {
+  color: #909399;
+  font-size: 18px;
+  font-weight: bold;
 }
 </style>

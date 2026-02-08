@@ -21,6 +21,18 @@ func NewCustomerController(cs *serviceCustomer.CustomerService) *CustomerControl
 	}
 }
 
+// List 获取客户列表
+// @Summary 获取客户列表
+// @Description 分页获取所有客户信息
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/customers [get]
 func (c *CustomerController) List(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
@@ -39,6 +51,18 @@ func (c *CustomerController) List(ctx *gin.Context) {
 	})
 }
 
+// Create 创建客户
+// @Summary 创建客户
+// @Description 创建新客户账号，如未指定密码则使用默认密码
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param request body v1.CreateCustomerRequest true "创建客户请求"
+// @Security Bearer
+// @Success 200 {object} entity.Customer
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/customers [post]
 func (c *CustomerController) Create(ctx *gin.Context) {
 	var req apiV1.CreateCustomerRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -77,6 +101,17 @@ func (c *CustomerController) Create(ctx *gin.Context) {
 }
 
 // Detail 获取客户详情（包含机器分配信息）
+// @Summary 获取客户详情
+// @Description 根据客户 ID 获取详细信息，包含机器分配信息
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param id path int true "客户 ID"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Router /admin/customers/{id} [get]
 func (c *CustomerController) Detail(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -94,6 +129,18 @@ func (c *CustomerController) Detail(ctx *gin.Context) {
 }
 
 // Update 更新客户信息
+// @Summary 更新客户信息
+// @Description 根据客户 ID 更新客户字段，仅更新传入的非空字段
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param id path int true "客户 ID"
+// @Param request body v1.UpdateCustomerRequest true "更新客户请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/customers/{id} [put]
 func (c *CustomerController) Update(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -144,9 +191,23 @@ func (c *CustomerController) Update(ctx *gin.Context) {
 }
 
 // Disable 禁用客户
+// @Summary 禁用客户
+// @Description 将客户状态设置为 suspended
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param id path int true "客户 ID"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/customers/{id}/disable [post]
 func (c *CustomerController) Disable(ctx *gin.Context) {
 	idStr := ctx.Param("id")
-	id, _ := strconv.ParseUint(idStr, 10, 64)
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的客户 ID")
+		return
+	}
 
 	if err := c.customerService.UpdateStatus(ctx, uint(id), "suspended"); err != nil {
 		c.Error(ctx, 500, "Failed to disable customer")
@@ -156,6 +217,17 @@ func (c *CustomerController) Disable(ctx *gin.Context) {
 }
 
 // Enable 启用客户
+// @Summary 启用客户
+// @Description 将客户状态设置为 active
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param id path int true "客户 ID"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/customers/{id}/enable [post]
 func (c *CustomerController) Enable(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -172,6 +244,18 @@ func (c *CustomerController) Enable(ctx *gin.Context) {
 }
 
 // UpdateQuota 更新客户配额
+// @Summary 更新客户配额
+// @Description 更新指定客户的 GPU 和存储配额
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param id path int true "客户 ID"
+// @Param request body v1.UpdateQuotaRequest true "更新配额请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/customers/{id}/quota [put]
 func (c *CustomerController) UpdateQuota(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -194,6 +278,17 @@ func (c *CustomerController) UpdateQuota(ctx *gin.Context) {
 }
 
 // ResourceUsage 获取客户资源使用统计
+// @Summary 获取客户资源使用统计
+// @Description 获取指定客户的 GPU、存储等资源使用情况
+// @Tags Admin - Customers
+// @Accept json
+// @Produce json
+// @Param id path int true "客户 ID"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/customers/{id}/usage [get]
 func (c *CustomerController) ResourceUsage(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)

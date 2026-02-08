@@ -187,6 +187,18 @@ func (c *AlertController) Acknowledge(ctx *gin.Context) {
 }
 
 // ListRules 获取告警规则列表
+// @Summary 获取告警规则列表
+// @Description 分页获取告警规则，支持按严重级别和启用状态筛选
+// @Tags Admin - Alert Rules
+// @Produce json
+// @Param page query int false "页码" default(1)
+// @Param page_size query int false "每页数量" default(10)
+// @Param severity query string false "严重级别筛选"
+// @Param enabled query string false "启用状态筛选（true/false）"
+// @Security Bearer
+// @Success 200 {object} map[string]interface{}
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/alert-rules [get]
 func (c *AlertController) ListRules(ctx *gin.Context) {
 	page, _ := strconv.Atoi(ctx.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(ctx.DefaultQuery("page_size", "10"))
@@ -213,6 +225,17 @@ func (c *AlertController) ListRules(ctx *gin.Context) {
 }
 
 // CreateRule 创建告警规则
+// @Summary 创建告警规则
+// @Description 创建新的告警规则，指定指标类型、阈值和触发条件
+// @Tags Admin - Alert Rules
+// @Accept json
+// @Produce json
+// @Param request body v1.CreateAlertRuleRequest true "创建告警规则请求"
+// @Security Bearer
+// @Success 200 {object} entity.AlertRule
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/alert-rules [post]
 func (c *AlertController) CreateRule(ctx *gin.Context) {
 	var req apiV1.CreateAlertRuleRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -248,6 +271,16 @@ func (c *AlertController) CreateRule(ctx *gin.Context) {
 }
 
 // GetRule 获取告警规则详情
+// @Summary 获取告警规则详情
+// @Description 根据规则 ID 获取告警规则的详细信息
+// @Tags Admin - Alert Rules
+// @Produce json
+// @Param id path int true "规则 ID"
+// @Security Bearer
+// @Success 200 {object} entity.AlertRule
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 404 {object} common.ErrorResponse
+// @Router /admin/alert-rules/{id} [get]
 func (c *AlertController) GetRule(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -265,6 +298,18 @@ func (c *AlertController) GetRule(ctx *gin.Context) {
 }
 
 // UpdateRule 更新告警规则
+// @Summary 更新告警规则
+// @Description 根据规则 ID 更新告警规则的配置
+// @Tags Admin - Alert Rules
+// @Accept json
+// @Produce json
+// @Param id path int true "规则 ID"
+// @Param request body v1.UpdateAlertRuleRequest true "更新告警规则请求"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/alert-rules/{id} [put]
 func (c *AlertController) UpdateRule(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -318,6 +363,16 @@ func (c *AlertController) UpdateRule(ctx *gin.Context) {
 }
 
 // DeleteRule 删除告警规则
+// @Summary 删除告警规则
+// @Description 根据规则 ID 删除告警规则
+// @Tags Admin - Alert Rules
+// @Produce json
+// @Param id path int true "规则 ID"
+// @Security Bearer
+// @Success 200 {object} common.SuccessResponse
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/alert-rules/{id} [delete]
 func (c *AlertController) DeleteRule(ctx *gin.Context) {
 	idStr := ctx.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)

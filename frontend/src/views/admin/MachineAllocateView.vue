@@ -56,9 +56,7 @@ const loadCustomers = async () => {
 const getMachineLabel = (machine: Machine) => {
   const parts = [machine.name]
   if (machine.region) parts.push(machine.region)
-  if (machine.gpuCount && machine.gpuModel) {
-    parts.push(`${machine.gpuCount}x ${machine.gpuModel}`)
-  } else if (machine.gpus && machine.gpus.length > 0 && machine.gpus[0]) {
+  if (machine.gpus && machine.gpus.length > 0 && machine.gpus[0]) {
     parts.push(`${machine.gpus.length}x ${machine.gpus[0].name}`)
   }
   return parts.join(' - ')

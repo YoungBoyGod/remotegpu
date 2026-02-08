@@ -1,0 +1,32 @@
+groups:
+  - name: gpu_alerts
+    rules:
+      # GPU 温度过高告警
+      - alert: GpuTemperatureHigh
+        expr: DCGM_FI_DEV_GPU_TEMP > 85
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU 温度过高 ({{ $labels.instance }})"
+          description: "GPU {{ $labels.gpu }} 温度超过 85°C，当前值: {{ $value | printf \"%.0f\" }}°C"
+
+      # GPU 温度严重过高告警
+      - alert: GpuTemperatureCritical
+        expr: DCGM_FI_DEV_GPU_TEMP > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "GPU 温度严重过高 ({{ $labels.instance }})"
+          description: "GPU {{ $labels.gpu }} 温度超过 95°C，当前值: {{ $value | printf \"%.0f\" }}°C，存在硬件损坏风险"
+
+      # GPU 显存使用率过高
+      - alert: GpuMemoryUsageHigh
+        expr: DCGM_FI_DEV_FB_USED / (DCGM_FI_DEV_FB_USED + DCGM_FI_DEV_FB_FREE) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "GPU 显存使用率过高 ({{ $labels.instance }})"
+          description: "GPU {{ $labels.gpu }} 显存使用超过 90%"

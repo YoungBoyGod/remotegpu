@@ -24,6 +24,9 @@ declare -A services=(
     ["uptime-kuma"]="remotegpu-uptime-kuma"
     ["guacamole"]="remotegpu-guacamole"
     ["harbor-nginx"]="remotegpu-harbor-nginx"
+    ["test-gpu-01"]="test-gpu-01"
+    ["test-gpu-02"]="test-gpu-02"
+    ["test-gpu-03"]="test-gpu-03"
 )
 
 # 检查每个服务的状态
@@ -75,6 +78,9 @@ declare -A ports=(
     ["8080"]="JumpServer"
     ["8081"]="Guacamole"
     ["8082"]="Harbor"
+    ["2201"]="Test GPU 01 SSH"
+    ["2202"]="Test GPU 02 SSH"
+    ["2203"]="Test GPU 03 SSH"
 )
 
 for port in "${!ports[@]}"; do

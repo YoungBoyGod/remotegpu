@@ -30,6 +30,9 @@ func (s *HostStatusSyncer) Start(ctx context.Context) {
 	ticker := time.NewTicker(s.syncInterval)
 	defer ticker.Stop()
 
+	// 启动时立即执行一次同步，避免重启后状态不一致
+	s.syncAll(ctx)
+
 	logger.GetLogger().Info("设备状态同步服务已启动")
 
 	for {

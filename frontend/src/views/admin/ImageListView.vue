@@ -2,8 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Refresh } from '@element-plus/icons-vue'
-import { getImageList, syncImages } from '@/api/admin'
-import request from '@/utils/request'
+import { getImageList, syncImages, deleteImage } from '@/api/admin'
 import PageHeader from '@/components/common/PageHeader.vue'
 
 interface Image {
@@ -124,7 +123,7 @@ const handleDelete = async (row: Image) => {
       '确认删除',
       { type: 'warning' }
     )
-    await request.delete(`/admin/images/${row.id}`)
+    await deleteImage(row.id)
     ElMessage.success('删除成功')
     loadImages()
   } catch {

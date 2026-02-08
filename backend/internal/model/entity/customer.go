@@ -33,12 +33,8 @@ type Customer struct {
 	MustChangePassword bool   `gorm:"default:false" json:"must_change_password"`
 
 	// 配额限制
-	QuotaGPU     int   `gorm:"default:0" json:"quota_gpu"`      // GPU 数量配额，0 表示不限制
-	QuotaStorage int64 `gorm:"default:0" json:"quota_storage"`  // 存储容量配额（MB），0 表示不限制
-
-	// Billing
-	Balance  float64 `gorm:"type:decimal(10,4);default:0.00" json:"balance"`
-	Currency string  `gorm:"type:varchar(10);default:'CNY'" json:"currency"`
+	QuotaGPU     int   `gorm:"default:0" json:"quota_gpu"`
+	QuotaStorage int64 `gorm:"default:0" json:"quota_storage"`
 
 	LastLoginAt *time.Time `json:"last_login_at"`
 
@@ -63,15 +59,3 @@ type SSHKey struct {
 	CreatedAt   time.Time `json:"created_at"`
 }
 
-// Workspace 工作空间实体，表示资源的逻辑分组（团队）
-type Workspace struct {
-	ID          uint      `gorm:"primarykey" json:"id"`
-	UUID        string    `gorm:"type:uuid;default:uuid_generate_v4();uniqueIndex;not null" json:"uuid"`
-	OwnerID     uint      `gorm:"not null" json:"owner_id"`
-	Name        string    `gorm:"type:varchar(128);not null" json:"name"`
-	Description string    `gorm:"type:text" json:"description"`
-	Type        string    `gorm:"type:varchar(32);default:'personal'" json:"type"` // personal, team
-	Status      string    `gorm:"type:varchar(32);default:'active'" json:"status"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
-}

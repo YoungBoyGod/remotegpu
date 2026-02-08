@@ -35,3 +35,12 @@ type ConfirmPasswordResetRequest struct {
 	Token       string `json:"token" binding:"required"`
 	NewPassword string `json:"new_password" binding:"required"`
 }
+
+// UpdateProfileRequest 更新个人资料请求
+type UpdateProfileRequest struct {
+	DisplayName string `json:"display_name"`
+	Phone       string `json:"phone"`
+	Company     string `json:"company"`
+	FullName    string `json:"full_name"`
+	AvatarURL   string `json:"avatar_url"`
+}

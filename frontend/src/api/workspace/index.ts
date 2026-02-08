@@ -18,14 +18,14 @@ import type { StatusResponse } from '../common/types'
  * 创建工作空间
  */
 export function createWorkspace(data: CreateWorkspaceRequest) {
-  return request.post<WorkspaceInfo>('/workspaces', data)
+  return request.post<WorkspaceInfo>('/customer/workspaces', data)
 }
 
 /**
  * 获取工作空间列表
  */
 export function getWorkspaces(page: number = 1, pageSize: number = 10) {
-  return request.get<WorkspaceListResponse>('/workspaces', {
+  return request.get<WorkspaceListResponse>('/customer/workspaces', {
     params: { page, page_size: pageSize }
   })
 }
@@ -34,21 +34,21 @@ export function getWorkspaces(page: number = 1, pageSize: number = 10) {
  * 获取工作空间详情
  */
 export function getWorkspaceById(id: number) {
-  return request.get<WorkspaceInfo>(`/workspaces/${id}`)
+  return request.get<WorkspaceInfo>(`/customer/workspaces/${id}`)
 }
 
 /**
  * 更新工作空间
  */
 export function updateWorkspace(id: number, data: UpdateWorkspaceRequest) {
-  return request.put<WorkspaceInfo>(`/workspaces/${id}`, data)
+  return request.put<WorkspaceInfo>(`/customer/workspaces/${id}`, data)
 }
 
 /**
  * 删除工作空间
  */
 export function deleteWorkspace(id: number) {
-  return request.delete<StatusResponse>(`/workspaces/${id}`)
+  return request.delete<StatusResponse>(`/customer/workspaces/${id}`)
 }
 
 // ==================== 成员管理 ====================
@@ -57,19 +57,19 @@ export function deleteWorkspace(id: number) {
  * 添加成员
  */
 export function addMember(workspaceId: number, data: AddMemberRequest) {
-  return request.post<StatusResponse>(`/workspaces/${workspaceId}/members`, data)
+  return request.post<StatusResponse>(`/customer/workspaces/${workspaceId}/members`, data)
 }
 
 /**
  * 移除成员
  */
 export function removeMember(workspaceId: number, userId: number) {
-  return request.delete<StatusResponse>(`/workspaces/${workspaceId}/members/${userId}`)
+  return request.delete<StatusResponse>(`/customer/workspaces/${workspaceId}/members/${userId}`)
 }
 
 /**
  * 获取成员列表
  */
 export function getMembers(workspaceId: number) {
-  return request.get<WorkspaceMemberInfo[]>(`/workspaces/${workspaceId}/members`)
+  return request.get<WorkspaceMemberInfo[]>(`/customer/workspaces/${workspaceId}/members`)
 }

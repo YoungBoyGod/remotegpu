@@ -50,6 +50,8 @@ export interface CreateMachinePayload {
   public_ip?: string
   ssh_host?: string
   ssh_port: number
+  jupyter_port?: number
+  vnc_port?: number
   ssh_username?: string
   ssh_password?: string
   ssh_key?: string
@@ -62,7 +64,7 @@ export interface CreateMachinePayload {
   external_jupyter_port?: number
   external_vnc_port?: number
   nginx_domain?: string
-  nginx_config_path?: string
+  nginx_config?: string
 }
 
 export function addMachine(data: CreateMachinePayload): Promise<ApiResponse<Machine>> {
@@ -76,12 +78,9 @@ export interface ImportMachineItem {
   host_ip: string
   ssh_port: number
   region: string
-  gpu_model: string
-  gpu_count: number
-  cpu_cores: number
-  ram_size: number
-  disk_size: number
-  price_hourly: number
+  ssh_username: string
+  ssh_password: string
+  ssh_key: string
 }
 
 /**
@@ -134,6 +133,27 @@ export function deleteMachine(id: string): Promise<ApiResponse<void>> {
  */
 export function setMachineMaintenance(id: string, maintenance: boolean): Promise<ApiResponse<void>> {
   return request.post(`/admin/machines/${id}/maintenance`, { maintenance })
+}
+
+/**
+ * 批量设置维护状态
+ */
+export function batchSetMaintenance(hostIds: string[], maintenance: boolean): Promise<ApiResponse<{ affected: number }>> {
+  return request.post('/admin/machines/batch/maintenance', { host_ids: hostIds, maintenance })
+}
+
+/**
+ * 批量分配机器
+ */
+export function batchAllocate(hostIds: string[], customerId: number, durationMonths: number, remark?: string): Promise<ApiResponse<{ success: string[]; failed: string[] }>> {
+  return request.post('/admin/machines/batch/allocate', { host_ids: hostIds, customer_id: customerId, duration_months: durationMonths, remark })
+}
+
+/**
+ * 批量回收机器
+ */
+export function batchReclaim(hostIds: string[]): Promise<ApiResponse<{ success: string[]; failed: string[] }>> {
+  return request.post('/admin/machines/batch/reclaim', { host_ids: hostIds })
 }
 
 /**
@@ -314,7 +334,7 @@ export interface AlertRuleForm {
   condition: string
   threshold: number
   severity: string
-  duration_seconds: number
+  duration: number
   enabled: boolean
   description?: string
 }
@@ -336,7 +356,7 @@ export function createAlertRule(data: AlertRuleForm): Promise<ApiResponse<AlertR
 /**
  * 更新告警规则
  */
-export function updateAlertRule(id: number, data: AlertRuleForm): Promise<ApiResponse<AlertRule>> {
+export function updateAlertRule(id: number, data: Partial<AlertRuleForm>): Promise<ApiResponse<AlertRule>> {
   return request.put(`/admin/alert-rules/${id}`, data)
 }
 
@@ -368,6 +388,13 @@ export function getImageList(params: PageRequest & { category?: string; framewor
  */
 export function syncImages(): Promise<ApiResponse<{ message: string }>> {
   return request.post('/admin/images/sync')
+}
+
+/**
+ * 删除镜像
+ */
+export function deleteImage(id: number): Promise<ApiResponse<void>> {
+  return request.delete(`/admin/images/${id}`)
 }
 
 // ==================== 文档管理 ====================

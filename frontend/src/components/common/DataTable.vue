@@ -23,6 +23,7 @@ const emit = defineEmits<{
   'update:pageSize': [value: number]
   'page-change': [page: number]
   'size-change': [size: number]
+  'selection-change': [selection: any[]]
 }>()
 
 const handleCurrentChange = (page: number) => {
@@ -43,6 +44,7 @@ const handleSizeChange = (size: number) => {
       v-loading="loading"
       stripe
       style="width: 100%"
+      @selection-change="(val: any[]) => emit('selection-change', val)"
     >
       <slot />
       <template #empty>

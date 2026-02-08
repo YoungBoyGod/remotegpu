@@ -38,11 +38,21 @@ export interface CustomerAllocation {
   machine_name?: string
   allocated_at?: string
   end_time?: string
+  status?: string
+  // 对内连接
+  ip_address?: string
   ssh_host?: string
   ssh_port?: number
+  ssh_username?: string
+  ssh_password?: string
   jupyter_url?: string
   vnc_url?: string
-  status?: string
+  // 对外连接
+  external_ip?: string
+  nginx_domain?: string
+  external_ssh_port?: number
+  external_jupyter_port?: number
+  external_vnc_port?: number
 }
 
 // 客户详情（后端返回 { customer, allocations }）

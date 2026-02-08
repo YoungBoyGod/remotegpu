@@ -26,7 +26,7 @@ services:
     ports:
       - "9187:9187"
     environment:
-      DATA_SOURCE_NAME: "postgresql://remotegpu_user:remotegpu_password@192.168.10.210:5432/remotegpu?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://remotegpu_user:remotegpu_password@remotegpu-postgresql:5432/remotegpu?sslmode=disable"
     networks:
       - remotegpu-network
 
@@ -38,7 +38,7 @@ services:
     ports:
       - "9121:9121"
     environment:
-      REDIS_ADDR: "redis://192.168.10.210:6379"
+      REDIS_ADDR: "redis://remotegpu-redis:6379"
       REDIS_PASSWORD: "remotegpu_password"
     networks:
       - remotegpu-network
@@ -51,7 +51,7 @@ services:
     ports:
       - "9113:9113"
     command:
-      - '--nginx.scrape-uri=http://192.168.10.210/nginx_status'
+      - '--nginx.scrape-uri=http://remotegpu-nginx/nginx_status'
     networks:
       - remotegpu-network
 

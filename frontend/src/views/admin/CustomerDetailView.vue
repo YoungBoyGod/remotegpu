@@ -8,6 +8,7 @@ import {
   updateCustomer,
   disableCustomer,
   enableCustomer,
+  reclaimMachine,
 } from '@/api/admin'
 import type { Customer, CustomerAllocation } from '@/types/customer'
 import { CopyDocument } from '@element-plus/icons-vue'
@@ -159,6 +160,23 @@ const goToMachine = (machineId: string) => {
   router.push(`/admin/machines/${machineId}`)
 }
 
+const handleReclaim = async (row: CustomerAllocation) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要回收机器「${row.machine_name || row.machine_id}」吗？回收后客户将无法继续使用。`,
+      '回收确认',
+      { confirmButtonText: '确定回收', cancelButtonText: '取消', type: 'warning' }
+    )
+    await reclaimMachine(row.machine_id)
+    ElMessage.success('回收成功')
+    loadCustomerDetail()
+  } catch (error: any) {
+    if (error !== 'cancel') {
+      ElMessage.error(error?.msg || '回收失败')
+    }
+  }
+}
+
 onMounted(() => {
   loadCustomerDetail()
 })
@@ -201,12 +219,6 @@ onMounted(() => {
             <el-descriptions-item label="联系人">
               {{ customer.full_name || '-' }}
             </el-descriptions-item>
-            <el-descriptions-item label="公司代号">
-              {{ customer.company_code || '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="公司名称">
-              {{ customer.company || '-' }}
-            </el-descriptions-item>
             <el-descriptions-item label="邮箱">
               {{ customer.email || '-' }}
             </el-descriptions-item>
@@ -231,28 +243,6 @@ onMounted(() => {
             </div>
           </template>
           <el-descriptions :column="2" border>
-            <el-descriptions-item label="角色">
-              {{ roleLabel((customer as any).role) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="账户类型">
-              {{ accountTypeLabel((customer as any).account_type) }}
-            </el-descriptions-item>
-            <el-descriptions-item label="账户余额">
-              {{ (customer as any).balance != null ? `¥ ${Number((customer as any).balance).toFixed(2)}` : '-' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="货币">
-              {{ (customer as any).currency || 'CNY' }}
-            </el-descriptions-item>
-            <el-descriptions-item label="邮箱验证">
-              <el-tag :type="(customer as any).email_verified ? 'success' : 'info'" size="small">
-                {{ (customer as any).email_verified ? '已验证' : '未验证' }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="手机验证">
-              <el-tag :type="(customer as any).phone_verified ? 'success' : 'info'" size="small">
-                {{ (customer as any).phone_verified ? '已验证' : '未验证' }}
-              </el-tag>
-            </el-descriptions-item>
             <el-descriptions-item label="创建时间">
               {{ formatDateTime(customer.created_at) }}
             </el-descriptions-item>
@@ -270,59 +260,89 @@ onMounted(() => {
               <el-tag size="small">{{ allocations.length }} 台</el-tag>
             </div>
           </template>
-          <el-table v-if="allocations.length > 0" :data="allocations" border>
-            <el-table-column label="机器名称" min-width="140">
-              <template #default="{ row }">
-                <el-button link type="primary" @click="goToMachine(row.machine_id)">
+
+          <div v-if="allocations.length > 0" class="machine-items">
+            <div v-for="row in allocations" :key="row.allocation_id" class="machine-row">
+              <!-- 顶栏：名称 + 状态 + 时间 + 回收 -->
+              <div class="row-header">
+                <el-button link type="primary" class="row-name" @click="goToMachine(row.machine_id)">
                   {{ row.machine_name || row.machine_id }}
                 </el-button>
-              </template>
-            </el-table-column>
-            <el-table-column label="分配时间" min-width="160">
-              <template #default="{ row }">
-                {{ formatDateTime(row.allocated_at) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="到期时间" min-width="160">
-              <template #default="{ row }">
-                {{ formatDateTime(row.end_time) }}
-              </template>
-            </el-table-column>
-            <el-table-column label="SSH" min-width="180">
-              <template #default="{ row }">
-                <template v-if="row.ssh_host">
-                  <span>{{ row.ssh_host }}:{{ row.ssh_port || 22 }}</span>
-                  <el-button link :icon="CopyDocument" @click="copyToClipboard(`${row.ssh_host}:${row.ssh_port || 22}`)" />
-                </template>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="Jupyter" min-width="120">
-              <template #default="{ row }">
-                <template v-if="row.jupyter_url">
-                  <a class="info-link" :href="row.jupyter_url" target="_blank">访问</a>
-                  <el-button link :icon="CopyDocument" @click="copyToClipboard(row.jupyter_url)" />
-                </template>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="VNC" min-width="120">
-              <template #default="{ row }">
-                <template v-if="row.vnc_url">
-                  <a class="info-link" :href="row.vnc_url" target="_blank">访问</a>
-                  <el-button link :icon="CopyDocument" @click="copyToClipboard(row.vnc_url)" />
-                </template>
-                <span v-else>-</span>
-              </template>
-            </el-table-column>
-            <el-table-column label="状态" width="100">
-              <template #default="{ row }">
                 <el-tag :type="row.status === 'active' ? 'success' : 'info'" size="small">
                   {{ row.status === 'active' ? '使用中' : row.status || '-' }}
                 </el-tag>
-              </template>
-            </el-table-column>
-          </el-table>
+                <span class="row-time">{{ formatDateTime(row.allocated_at) }} ~ {{ formatDateTime(row.end_time) }}</span>
+                <div class="row-actions">
+                  <el-button type="danger" size="small" plain @click="handleReclaim(row)">回收</el-button>
+                </div>
+              </div>
+
+              <!-- 两栏：对内 | 对外 -->
+              <div class="row-body">
+                <div class="body-col">
+                  <div class="col-title">对内连接</div>
+                  <div class="conn-line">
+                    <span class="conn-tag">SSH</span>
+                    <template v-if="row.ip_address || row.ssh_host">
+                      <span class="conn-field"><span class="conn-label">IP:</span> {{ row.ip_address || row.ssh_host }}</span>
+                      <span class="conn-field"><span class="conn-label">端口:</span> {{ row.ssh_port || 22 }}</span>
+                      <span class="conn-field"><span class="conn-label">用户:</span> {{ row.ssh_username || 'root' }}</span>
+                      <span class="conn-field" v-if="row.ssh_password">
+                        <span class="conn-label">密码:</span>
+                        <span class="password-text">{{ row.ssh_password }}</span>
+                        <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(row.ssh_password!)" />
+                      </span>
+                    </template>
+                    <span v-else class="text-muted">未配置</span>
+                  </div>
+                  <div class="conn-line">
+                    <span class="conn-tag conn-tag-jupyter">Jupyter</span>
+                    <template v-if="row.jupyter_url">
+                      <a class="conn-link" :href="row.jupyter_url" target="_blank">{{ row.jupyter_url }}</a>
+                      <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(row.jupyter_url)" />
+                    </template>
+                    <span v-else class="text-muted">未配置</span>
+                  </div>
+                  <div class="conn-line">
+                    <span class="conn-tag conn-tag-vnc">VNC</span>
+                    <template v-if="row.vnc_url">
+                      <a class="conn-link" :href="row.vnc_url" target="_blank">{{ row.vnc_url }}</a>
+                      <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(row.vnc_url)" />
+                    </template>
+                    <span v-else class="text-muted">未配置</span>
+                  </div>
+                </div>
+
+                <div class="body-col">
+                  <div class="col-title">对外连接</div>
+                  <div class="conn-line">
+                    <span class="conn-tag conn-tag-ext">SSH</span>
+                    <template v-if="row.nginx_domain || row.external_ip">
+                      <span class="conn-field">{{ row.nginx_domain || row.external_ip }}:{{ row.external_ssh_port || '-' }}</span>
+                      <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(`ssh -p ${row.external_ssh_port || 22} ${row.ssh_username || 'root'}@${row.nginx_domain || row.external_ip}`)" />
+                    </template>
+                    <span v-else class="text-muted">未配置</span>
+                  </div>
+                  <div class="conn-line">
+                    <span class="conn-tag conn-tag-ext">Jupyter</span>
+                    <template v-if="row.external_jupyter_port && (row.nginx_domain || row.external_ip)">
+                      <span class="conn-field">{{ row.nginx_domain || row.external_ip }}:{{ row.external_jupyter_port }}</span>
+                      <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(`${row.nginx_domain || row.external_ip}:${row.external_jupyter_port}`)" />
+                    </template>
+                    <span v-else class="text-muted">未配置</span>
+                  </div>
+                  <div class="conn-line">
+                    <span class="conn-tag conn-tag-ext">VNC</span>
+                    <template v-if="row.external_vnc_port && (row.nginx_domain || row.external_ip)">
+                      <span class="conn-field">{{ row.nginx_domain || row.external_ip }}:{{ row.external_vnc_port }}</span>
+                      <el-button link :icon="CopyDocument" size="small" @click="copyToClipboard(`${row.nginx_domain || row.external_ip}:${row.external_vnc_port}`)" />
+                    </template>
+                    <span v-else class="text-muted">未配置</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
           <div v-else class="empty-tip">暂无分配的机器</div>
         </el-card>
 
@@ -334,12 +354,6 @@ onMounted(() => {
             </el-form-item>
             <el-form-item label="联系人">
               <el-input v-model="editForm.full_name" placeholder="请输入联系人姓名" />
-            </el-form-item>
-            <el-form-item label="公司代号">
-              <el-input v-model="editForm.company_code" placeholder="请输入公司代号" />
-            </el-form-item>
-            <el-form-item label="公司名称">
-              <el-input v-model="editForm.company" placeholder="请输入公司名称" />
             </el-form-item>
             <el-form-item label="邮箱">
               <el-input v-model="editForm.email" placeholder="请输入邮箱" />
@@ -393,5 +407,129 @@ onMounted(() => {
   text-align: center;
   color: #909399;
   font-size: 14px;
+}
+
+.machine-row {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 12px;
+  transition: box-shadow 0.2s;
+}
+
+.machine-row:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+}
+
+.row-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+}
+
+.row-name {
+  font-weight: 600;
+  font-size: 15px;
+}
+
+.row-time {
+  font-size: 12px;
+  color: #909399;
+}
+
+.row-actions {
+  margin-left: auto;
+}
+
+.row-body {
+  display: flex;
+  border-top: 1px solid #ebeef5;
+}
+
+.body-col {
+  flex: 1;
+  padding: 10px 20px;
+}
+
+.body-col + .body-col {
+  border-left: 1px solid #ebeef5;
+}
+
+.col-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.conn-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #606266;
+  padding: 4px 0;
+  border-top: 1px dashed #f0f0f0;
+}
+
+.conn-tag {
+  display: inline-block;
+  min-width: 52px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: #409eff;
+  background: #ecf5ff;
+  padding: 2px 8px;
+  border-radius: 3px;
+  flex-shrink: 0;
+}
+
+.conn-tag-jupyter {
+  color: #e6a23c;
+  background: #fdf6ec;
+}
+
+.conn-tag-vnc {
+  color: #67c23a;
+  background: #f0f9eb;
+}
+
+.conn-tag-ext {
+  color: #f56c6c;
+  background: #fef0f0;
+}
+
+.conn-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.conn-label {
+  color: #909399;
+  flex-shrink: 0;
+}
+
+.conn-link {
+  color: #409eff;
+  text-decoration: none;
+  font-size: 13px;
+}
+
+.conn-link:hover {
+  text-decoration: underline;
+}
+
+.password-text {
+  font-family: monospace;
+  font-size: 13px;
+  color: #303133;
+}
+
+.text-muted {
+  color: #c0c4cc;
 }
 </style>
