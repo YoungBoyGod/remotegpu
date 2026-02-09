@@ -65,6 +65,15 @@ const statusTagType = (status?: string) => {
   return map[status || ''] || 'info'
 }
 
+const copyText = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    ElMessage.success('已复制到剪贴板')
+  } catch {
+    ElMessage.error('复制失败')
+  }
+}
+
 const formatDate = (value?: string | null) => {
   if (!value) return '-'
   const date = new Date(value)
@@ -87,68 +96,256 @@ onMounted(async () => {
       </template>
     </PageHeader>
 
-    <el-row :gutter="16">
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>基础信息</span>
-          </template>
-          <el-descriptions :column="1" border v-loading="loading">
-            <el-descriptions-item label="机器ID">{{ machine?.id || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="机器名称">{{ machine?.name || machine?.hostname || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="主机名">{{ machine?.hostname || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="状态">
-              <el-tag :type="statusTagType(machine?.device_status)">
-                {{ machine?.device_status === 'online' ? '在线' : '离线' }}
-              </el-tag>
-            </el-descriptions-item>
-            <el-descriptions-item label="内网IP">{{ machine?.ip_address || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="公网IP">{{ machine?.public_ip || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="开始时间">{{ formatDate(machine?.start_time) }}</el-descriptions-item>
-            <el-descriptions-item label="到期时间">{{ formatDate(machine?.end_time) }}</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
-      <el-col :span="12">
-        <el-card>
-          <template #header>
-            <span>资源信息</span>
-          </template>
-          <el-descriptions :column="1" border v-loading="loading">
-            <el-descriptions-item label="CPU(核)">{{ machine?.total_cpu || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="内存(GB)">{{ machine?.total_memory_gb || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="GPU型号">{{ machine?.gpus?.[0]?.name || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="GPU数量">{{ machine?.gpus?.length || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="GPU显存(GB)">{{ machine?.gpus?.[0]?.memory_total_mb ? Math.round(machine.gpus[0].memory_total_mb / 1024) : '-' }}</el-descriptions-item>
-          </el-descriptions>
-        </el-card>
-      </el-col>
-    </el-row>
+    <!-- 机器名称和状态 -->
+    <div class="detail-banner" v-loading="loading">
+      <div class="banner-left">
+        <h3 class="machine-name">{{ machine?.name || machine?.hostname || '-' }}</h3>
+        <el-tag :type="statusTagType(machine?.device_status)" size="large">
+          {{ machine?.device_status === 'online' ? '在线' : '离线' }}
+        </el-tag>
+      </div>
+      <div class="banner-meta">
+        <span class="meta-item">ID: {{ machine?.id || '-' }}</span>
+        <span class="meta-item">区域: {{ machine?.region || '-' }}</span>
+        <span class="meta-item">分配时间: {{ formatDate(machine?.start_time) }} ~ {{ formatDate(machine?.end_time) }}</span>
+      </div>
+    </div>
 
-    <el-row :gutter="16" class="connection-row">
-      <el-col :span="24">
-        <el-card>
-          <template #header>
-            <span>连接信息</span>
+    <!-- 资源概览 -->
+    <div class="resource-cards">
+      <div class="resource-card">
+        <div class="resource-label">CPU</div>
+        <div class="resource-value">{{ machine?.total_cpu || '-' }} <span class="resource-unit">核</span></div>
+      </div>
+      <div class="resource-card">
+        <div class="resource-label">内存</div>
+        <div class="resource-value">{{ machine?.total_memory_gb || '-' }} <span class="resource-unit">GB</span></div>
+      </div>
+      <div class="resource-card">
+        <div class="resource-label">GPU</div>
+        <div class="resource-value">{{ machine?.gpus?.length || 0 }}x <span class="resource-unit">{{ machine?.gpus?.[0]?.name || '-' }}</span></div>
+      </div>
+      <div class="resource-card">
+        <div class="resource-label">GPU 显存</div>
+        <div class="resource-value">{{ machine?.gpus?.[0]?.memory_total_mb ? Math.round(machine.gpus[0].memory_total_mb / 1024) : '-' }} <span class="resource-unit">GB</span></div>
+      </div>
+    </div>
+
+    <!-- 连接信息卡片 -->
+    <div class="connection-section" v-loading="connectionLoading">
+      <h4 class="section-title">连接方式</h4>
+      <div class="connection-cards">
+        <!-- SSH -->
+        <el-card class="conn-card" shadow="hover">
+          <div class="conn-card-header">
+            <span class="conn-tag conn-tag-ssh">SSH</span>
+            <el-button v-if="connectionInfo?.ssh?.command" link size="small" @click="copyText(connectionInfo.ssh.command)">复制命令</el-button>
+          </div>
+          <template v-if="connectionInfo?.ssh">
+            <div class="conn-field"><span class="conn-label">主机</span><span class="conn-value">{{ connectionInfo.ssh.host }}</span></div>
+            <div class="conn-field"><span class="conn-label">端口</span><span class="conn-value">{{ connectionInfo.ssh.port }}</span></div>
+            <div class="conn-field"><span class="conn-label">用户名</span><span class="conn-value">{{ connectionInfo.ssh.username }}</span></div>
+            <div v-if="connectionInfo.ssh.command" class="conn-command">{{ connectionInfo.ssh.command }}</div>
           </template>
-          <el-descriptions :column="2" border v-loading="connectionLoading">
-            <el-descriptions-item label="SSH 主机">{{ connectionInfo?.ssh?.host || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="SSH 端口">{{ connectionInfo?.ssh?.port || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="SSH 用户名">{{ connectionInfo?.ssh?.username || '-' }}</el-descriptions-item>
-            <el-descriptions-item label="VNC 地址">{{ connectionInfo?.vnc?.url || '-' }}</el-descriptions-item>
-          </el-descriptions>
+          <div v-else class="conn-empty">暂无 SSH 连接信息</div>
         </el-card>
-      </el-col>
-    </el-row>
+
+        <!-- Jupyter -->
+        <el-card class="conn-card" shadow="hover">
+          <div class="conn-card-header">
+            <span class="conn-tag conn-tag-jupyter">Jupyter</span>
+          </div>
+          <template v-if="connectionInfo?.jupyter?.url">
+            <div class="conn-field"><span class="conn-label">地址</span><a class="conn-link" :href="connectionInfo.jupyter.url" target="_blank">{{ connectionInfo.jupyter.url }}</a></div>
+            <div v-if="connectionInfo.jupyter.token" class="conn-field"><span class="conn-label">Token</span><span class="conn-value mono">{{ connectionInfo.jupyter.token }}</span></div>
+          </template>
+          <div v-else class="conn-empty">暂无 Jupyter 连接信息</div>
+        </el-card>
+
+        <!-- VNC -->
+        <el-card class="conn-card" shadow="hover">
+          <div class="conn-card-header">
+            <span class="conn-tag conn-tag-vnc">VNC</span>
+          </div>
+          <template v-if="connectionInfo?.vnc?.url">
+            <div class="conn-field"><span class="conn-label">地址</span><a class="conn-link" :href="connectionInfo.vnc.url" target="_blank">{{ connectionInfo.vnc.url }}</a></div>
+            <div v-if="connectionInfo.vnc.password" class="conn-field"><span class="conn-label">密码</span><span class="conn-value mono">{{ connectionInfo.vnc.password }}</span></div>
+          </template>
+          <div v-else class="conn-empty">暂无 VNC 连接信息</div>
+        </el-card>
+      </div>
+    </div>
   </div>
 </template>
 
 <style scoped>
 .machine-detail {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
-.connection-row {
-  margin-top: 16px;
+.detail-banner {
+  background: #fff;
+  border-radius: 8px;
+  padding: 20px 24px;
+  margin-bottom: 16px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.machine-name {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1d2129;
+  margin: 0;
+}
+
+.banner-meta {
+  display: flex;
+  gap: 24px;
+  font-size: 13px;
+  color: #86909c;
+}
+
+.resource-cards {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.resource-card {
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.resource-label {
+  font-size: 13px;
+  color: #86909c;
+  margin-bottom: 8px;
+}
+
+.resource-value {
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
+}
+
+.resource-unit {
+  font-size: 13px;
+  font-weight: 400;
+  color: #86909c;
+}
+
+.connection-section {
+  margin-top: 4px;
+}
+
+.section-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d2129;
+  margin: 0 0 12px 0;
+}
+
+.connection-cards {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.conn-card {
+  border-radius: 8px;
+  border: none;
+}
+
+.conn-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.conn-tag {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.conn-tag-ssh { color: #409eff; background: #ecf5ff; }
+.conn-tag-jupyter { color: #e6a23c; background: #fdf6ec; }
+.conn-tag-vnc { color: #67c23a; background: #f0f9eb; }
+
+.conn-field {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #f2f3f5;
+}
+
+.conn-field:last-of-type {
+  border-bottom: none;
+}
+
+.conn-label {
+  color: #86909c;
+  flex-shrink: 0;
+}
+
+.conn-value {
+  color: #1d2129;
+  text-align: right;
+  word-break: break-all;
+}
+
+.conn-value.mono {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+}
+
+.conn-link {
+  color: #409eff;
+  text-decoration: none;
+  font-size: 13px;
+  word-break: break-all;
+}
+
+.conn-link:hover {
+  text-decoration: underline;
+}
+
+.conn-command {
+  margin-top: 8px;
+  padding: 8px 10px;
+  background: #f7f8fa;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  color: #4e5969;
+  word-break: break-all;
+}
+
+.conn-empty {
+  color: #c0c4cc;
+  font-size: 13px;
+  text-align: center;
+  padding: 16px 0;
+}
+
+@media (max-width: 1000px) {
+  .resource-cards { grid-template-columns: repeat(2, 1fr); }
+  .connection-cards { grid-template-columns: 1fr; }
 }
 </style>

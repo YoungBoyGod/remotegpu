@@ -12,13 +12,12 @@ import (
 const (
 	// hostStatusKeyPrefix Redis key 前缀
 	hostStatusKeyPrefix = "host:status:"
-	// hostStatusTTL 设备状态缓存 TTL，超过此时间未续期视为离线
-	hostStatusTTL = 90 * time.Second
 )
 
 // HostStatusCache 设备实时状态缓存
 type HostStatusCache struct {
 	cache cache.Cache
+	ttl   time.Duration // 心跳 TTL，与 HeartbeatMonitor 超时保持一致
 }
 
 // CachedHostStatus 缓存中的设备状态
@@ -32,9 +31,9 @@ type CachedHostStatus struct {
 	GPUCount       int       `json:"gpu_count,omitempty"`
 }
 
-// NewHostStatusCache 创建设备状态缓存
-func NewHostStatusCache(c cache.Cache) *HostStatusCache {
-	return &HostStatusCache{cache: c}
+// NewHostStatusCache 创建设备状态缓存，ttl 应与心跳超时配置保持一致
+func NewHostStatusCache(c cache.Cache, ttl time.Duration) *HostStatusCache {
+	return &HostStatusCache{cache: c, ttl: ttl}
 }
 
 func hostStatusKey(hostID string) string {
@@ -47,7 +46,7 @@ func (h *HostStatusCache) SetOnline(ctx context.Context, status *CachedHostStatu
 	if err != nil {
 		return fmt.Errorf("序列化设备状态失败: %w", err)
 	}
-	return h.cache.Set(ctx, hostStatusKey(status.HostID), string(data), hostStatusTTL)
+	return h.cache.Set(ctx, hostStatusKey(status.HostID), string(data), h.ttl)
 }
 
 // Get 从 Redis 读取设备实时状态，key 不存在返回 nil

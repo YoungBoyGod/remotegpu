@@ -68,6 +68,11 @@ func (s *OpsService) DeleteAlertRule(ctx context.Context, id uint) error {
 	return s.opsDao.DeleteAlertRule(ctx, id)
 }
 
+// ToggleAlertRule 切换告警规则启用状态
+func (s *OpsService) ToggleAlertRule(ctx context.Context, id uint) (*entity.AlertRule, error) {
+	return s.opsDao.ToggleAlertRule(ctx, id)
+}
+
 // ListAlertRules 分页查询告警规则
 func (s *OpsService) ListAlertRules(ctx context.Context, page, pageSize int, severity string, enabled *bool) ([]entity.AlertRule, int64, error) {
 	return s.opsDao.ListAlertRules(ctx, page, pageSize, severity, enabled)

@@ -215,23 +215,28 @@ onMounted(() => {
 <style scoped>
 .allocation-list {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
   margin: 0;
 }
 
 .filter-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 </style>

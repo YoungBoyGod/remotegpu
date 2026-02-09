@@ -375,6 +375,8 @@ onMounted(() => {
 <style scoped>
 .customer-detail {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .info-card {

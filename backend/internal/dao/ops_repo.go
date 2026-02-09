@@ -106,6 +106,20 @@ func (d *OpsDao) DeleteAlertRule(ctx context.Context, id uint) error {
 	return d.db.WithContext(ctx).Delete(&entity.AlertRule{}, "id = ?", id).Error
 }
 
+// ToggleAlertRule 切换告警规则启用状态
+func (d *OpsDao) ToggleAlertRule(ctx context.Context, id uint) (*entity.AlertRule, error) {
+	var rule entity.AlertRule
+	err := d.db.WithContext(ctx).First(&rule, "id = ?", id).Error
+	if err != nil {
+		return nil, err
+	}
+	rule.Enabled = !rule.Enabled
+	if err := d.db.WithContext(ctx).Model(&rule).Update("enabled", rule.Enabled).Error; err != nil {
+		return nil, err
+	}
+	return &rule, nil
+}
+
 // ListAlertRules 分页查询告警规则
 func (d *OpsDao) ListAlertRules(ctx context.Context, page, pageSize int, severity string, enabled *bool) ([]entity.AlertRule, int64, error) {
 	var rules []entity.AlertRule

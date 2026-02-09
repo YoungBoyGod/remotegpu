@@ -150,7 +150,7 @@ const getCustomerName = (customer: Customer) => {
 }
 
 const getContactName = (customer: Customer) => {
-  return customer.full_name || customer.display_name || customer.contactPerson || customer.username || '-'
+  return customer.full_name || customer.display_name || customer.contact_person || customer.username || '-'
 }
 
 const getRowIndex = (index: number) => {
@@ -175,7 +175,9 @@ onMounted(() => {
         <el-form-item label="状态">
           <el-select v-model="filters.status" placeholder="全部状态" clearable style="width: 120px">
             <el-option label="正常" value="active" />
+            <el-option label="未激活" value="pending" />
             <el-option label="已禁用" value="disabled" />
+            <el-option label="已停用" value="suspended" />
             <el-option label="已删除" value="deleted" />
           </el-select>
         </el-form-item>
@@ -237,7 +239,7 @@ onMounted(() => {
           <el-button v-if="row.status === 'active'" link type="warning" size="small" @click="handleDisable(row)">
             禁用
           </el-button>
-          <el-button v-if="row.status === 'disabled'" link type="success" size="small" @click="handleEnable(row)">
+          <el-button v-if="row.status === 'disabled' || row.status === 'suspended'" link type="success" size="small" @click="handleEnable(row)">
             启用
           </el-button>
         </template>
@@ -249,23 +251,28 @@ onMounted(() => {
 <style scoped>
 .customer-list {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
   margin: 0;
 }
 
 .filter-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 </style>

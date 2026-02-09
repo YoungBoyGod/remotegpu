@@ -22,12 +22,12 @@ func NewEnvironmentController(svc *serviceEnvironment.EnvironmentService) *Envir
 
 // getCustomerID 从上下文获取当前登录用户 ID
 func (c *EnvironmentController) getCustomerID(ctx *gin.Context) (uint, bool) {
-	userID, exists := ctx.Get("userID")
-	if !exists {
+	userID := ctx.GetUint("userID")
+	if userID == 0 {
 		c.Error(ctx, 401, "未认证")
 		return 0, false
 	}
-	return userID.(uint), true
+	return userID, true
 }
 
 // Create 创建环境

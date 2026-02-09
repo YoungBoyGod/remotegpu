@@ -264,6 +264,8 @@ onMounted(() => {
 <style scoped>
 .image-list {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .filter-card {

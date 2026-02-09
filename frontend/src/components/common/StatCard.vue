@@ -70,42 +70,73 @@ const trendIcon = computed(() => {
 <style scoped>
 .stat-card {
   background: #fff;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  transition: all 0.3s;
+  border-radius: 12px;
+  padding: 22px 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
   border-left: 4px solid;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  opacity: 0.06;
+  transform: translate(20px, -20px);
 }
 
 .stat-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px);
 }
 
 .stat-card-primary {
   border-left-color: #409eff;
 }
+.stat-card-primary::after {
+  background: #409eff;
+}
 
 .stat-card-success {
   border-left-color: #67c23a;
+}
+.stat-card-success::after {
+  background: #67c23a;
 }
 
 .stat-card-warning {
   border-left-color: #e6a23c;
 }
+.stat-card-warning::after {
+  background: #e6a23c;
+}
 
 .stat-card-danger {
   border-left-color: #f56c6c;
+}
+.stat-card-danger::after {
+  background: #f56c6c;
 }
 
 .stat-card-info {
   border-left-color: #909399;
 }
+.stat-card-info::after {
+  background: #909399;
+}
 
 .stat-card-content {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  position: relative;
+  z-index: 1;
 }
 
 .stat-card-header {
@@ -115,14 +146,15 @@ const trendIcon = computed(() => {
 }
 
 .stat-card-title {
-  font-size: 14px;
+  font-size: 13px;
   color: #909399;
   font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 .stat-card-icon {
-  font-size: 24px;
-  opacity: 0.6;
+  font-size: 26px;
+  opacity: 0.7;
 }
 
 .stat-card-body {
@@ -132,10 +164,11 @@ const trendIcon = computed(() => {
 }
 
 .stat-card-value {
-  font-size: 28px;
+  font-size: 30px;
   font-weight: 700;
-  color: #303133;
+  color: #1d2129;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
 }
 
 .stat-card-trend {
@@ -150,7 +183,7 @@ const trendIcon = computed(() => {
 
 .trend-up {
   color: #67c23a;
-  background: #f0f9ff;
+  background: #f0f9eb;
 }
 
 .trend-down {

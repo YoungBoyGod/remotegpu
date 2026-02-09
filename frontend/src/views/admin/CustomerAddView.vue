@@ -107,6 +107,8 @@ const handleCancel = () => {
 <style scoped>
 .customer-add {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
@@ -114,9 +116,9 @@ const handleCancel = () => {
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
   margin: 0;
 }
 </style>

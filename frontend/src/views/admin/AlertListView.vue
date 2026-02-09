@@ -541,6 +541,8 @@ onMounted(() => {
 <style scoped>
 .alert-center {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .filter-card {

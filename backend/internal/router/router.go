@@ -107,8 +107,13 @@ func InitRouter(r *gin.Engine) {
 	authSvc := serviceAuth.NewAuthService(db, cache.GetCache())
 	machineSvc := serviceMachine.NewMachineService(db)
 	// 注入 Redis 设备状态缓存
+	// 使用心跳监控配置的超时值作为 Redis TTL，确保超时判断一致
+	heartbeatTimeout := time.Duration(config.GlobalConfig.HeartbeatMonitor.Timeout) * time.Second
+	if heartbeatTimeout == 0 {
+		heartbeatTimeout = 180 * time.Second // 默认 180 秒
+	}
 	if c := cache.GetCache(); c != nil {
-		hostStatusCache := serviceMachine.NewHostStatusCache(c)
+		hostStatusCache := serviceMachine.NewHostStatusCache(c, heartbeatTimeout)
 		machineSvc.SetStatusCache(hostStatusCache)
 		// 启动定时同步（每 1 分钟将 Redis 状态同步到 PostgreSQL）
 		syncer := serviceMachine.NewHostStatusSyncer(db, hostStatusCache, 1*time.Minute)
@@ -268,6 +273,7 @@ func InitRouter(r *gin.Engine) {
 			adminGroup.POST("/alert-rules", alertController.CreateRule)
 			adminGroup.PUT("/alert-rules/:id", alertController.UpdateRule)
 			adminGroup.DELETE("/alert-rules/:id", alertController.DeleteRule)
+			adminGroup.POST("/alert-rules/:id/toggle", alertController.ToggleRule)
 
 			// 审计日志
 			adminGroup.GET("/audit/logs", auditController.List)

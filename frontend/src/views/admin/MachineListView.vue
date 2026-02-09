@@ -311,7 +311,8 @@ const handleAllocate = async (machine: Machine) => {
   // 加载客户列表
   try {
     const response = await getCustomerList({ page: 1, pageSize: 100 })
-    customers.value = response.data.list || []
+    // 只显示正常状态的客户
+    customers.value = (response.data.list || []).filter((c: Customer) => c.status === 'active')
   } catch (error) {
     console.error('加载客户列表失败:', error)
   }
@@ -389,7 +390,8 @@ const handleBatchAllocate = async () => {
   batchAllocateDialogVisible.value = true
   try {
     const response = await getCustomerList({ page: 1, pageSize: 100 })
-    customers.value = response.data.list || []
+    // 只显示正常状态的客户
+    customers.value = (response.data.list || []).filter((c: Customer) => c.status === 'active')
   } catch (error) {
     console.error('加载客户列表失败:', error)
   }
@@ -795,24 +797,29 @@ onMounted(() => {
 <style scoped>
 .machine-list {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
   margin: 0;
 }
 
 .filter-card {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .selection-count {
@@ -852,9 +859,9 @@ onMounted(() => {
   gap: 10px;
   padding: 10px 16px;
   margin-bottom: 8px;
-  background: #f5f7fa;
-  border: 1px solid #e4e7ed;
-  border-radius: 6px;
+  background: #f0f1f5;
+  border: 1px solid #e5e6eb;
+  border-radius: 8px;
 }
 
 .select-all-label {
@@ -864,21 +871,21 @@ onMounted(() => {
 }
 
 .machine-row {
-  border: 1px solid #e4e7ed;
-  border-radius: 8px;
+  border: 1px solid #e5e6eb;
+  border-radius: 10px;
   background: #fff;
   margin-bottom: 12px;
   transition: box-shadow 0.2s, border-color 0.2s;
 }
 
 .machine-row:hover {
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
-  border-color: #c0c4cc;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+  border-color: #c9cdd4;
 }
 
 .machine-row.is-selected {
   border-color: #409eff;
-  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.15);
+  box-shadow: 0 0 0 2px rgba(64, 158, 255, 0.12);
 }
 
 /* 顶栏 */
@@ -886,12 +893,12 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-  padding: 12px 20px;
+  padding: 14px 20px;
 }
 
 .row-index {
   font-size: 13px;
-  color: #909399;
+  color: #86909c;
   min-width: 20px;
   text-align: center;
   flex-shrink: 0;
@@ -913,23 +920,25 @@ onMounted(() => {
 /* 三栏布局 */
 .row-body {
   display: flex;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid #f2f3f5;
 }
 
 .body-col {
   flex: 1;
-  padding: 10px 20px;
+  padding: 12px 20px;
 }
 
 .body-col + .body-col {
-  border-left: 1px solid #ebeef5;
+  border-left: 1px solid #f2f3f5;
 }
 
 .col-title {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
-  color: #909399;
-  margin-bottom: 8px;
+  color: #86909c;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .spec-row {
@@ -941,14 +950,14 @@ onMounted(() => {
 }
 
 .spec-label {
-  color: #909399;
+  color: #86909c;
   font-size: 12px;
   min-width: 32px;
   flex-shrink: 0;
 }
 
 .spec-value {
-  color: #303133;
+  color: #1d2129;
 }
 
 /* 连接信息行 */
@@ -957,36 +966,36 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #606266;
-  padding: 4px 0;
-  border-top: 1px dashed #f0f0f0;
+  color: #4e5969;
+  padding: 5px 0;
+  border-top: 1px dashed #f2f3f5;
 }
 
 .conn-line:first-child {
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid #f2f3f5;
 }
 
 .conn-tag {
   display: inline-block;
   min-width: 52px;
   text-align: center;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   color: #409eff;
-  background: #ecf5ff;
+  background: #e8f3ff;
   padding: 2px 8px;
-  border-radius: 3px;
+  border-radius: 4px;
   flex-shrink: 0;
 }
 
 .conn-tag-jupyter {
   color: #e6a23c;
-  background: #fdf6ec;
+  background: #fff7e6;
 }
 
 .conn-tag-vnc {
   color: #67c23a;
-  background: #f0f9eb;
+  background: #e8ffea;
 }
 
 .conn-field {
@@ -997,14 +1006,14 @@ onMounted(() => {
 }
 
 .conn-label {
-  color: #909399;
+  color: #86909c;
   flex-shrink: 0;
 }
 
 .conn-empty {
-  color: #c0c4cc;
+  color: #c9cdd4;
   font-size: 13px;
-  border-top: 1px solid #f0f0f0;
+  border-top: 1px solid #f2f3f5;
   padding: 4px 0;
 }
 
@@ -1030,17 +1039,17 @@ onMounted(() => {
 
 .conn-tag-ext {
   color: #f56c6c;
-  background: #fef0f0;
+  background: #ffece8;
 }
 
 .password-text {
-  font-family: monospace;
+  font-family: 'SF Mono', 'Fira Code', monospace;
   font-size: 13px;
-  color: #303133;
+  color: #1d2129;
 }
 
 .text-muted {
-  color: #c0c4cc;
+  color: #c9cdd4;
 }
 
 /* 分页 */

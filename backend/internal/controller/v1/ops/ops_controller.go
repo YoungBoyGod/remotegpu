@@ -362,6 +362,33 @@ func (c *AlertController) UpdateRule(ctx *gin.Context) {
 	c.Success(ctx, gin.H{"message": "告警规则已更新"})
 }
 
+// ToggleRule 切换告警规则启用状态
+// @Summary 切换告警规则启用状态
+// @Description 切换指定告警规则的启用/禁用状态
+// @Tags Admin - Alert Rules
+// @Produce json
+// @Param id path int true "规则 ID"
+// @Security Bearer
+// @Success 200 {object} entity.AlertRule
+// @Failure 400 {object} common.ErrorResponse
+// @Failure 500 {object} common.ErrorResponse
+// @Router /admin/alert-rules/{id}/toggle [post]
+func (c *AlertController) ToggleRule(ctx *gin.Context) {
+	idStr := ctx.Param("id")
+	id, err := strconv.ParseUint(idStr, 10, 64)
+	if err != nil {
+		c.Error(ctx, 400, "无效的规则 ID")
+		return
+	}
+
+	rule, err := c.opsService.ToggleAlertRule(ctx, uint(id))
+	if err != nil {
+		c.Error(ctx, 500, "切换告警规则状态失败")
+		return
+	}
+	c.Success(ctx, rule)
+}
+
 // DeleteRule 删除告警规则
 // @Summary 删除告警规则
 // @Description 根据规则 ID 删除告警规则

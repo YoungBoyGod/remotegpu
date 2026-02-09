@@ -131,6 +131,8 @@ onMounted(() => {
 <style scoped>
 .agent-list-view {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .stat-cards {

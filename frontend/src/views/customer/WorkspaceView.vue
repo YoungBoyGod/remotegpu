@@ -281,11 +281,30 @@ onMounted(() => {
 <style scoped>
 .workspace-view {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .pagination {
   margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+:deep(.el-table th) {
+  background: #f7f8fa !important;
+  color: #4e5969;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+:deep(.el-table td) {
+  font-size: 13px;
+  color: #1d2129;
 }
 </style>

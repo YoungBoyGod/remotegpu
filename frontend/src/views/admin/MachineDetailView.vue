@@ -440,6 +440,8 @@ onMounted(() => {
 <style scoped>
 .machine-detail {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {

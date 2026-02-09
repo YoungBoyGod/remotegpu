@@ -69,8 +69,27 @@ const handleSizeChange = (size: number) => {
 <style scoped>
 .data-table {
   background: white;
-  border-radius: 4px;
-  padding: 20px;
+  border-radius: 8px;
+  padding: 20px 24px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+}
+
+.data-table :deep(.el-table) {
+  --el-table-border-color: #ebeef5;
+  --el-table-header-bg-color: #f8f9fc;
+  --el-table-row-hover-bg-color: #f5f7ff;
+}
+
+.data-table :deep(.el-table th.el-table__cell) {
+  font-weight: 600;
+  font-size: 13px;
+  color: #606266;
+  padding: 14px 0;
+}
+
+.data-table :deep(.el-table td.el-table__cell) {
+  padding: 12px 0;
+  font-size: 13px;
 }
 
 .pagination {

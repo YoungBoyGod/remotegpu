@@ -176,6 +176,8 @@ onMounted(() => {
 <style scoped>
 .customer-dashboard {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
@@ -183,34 +185,37 @@ onMounted(() => {
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0 0 8px 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
+  margin: 0 0 6px 0;
 }
 
 .page-description {
   font-size: 14px;
-  color: #909399;
+  color: #86909c;
   margin: 0;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
-  margin-bottom: 24px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .quick-actions-card,
 .activities-card {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: #1d2129;
 }
 
 .card-header {
@@ -221,35 +226,42 @@ onMounted(() => {
 
 .quick-actions {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 12px;
 }
 
 .action-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 24px;
-  background: #f5f7fa;
+  padding: 20px 12px;
+  background: #f7f8fa;
   border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .action-item:hover {
-  background: #e6f7ff;
+  background: #ecf5ff;
+  border-color: #c6e2ff;
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
 }
 
 .action-icon {
-  font-size: 32px;
-  margin-bottom: 12px;
+  font-size: 28px;
+  margin-bottom: 10px;
 }
 
 .action-title {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
-  color: #303133;
+  color: #4e5969;
+}
+
+@media (max-width: 1200px) {
+  .stats-grid { grid-template-columns: repeat(2, 1fr); }
+  .quick-actions { grid-template-columns: repeat(3, 1fr); }
 }
 </style>

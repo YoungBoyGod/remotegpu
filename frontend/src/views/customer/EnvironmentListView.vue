@@ -340,21 +340,26 @@ onMounted(() => {
 <style scoped>
 .environment-list {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .environment-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
-  gap: 20px;
+  gap: 16px;
   margin-bottom: 24px;
 }
 
 .environment-card {
-  transition: all 0.3s;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s;
 }
 
 .environment-card:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   transform: translateY(-2px);
 }
 
@@ -365,7 +370,7 @@ onMounted(() => {
 }
 
 .env-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -385,13 +390,13 @@ onMounted(() => {
 }
 
 .config-label {
-  color: #909399;
-  font-size: 14px;
+  color: #86909c;
+  font-size: 13px;
 }
 
 .config-value {
-  color: #303133;
-  font-size: 14px;
+  color: #1d2129;
+  font-size: 13px;
   font-weight: 500;
 }
 

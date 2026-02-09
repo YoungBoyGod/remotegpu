@@ -277,6 +277,8 @@ onMounted(() => {
 <style scoped>
 .audit-log-view {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .filter-card {

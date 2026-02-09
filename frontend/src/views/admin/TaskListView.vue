@@ -672,6 +672,8 @@ onUnmounted(() => {
 <style scoped>
 .task-list-view {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .stats-row {
@@ -683,9 +685,9 @@ onUnmounted(() => {
 .stat-item {
   flex: 1;
   background: #fff;
-  border-radius: 8px;
+  border-radius: 10px;
   padding: 16px 20px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   border-left: 3px solid #909399;
 }
 
@@ -697,12 +699,12 @@ onUnmounted(() => {
 .stat-value {
   font-size: 24px;
   font-weight: 700;
-  color: #303133;
+  color: #1d2129;
 }
 
 .stat-label {
   font-size: 13px;
-  color: #909399;
+  color: #86909c;
   margin-top: 4px;
 }
 

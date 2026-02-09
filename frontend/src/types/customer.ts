@@ -20,15 +20,13 @@ export interface Customer {
   last_login_at?: string
 
   name?: string
-  contactPerson?: string  // 联系人
-  contactEmail?: string  // 联系邮箱
-  contactPhone?: string  // 联系电话
-  tenantId?: number
-  allocatedMachines?: number  // 分配的机器数量
-  storageUsed?: number  // 已用存储（GB）
-  storageQuota?: number  // 存储配额（GB）
-  createdAt?: string
-  lastLoginAt?: string
+  contact_person?: string  // 联系人
+  contact_email?: string  // 联系邮箱
+  contact_phone?: string  // 联系电话
+  tenant_id?: number
+  allocated_machines?: number  // 分配的机器数量
+  storage_used?: number  // 已用存储（GB）
+  storage_quota?: number  // 存储配额（GB）
 }
 
 // 客户分配的机器信息（来自后端 GetCustomerDetail）

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getMachineList, getCustomerList, assignMachine } from '@/api/admin'
+import { getMachineList, getCustomerList, allocateMachine } from '@/api/admin'
 import type { Machine } from '@/types/machine'
 import type { Customer } from '@/types/customer'
 import { ElMessage } from 'element-plus'
@@ -38,7 +38,8 @@ const notifyOptions = [
 const loadMachines = async () => {
   try {
     const response = await getMachineList({ page: 1, pageSize: 1000 })
-    machines.value = response.data.list
+    // 只显示空闲状态的机器，已分配和维护中的不可选
+    machines.value = response.data.list.filter((m: Machine) => m.allocation_status === 'idle')
   } catch (error) {
     console.error('加载机器列表失败:', error)
   }
@@ -80,17 +81,14 @@ const handleSubmit = async () => {
       + (endDate.getMonth() - startDate.getMonth())
     const durationMonths = Math.max(diffMonths, 1)
 
+    // 只发送后端 AllocateRequest 接受的字段
     const payload = {
       customer_id: formData.value.customerId!,
       duration_months: durationMonths,
-      start_time: formData.value.dateRange[0],
-      end_time: formData.value.dateRange[1],
-      contact_person: formData.value.contactPerson || undefined,
-      notify_methods: formData.value.notifyMethods.length > 0 ? formData.value.notifyMethods : undefined,
       remark: formData.value.remark || undefined
     }
     const results = await Promise.allSettled(
-      formData.value.machineIds.map(id => assignMachine(id, payload))
+      formData.value.machineIds.map(id => allocateMachine(id, payload))
     )
     const failed = results.filter(r => r.status === 'rejected')
     if (failed.length === 0) {
@@ -221,6 +219,8 @@ onMounted(() => {
 <style scoped>
 .machine-allocate {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
@@ -228,9 +228,9 @@ onMounted(() => {
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
   margin: 0;
 }
 </style>

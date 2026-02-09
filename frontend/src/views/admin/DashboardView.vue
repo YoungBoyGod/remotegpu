@@ -328,29 +328,31 @@ onUnmounted(() => {
 <style scoped>
 .admin-dashboard {
   padding: 24px;
+  background: #f5f7fa;
+  min-height: 100%;
 }
 
 .page-header {
-  margin-bottom: 24px;
+  margin-bottom: 28px;
 }
 
 .page-title {
-  font-size: 24px;
-  font-weight: 600;
-  color: #303133;
-  margin: 0 0 8px 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1d2129;
+  margin: 0 0 6px 0;
 }
 
 .page-description {
   font-size: 14px;
-  color: #909399;
+  color: #86909c;
   margin: 0;
 }
 
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
   margin-bottom: 24px;
 }
 
@@ -360,6 +362,9 @@ onUnmounted(() => {
 
 .content-card {
   height: 100%;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .card-header {
@@ -369,9 +374,9 @@ onUnmounted(() => {
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
-  color: #303133;
+  color: #1d2129;
 }
 
 /* 利用率概览 */
@@ -381,25 +386,28 @@ onUnmounted(() => {
 
 .utilization-card {
   height: 100%;
+  border-radius: 8px;
+  border: none;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
 }
 
 .utilization-item {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .utilization-label {
   font-size: 14px;
-  font-weight: 500;
-  color: #606266;
+  font-weight: 600;
+  color: #4e5969;
 }
 
 /* GPU 趋势图 */
 .gpu-trend-chart {
   display: flex;
   gap: 8px;
-  padding: 8px 0;
+  padding: 12px 0;
 }
 
 .trend-y-axis {
@@ -407,7 +415,7 @@ onUnmounted(() => {
   flex-direction: column;
   justify-content: space-between;
   font-size: 11px;
-  color: #909399;
+  color: #86909c;
   padding-bottom: 22px;
   min-width: 36px;
   text-align: right;
@@ -416,7 +424,7 @@ onUnmounted(() => {
 .trend-bars {
   display: flex;
   align-items: flex-end;
-  gap: 8px;
+  gap: 6px;
   height: 180px;
   flex: 1;
 }
@@ -448,13 +456,13 @@ onUnmounted(() => {
 .trend-bar {
   width: 70%;
   min-height: 2px;
-  border-radius: 3px 3px 0 0;
-  transition: height 0.3s, background 0.3s;
+  border-radius: 4px 4px 0 0;
+  transition: height 0.4s ease, background 0.3s;
 }
 
 .trend-bar-label {
   font-size: 11px;
-  color: #909399;
+  color: #86909c;
   margin-top: 6px;
   white-space: nowrap;
 }
@@ -470,8 +478,13 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px;
-  border-bottom: 1px solid #ebeef5;
+  padding: 14px 12px;
+  border-bottom: 1px solid #f2f3f5;
+  transition: background 0.2s;
+}
+
+.allocation-item:hover {
+  background: #f7f8fa;
 }
 
 .allocation-item:last-child {
@@ -486,21 +499,21 @@ onUnmounted(() => {
 }
 
 .allocation-machine {
-  color: #303133;
-  font-weight: 500;
+  color: #1d2129;
+  font-weight: 600;
 }
 
 .allocation-arrow {
-  color: #c0c4cc;
+  color: #c9cdd4;
 }
 
 .allocation-customer {
-  color: #606266;
+  color: #4e5969;
 }
 
 .allocation-company {
   font-size: 12px;
-  color: #909399;
+  color: #86909c;
 }
 
 .allocation-meta {
@@ -511,6 +524,6 @@ onUnmounted(() => {
 
 .allocation-time {
   font-size: 12px;
-  color: #909399;
+  color: #86909c;
 }
 </style>
