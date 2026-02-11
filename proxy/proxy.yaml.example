@@ -1,0 +1,30 @@
+# RemoteGPU Proxy 配置文件示例
+
+# 管理 API 监听端口
+port: 9090
+
+# 后端服务器配置
+server:
+  url: "http://localhost:8080"
+  proxy_id: "proxy-001"
+  token: "your-proxy-token"
+  timeout: 30s
+
+# 端口池配置
+port_pool:
+  range_start: 20000
+  range_end: 60000
+
+# 心跳配置
+heartbeat:
+  interval: 30s
+
+# HTTP 反向代理配置
+http_proxy:
+  enabled: false
+  port: 9091
+
+# 网络配置
+network:
+  inner_ip: "192.168.1.100"
+  outer_ip: "1.2.3.4"

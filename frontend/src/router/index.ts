@@ -169,6 +169,13 @@ const router = createRouter({
           component: () => import('@/views/DocumentCenterView.vue'),
           meta: { title: '文档中心' },
         },
+        // Proxy 管理
+        {
+          path: 'proxy',
+          name: 'admin-proxy',
+          component: () => import('@/views/admin/ProxyListView.vue'),
+          meta: { title: 'Proxy 管理' },
+        },
         {
           path: ':pathMatch(.*)*',
           name: 'admin-coming-soon',

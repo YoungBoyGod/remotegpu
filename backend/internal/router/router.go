@@ -31,6 +31,7 @@ import (
 	serviceTask "github.com/YoungBoyGod/remotegpu/internal/service/task"
 	serviceWorkspace "github.com/YoungBoyGod/remotegpu/internal/service/workspace"
 	serviceEnvironment "github.com/YoungBoyGod/remotegpu/internal/service/environment"
+	serviceProxy "github.com/YoungBoyGod/remotegpu/internal/service/proxy"
 
 	// 控制器层
 	ctrlAuth "github.com/YoungBoyGod/remotegpu/internal/controller/v1/auth"
@@ -48,6 +49,7 @@ import (
 	ctrlWorkspace "github.com/YoungBoyGod/remotegpu/internal/controller/v1/workspace"
 	ctrlEnvironment "github.com/YoungBoyGod/remotegpu/internal/controller/v1/environment"
 	ctrlAllocation "github.com/YoungBoyGod/remotegpu/internal/controller/v1/allocation"
+	ctrlProxy "github.com/YoungBoyGod/remotegpu/internal/controller/v1/proxy"
 )
 
 // agentAdapter 适配器，将 AgentService 转换为 AgentSystemInfoProvider 接口
@@ -170,6 +172,7 @@ func InitRouter(r *gin.Engine) {
 	dashboardSvc := serviceOps.NewDashboardService(machineSvc, custSvc, allocSvc, promClient)
 	workspaceSvc := serviceWorkspace.NewWorkspaceService(db)
 	environmentSvc := serviceEnvironment.NewEnvironmentService(db)
+	proxySvc := serviceProxy.NewProxyService(db)
 
 	// --- 控制器层初始化 ---
 	authController := ctrlAuth.NewAuthController(authSvc)
@@ -197,6 +200,7 @@ func InitRouter(r *gin.Engine) {
 	workspaceController := ctrlWorkspace.NewWorkspaceController(workspaceSvc)
 	environmentController := ctrlEnvironment.NewEnvironmentController(environmentSvc)
 	allocationController := ctrlAllocation.NewAllocationController(allocSvc)
+	proxyController := ctrlProxy.NewProxyController(proxySvc)
 
 	// API v1 路由
 	apiV1 := r.Group("/api/v1")
@@ -320,6 +324,12 @@ func InitRouter(r *gin.Engine) {
 			adminGroup.GET("/storage/files", storageController.ListFiles)
 			adminGroup.POST("/storage/files/delete", storageController.DeleteFile)
 			adminGroup.GET("/storage/files/download-url", storageController.GetDownloadURL)
+
+			// Proxy 管理
+			adminGroup.GET("/proxy/nodes", proxyController.ListNodes)
+			adminGroup.GET("/proxy/nodes/:id", proxyController.GetNode)
+			adminGroup.DELETE("/proxy/nodes/:id", proxyController.DeleteNode)
+			adminGroup.GET("/proxy/mappings", proxyController.ListMappings)
 		}
 
 		// 3. Customer Module (Protected)
@@ -398,6 +408,14 @@ func InitRouter(r *gin.Engine) {
 			agentGroup.POST("/tasks/:id/lease/renew", agentTaskController.RenewLease)
 			agentGroup.POST("/tasks/:id/complete", agentTaskController.CompleteTask)
 			agentGroup.POST("/tasks/:id/progress", agentTaskController.ReportProgress)
+		}
+
+		// 5. Proxy Module (Proxy 专用 API，需要 Agent Token 认证)
+		proxyGroup := apiV1.Group("/proxy")
+		proxyGroup.Use(middleware.AgentAuth())
+		{
+			proxyGroup.POST("/register", proxyController.Register)
+			proxyGroup.POST("/heartbeat", proxyController.Heartbeat)
 		}
 	}
 }

@@ -1,0 +1,25 @@
+version: '3.8'
+
+services:
+  remotegpu-proxy:
+    image: remotegpu-proxy:latest
+    build:
+      context: ../../proxy
+      dockerfile: Dockerfile
+    container_name: remotegpu-proxy
+    ports:
+      - "9090:9090"       # 管理 API
+      - "9091:9091"       # HTTP 反向代理
+      - "20000-60000:20000-60000"  # TCP 转发端口池
+    volumes:
+      - ./proxy.yaml:/etc/remotegpu-proxy/proxy.yaml:ro
+    environment:
+      - PROXY_PORT=9090
+      - SERVER_URL=http://remotegpu-backend:8080
+    restart: unless-stopped
+    networks:
+      - remotegpu
+
+networks:
+  remotegpu:
+    external: true

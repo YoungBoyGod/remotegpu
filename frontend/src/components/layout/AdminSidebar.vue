@@ -13,7 +13,8 @@ import {
   ArrowRight,
   ArrowDown,
   FolderOpened,
-  Document
+  Document,
+  Switch
 } from '@element-plus/icons-vue'
 
 interface MenuItem {
@@ -89,6 +90,12 @@ const menuItems: MenuItem[] = [
     title: 'Agent 管理',
     icon: Connection,
     path: '/admin/agents'
+  },
+  {
+    id: 'proxy',
+    title: 'Proxy 管理',
+    icon: Switch,
+    path: '/admin/proxy'
   },
   {
     id: 'storage',

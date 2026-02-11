@@ -56,6 +56,12 @@ type PortMapping struct {
 	Status       string    `gorm:"type:varchar(20);default:'active'" json:"status"` // active, released
 	AllocatedAt  time.Time `gorm:"default:CURRENT_TIMESTAMP" json:"allocated_at"`
 	ReleasedAt   *time.Time `json:"released_at"`
+
+	// Proxy 相关字段
+	ProxyID    string `gorm:"type:varchar(64)" json:"proxy_id"`
+	TargetHost string `gorm:"type:varchar(256)" json:"target_host"`
+	TargetPort int    `json:"target_port"`
+	Protocol   string `gorm:"type:varchar(10);default:'tcp'" json:"protocol"`
 }
 
 func (PortMapping) TableName() string {
